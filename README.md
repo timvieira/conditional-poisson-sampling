@@ -1,10 +1,12 @@
 # Conditional Poisson Sampling
 
-A NumPy implementation of the **conditional Poisson distribution** over fixed-size subsets:
+Sample random subsets of exactly $n$ items from a universe of $N$, where each item $i$ has a specified inclusion probability $\pi_i$.
 
-$$P(S; \theta) = \frac{\exp \bigl(\sum_{i \in S} \theta_i\bigr)}{e_n(\exp \theta)}, \quad |S| = n$$
+Given positive weights $q_1, \dots, q_N$, the probability of drawing a particular subset $S$ of size $n$ is proportional to the product of its weights:
 
-where $e_n$ is the $n$-th elementary symmetric polynomial.
+$$P(S) \propto \prod_{i \in S} q_i, \quad \lvert S \rvert = n$$
+
+This is the **conditional Poisson distribution** (also called the *exponential* or *maximum-entropy* fixed-size design). It is the unique maximum-entropy distribution over size-$n$ subsets for given marginal inclusion probabilities — the fixed-size analogue of independent Bernoulli sampling.
 
 ## Installation
 
@@ -26,7 +28,7 @@ from conditional_poisson import ConditionalPoisson
 q = np.array([1.0, 2.0, 3.0, 0.5, 1.5])
 cp = ConditionalPoisson.from_weights(n=2, q=q)
 
-# Inclusion probabilities
+# Inclusion probabilities: P(item i is in the sample)
 print(cp.pi)          # shape (5,), sums to n=2
 
 # Log-normalizer
@@ -35,7 +37,7 @@ print(cp.log_normalizer)
 # Sample 1000 subsets of size 2
 samples = cp.sample(1000, rng=42)   # shape (1000, 2)
 
-# Log-probability of a subset
+# Log-probability of a specific subset
 print(cp.log_prob([0, 3]))
 
 # Hessian-vector product: Cov[Z] v
@@ -47,12 +49,14 @@ print(cp.hvp(v))
 
 | Constructor | Description |
 |---|---|
-| `ConditionalPoisson(n, theta)` | Direct from log-weights $\theta$ |
-| `ConditionalPoisson.uniform(N, n)` | Uniform inclusion probabilities $n/N$ |
-| `ConditionalPoisson.from_weights(n, q)` | From positive weights $q_i = \exp(\theta_i)$ |
-| `ConditionalPoisson.fit(pi_star, n)` | Fit $\theta$ to target inclusion probabilities |
+| `ConditionalPoisson(n, theta)` | Direct from log-weights $\theta_i = \log q_i$ |
+| `ConditionalPoisson.uniform(N, n)` | Uniform: every item has inclusion probability $n/N$ |
+| `ConditionalPoisson.from_weights(n, q)` | From positive weights $q_i$ |
+| `ConditionalPoisson.fit(pi_star, n)` | Find weights that produce target inclusion probabilities $\pi^{\ast}$ |
 
 ### Fitting to target probabilities
+
+A common use case: you have desired inclusion probabilities and need to find weights that achieve them.
 
 ```python
 pi_star = np.array([0.6, 0.4, 0.8, 0.3, 0.9])  # must sum to n
@@ -60,18 +64,21 @@ cp = ConditionalPoisson.fit(pi_star, n=3, tol=1e-10, verbose=True)
 print(np.max(np.abs(cp.pi - pi_star)))  # should be < tol
 ```
 
-## Algorithm
+This solves a convex optimization problem (Newton-CG with Armijo backtracking) to find $\theta$ such that the resulting inclusion probabilities match $\pi^{\ast}$.
 
-All operations are built on a single **augmented polynomial product tree** over the factors $(1 + q_i z)$.
+## How it works
 
-- **Upward pass** builds the P-tree: $P_T(z) = \prod_{i \in T}(1 + q_i z)$ truncated to degree $n$.
-- **D-tree** (for HVP): $D_T(z) = \sum_{i \in T} q_i v_i \prod_{j \in T, j \neq i}(1 + q_j z)$, using the product rule.
-- **Downward pass** propagates leave-one-out polynomials $P^{(-i)}(z)$ and $D^{(-i)}(z)$ to each leaf.
-- **Sampling** walks the P-tree top-down, splitting a quota $k$ at each node proportional to $P_L[j] \cdot P_R[k-j]$.
+The key computational challenge is that the normalizing constant sums over all $\binom{N}{n}$ subsets — far too many to enumerate. This library uses a **polynomial product tree** to compute everything in $O(N \log^2 n)$ time.
 
-### Upward pass (P-tree)
+The idea: encoding the sum over subsets as the $n$-th coefficient of a product of polynomials. Define one polynomial per item:
 
-The P-tree computes the product polynomial $P_T(z) = \prod_{i \in T}(1 + q_i z)$ bottom-up. Each leaf holds a degree-1 factor, and internal nodes multiply their children's polynomials:
+$$(1 + q_1 z)(1 + q_2 z) \cdots (1 + q_N z)$$
+
+When you expand this product, the coefficient of $z^n$ equals the sum of all products of $n$ distinct weights — exactly the normalizing constant. This polynomial product can be computed efficiently using a binary tree.
+
+### Upward pass: building the product
+
+Each leaf holds one factor $(1 + q_i z)$. Internal nodes multiply their children's polynomials. The root holds the full product, whose $n$-th coefficient is the normalizing constant.
 
 ```mermaid
 graph BT
@@ -79,7 +86,7 @@ graph BT
     L2["leaf 2<br/>(1 + q₂z)"] --> N12
     L3["leaf 3<br/>(1 + q₃z)"] --> N34["node 3,4<br/>P₃ · P₄"]
     L4["leaf 4<br/>(1 + q₄z)"] --> N34
-    N12 --> ROOT["root<br/>P₁₂ · P₃₄ = e(z)"]
+    N12 --> ROOT["root<br/>P₁₂ · P₃₄"]
     N34 --> ROOT
 
     style ROOT fill:#4a90d9,color:#fff
@@ -91,11 +98,9 @@ graph BT
     style L4 fill:#b8d4e8,color:#000
 ```
 
-The root polynomial's $n$-th coefficient is the elementary symmetric polynomial $e_n(q)$, which is the normalizing constant.
+### Downward pass: inclusion probabilities
 
-### Downward pass (leave-one-out)
-
-The downward pass propagates "outside" polynomials top-down. At each node, the child receives the product of its parent's outside polynomial with its sibling's inside polynomial. At the leaves, this yields the leave-one-out products $P^{(-i)}(z) = \prod_{j \neq i}(1 + q_j z)$:
+To compute the inclusion probability of item $i$, we need the "leave-one-out" product — the product of all factors *except* $i$. Rather than recomputing $N$ separate products, the downward pass propagates information from the root back to the leaves. Each child receives the product of its parent's outside context with its sibling's subtree:
 
 ```mermaid
 graph TB
@@ -115,11 +120,11 @@ graph TB
     style L4 fill:#d4e8b8,color:#000
 ```
 
-The inclusion probability is then $\pi_i = q_i \cdot [z^{n-1}] P^{(-i)}(z) / e_n(q)$.
+At leaf $i$, the $(n{-}1)$-th coefficient of the leave-one-out polynomial gives the sum over all size-$(n{-}1)$ subsets from the remaining items. The inclusion probability is then $\pi_i = q_i \cdot [z^{n-1}] P^{(-i)}(z) / Z$ where $Z$ is the normalizing constant.
 
-### Sampling (top-down split)
+### Sampling: top-down quota splitting
 
-Sampling walks the P-tree top-down with a quota $k$ (initially $n$). At each internal node, the quota is split between the left and right children proportional to their polynomial coefficients:
+Sampling walks the tree top-down with a quota $k$ (starting at $n$). At each internal node, the quota is randomly split between children, weighted by their polynomial coefficients:
 
 ```mermaid
 graph TB
@@ -139,11 +144,11 @@ graph TB
     style RR fill:#b8d4e8,color:#000
 ```
 
-At each split: $P(j \text{ from left} \mid k) \propto P_L[j] \cdot P_R[k-j]$. Leaves with quota 1 are included in the sample; quota 0 are excluded.
+At each split, $j$ is drawn with probability proportional to $P_L[j] \cdot P_R[k-j]$. Leaves with quota 1 are included in the sample; quota 0 are excluded. This produces exact samples without ever building the $\binom{N}{n}$-sized probability table.
 
 ### Numerical stability
 
-Every polynomial is stored as a **ScaledPoly** `(coeffs_norm, log_scale)` with $\max \lvert c_k \rvert = 1$. FFT convolutions operate on $O(1)$-magnitude numbers, preventing float64 overflow and FFT rounding blowup. Weights are geometrically normalised before each tree build: $q \to q / \exp(\bar{\mu})$ where $\bar{\mu} = \text{mean}(\log q)$.
+Every polynomial is stored in a scaled representation `(coeffs_norm, log_scale)` with $\max \lvert c_k \rvert = 1$. FFT convolutions operate on $O(1)$-magnitude numbers, preventing float64 overflow and FFT rounding blowup. Weights are geometrically normalised before each tree build.
 
 ### Complexity
 
