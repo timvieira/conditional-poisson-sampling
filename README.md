@@ -2,9 +2,9 @@
 
 Sample random subsets of exactly $n$ items from a universe of $N$, where each item $i$ has a specified inclusion probability $\pi_i$.
 
-Given positive weights $q_1, \dots, q_N$, the probability of drawing a particular subset $S$ of size $n$ is proportional to the product of its weights:
+Given positive weights $w_1, \dots, w_N$, the probability of drawing a particular subset $S$ of size $n$ is proportional to the product of its weights:
 
-$$P(S) \propto \prod_{i \in S} q_i, \quad \lvert S \rvert = n$$
+$$P(S) \propto \prod_{i \in S} w_i, \quad \lvert S \rvert = n$$
 
 This is the **conditional Poisson distribution** (also called the *exponential* or *maximum-entropy* fixed-size design). It is the unique maximum-entropy distribution over size- $n$ subsets for given marginal inclusion probabilities — the fixed-size analogue of independent Bernoulli sampling.
 
@@ -25,8 +25,8 @@ import numpy as np
 from conditional_poisson import ConditionalPoisson
 
 # From weights
-q = np.array([1.0, 2.0, 3.0, 0.5, 1.5])
-cp = ConditionalPoisson.from_weights(n=2, q=q)
+w = np.array([1.0, 2.0, 3.0, 0.5, 1.5])
+cp = ConditionalPoisson.from_weights(n=2, q=w)
 
 # Inclusion probabilities: P(item i is in the sample)
 print(cp.pi)          # shape (5,), sums to n=2
@@ -49,9 +49,9 @@ print(cp.hvp(v))
 
 | Constructor | Description |
 |---|---|
-| `ConditionalPoisson(n, theta)` | Direct from log-weights $\theta_i = \log q_i$ |
+| `ConditionalPoisson(n, theta)` | Direct from log-weights $\theta_i = \log w_i$ |
 | `ConditionalPoisson.uniform(N, n)` | Uniform: every item has inclusion probability $n/N$ |
-| `ConditionalPoisson.from_weights(n, q)` | From positive weights $q_i$ |
+| `ConditionalPoisson.from_weights(n, q)` | From positive weights $w_i$ |
 | `ConditionalPoisson.fit(pi_star, n)` | Find weights that produce target inclusion probabilities $\pi^{\ast}$ |
 
 ### Fitting to target probabilities
@@ -72,20 +72,20 @@ The key computational challenge is that the normalizing constant sums over all $
 
 The idea: encoding the sum over subsets as the $n$-th coefficient of a product of polynomials. Define one polynomial per item:
 
-$$(1 + q_1 z)(1 + q_2 z) \cdots (1 + q_N z)$$
+$$(1 + w_1 z)(1 + w_2 z) \cdots (1 + w_N z)$$
 
 When you expand this product, the coefficient of $z^n$ equals the sum of all products of $n$ distinct weights — exactly the normalizing constant. This polynomial product can be computed efficiently using a binary tree.
 
 ### Upward pass: building the product
 
-Each leaf holds one factor $(1 + q_i z)$. Internal nodes multiply their children's polynomials. The root holds the full product, whose $n$-th coefficient is the normalizing constant.
+Each leaf holds one factor $(1 + w_i z)$. Internal nodes multiply their children's polynomials. The root holds the full product, whose $n$-th coefficient is the normalizing constant.
 
 ```mermaid
 graph BT
-    L1["leaf 1<br/>(1 + q₁z)"] --> N12["node 1,2<br/>P₁ · P₂"]
-    L2["leaf 2<br/>(1 + q₂z)"] --> N12
-    L3["leaf 3<br/>(1 + q₃z)"] --> N34["node 3,4<br/>P₃ · P₄"]
-    L4["leaf 4<br/>(1 + q₄z)"] --> N34
+    L1["leaf 1<br/>(1 + w₁z)"] --> N12["node 1,2<br/>P₁ · P₂"]
+    L2["leaf 2<br/>(1 + w₂z)"] --> N12
+    L3["leaf 3<br/>(1 + w₃z)"] --> N34["node 3,4<br/>P₃ · P₄"]
+    L4["leaf 4<br/>(1 + w₄z)"] --> N34
     N12 --> ROOT["root<br/>P₁₂ · P₃₄"]
     N34 --> ROOT
 
@@ -120,7 +120,7 @@ graph TB
     style L4 fill:#d4e8b8,color:#000
 ```
 
-At leaf $i$, the $(n-1)$-th coefficient of the leave-one-out polynomial gives the sum over all size- $(n-1)$ subsets from the remaining items. The inclusion probability is then $\pi_i = q_i \cdot [z^{n-1}] P^{(-i)}(z) / Z$ where $Z$ is the normalizing constant.
+At leaf $i$, the $(n-1)$-th coefficient of the leave-one-out polynomial gives the sum over all size- $(n-1)$ subsets from the remaining items. The inclusion probability is then $\pi_i = w_i \cdot [z^{n-1}] P^{(-i)}(z) / Z$ where $Z$ is the normalizing constant.
 
 ### Sampling: top-down quota splitting
 
