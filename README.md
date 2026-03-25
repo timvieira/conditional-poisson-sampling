@@ -6,7 +6,7 @@ Given positive weights $q_1, \dots, q_N$, the probability of drawing a particula
 
 $$P(S) \propto \prod_{i \in S} q_i, \quad \lvert S \rvert = n$$
 
-This is the **conditional Poisson distribution** (also called the *exponential* or *maximum-entropy* fixed-size design). It is the unique maximum-entropy distribution over size-$n$ subsets for given marginal inclusion probabilities — the fixed-size analogue of independent Bernoulli sampling.
+This is the **conditional Poisson distribution** (also called the *exponential* or *maximum-entropy* fixed-size design). It is the unique maximum-entropy distribution over size- $n$ subsets for given marginal inclusion probabilities — the fixed-size analogue of independent Bernoulli sampling.
 
 ## Installation
 
@@ -120,7 +120,7 @@ graph TB
     style L4 fill:#d4e8b8,color:#000
 ```
 
-At leaf $i$, the $(n{-}1)$-th coefficient of the leave-one-out polynomial gives the sum over all size-$(n{-}1)$ subsets from the remaining items. The inclusion probability is then $\pi_i = q_i \cdot [z^{n-1}] P^{(-i)}(z) / Z$ where $Z$ is the normalizing constant.
+At leaf $i$, the $(n-1)$-th coefficient of the leave-one-out polynomial gives the sum over all size- $(n-1)$ subsets from the remaining items. The inclusion probability is then $\pi_i = q_i \cdot [z^{n-1}] P^{(-i)}(z) / Z$ where $Z$ is the normalizing constant.
 
 ### Sampling: top-down quota splitting
 
