@@ -70,7 +70,9 @@ This solves a convex optimization problem (Newton-CG with Armijo backtracking) t
 
 ## How it works
 
-All operations use a **polynomial product tree** that computes $Z\binom{\boldsymbol{w}}{n}$, inclusion probabilities, and samples in $O(N \log^2 n)$ time. See the [blog post](content/conditional-poisson-sampling.ipynb) for a detailed walkthrough. The diagrams below give the high-level picture.
+All operations use a **polynomial product tree** that computes $Z\binom{\boldsymbol{w}}{n}$, inclusion probabilities, and samples in $O(N \log^2 N)$ time. The tree uses a divide-and-conquer strategy: the product $\prod_i (1 + w_i z)$ is computed by recursively splitting the items in half and multiplying the sub-products via FFT-based polynomial multiplication (`scipy.signal.convolve`). The recurrence is $T(N) = 2\,T(N/2) + O(N \log N)$, which solves to $T(N) = O(N \log^2 N)$ by the Master Theorem.
+
+See the [blog post](content/conditional-poisson-sampling.ipynb) for a detailed walkthrough. The diagrams below give the high-level picture.
 
 ### Upward pass: build the product tree
 
@@ -188,12 +190,14 @@ graph TB
 
 ### Complexity
 
+The tree build dominates and costs $O(N \log^2 N)$, independent of $n$. This follows from the divide-and-conquer recurrence $T(N) = 2\,T(N/2) + O(N \log N)$ where the $O(N \log N)$ term is the FFT-based polynomial multiplication at each level.
+
 | Operation | Time |
 |---|---|
-| `pi` / `log_normalizer` | $O(N \log^2 n)$ (cached) |
-| `hvp(v)` | $O(N \log^2 n)$ (P-tree cached; D-tree rebuilt) |
-| `sample(M)` | $O(N \log^2 n + M n \log N)$ |
-| `fit(pi_star)` | $O(N \log^2 n \cdot T_{\text{Newton}} \cdot T_{\text{CG}})$ |
+| `pi` / `log_normalizer` | $O(N \log^2 N)$ (cached) |
+| `hvp(v)` | $O(N \log^2 N)$ (P-tree cached; D-tree rebuilt) |
+| `sample(M)` | $O(N \log^2 N + M n \log N)$ |
+| `fit(pi_star)` | $O(N \log^2 N \cdot T_{\text{Newton}} \cdot T_{\text{CG}})$ |
 
 ## Tests
 

@@ -50,12 +50,23 @@ separately and compensated when extracting log Z:
 
 Complexity
 ----------
+The tree build follows the divide-and-conquer recurrence:
+
+  T(N) = 2 T(N/2) + O(N log N)   =>   T(N) = O(N (log N)^2)
+
+where the O(N log N) term is FFT-based polynomial multiplication.
+
   _build_p_tree          O(N (log N)^2)
   _downward_pass         O(N (log N)^2)
   pi / log_normalizer    O(N (log N)^2)  [cached]
   hvp(v)                 O(N (log N)^2)  [P-tree cached; D-tree + downward fresh]
   sample(M)              O(N (log N)^2 + M n log N)
   fit(pi_star)           O(N (log N)^2 * Newton_iters * CG_iters)
+
+TODO: truncate polynomials to degree n throughout the tree to achieve
+O(N log^2 n) instead of O(N log^2 N).  This requires per-coefficient
+scaling to avoid underflow when the degree-n coefficient is much smaller
+than the peak coefficient at degree ~subtree_size/2.
 """
 
 from __future__ import annotations
@@ -576,6 +587,7 @@ class ConditionalPoisson:
 
         theta = np.log(pi_star / (1.0 - pi_star))   # warm start
 
+        converged = False
         for it in range(max_iter):
             self.theta  = theta          # sets theta, clears cache
             pi          = self._cache.get("pi") or self.pi
@@ -585,6 +597,7 @@ class ConditionalPoisson:
             if verbose:
                 print(f"  iter {it:3d}:  max|pi*-pi| = {err:.3e}")
             if err < tol:
+                converged = True
                 break
 
             delta = _cg(self.hvp, grad)
@@ -600,6 +613,15 @@ class ConditionalPoisson:
                 step         *= 0.5
 
             theta += step * delta
+
+        if not converged:
+            import warnings
+            warnings.warn(
+                f"fit did not converge after {max_iter} iterations "
+                f"(max|pi*-pi| = {err:.3e}, tol = {tol:.3e}). "
+                f"Increase max_iter or loosen tol.",
+                stacklevel=3,
+            )
 
         theta      -= theta.mean()   # zero-centre (shift-invariant)
         self.theta  = theta
