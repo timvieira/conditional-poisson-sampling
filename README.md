@@ -2,11 +2,13 @@
 
 Sample random subsets of exactly $n$ items from a universe $\mathcal{S}$ of $N$ items, where each item $i$ has a specified inclusion probability $\pi_i$.
 
-Given a positive weight vector $\boldsymbol{w} = (w_1, \dots, w_N)$, the probability of drawing a particular subset $S \in \binom{\mathcal{S}}{n}$ is proportional to the product of its weights:
+Given a weight vector $\boldsymbol{w} = (w_1, \dots, w_N)$ with $w_i > 0$, the probability of drawing a particular subset $S \in \binom{\mathcal{S}}{n}$ is proportional to the product of its weights:
 
-$$P(S) \propto \prod_{i \in S} w_i, \quad S \in \tbinom{\mathcal{S}}{n}$$
+$$P(S) = \frac{\prod_{i \in S} w_i}{Z\tbinom{\boldsymbol{w}}{n}}, \quad S \in \tbinom{\mathcal{S}}{n}$$
 
-This is the **conditional Poisson distribution** (also called the *exponential* or *maximum-entropy* fixed-size design). It is the unique maximum-entropy distribution over size- $n$ subsets for given marginal inclusion probabilities — the fixed-size analogue of independent Bernoulli sampling.
+where $Z\binom{\boldsymbol{w}}{n} = \sum_{S \in \binom{\mathcal{S}}{n}} \prod_{i \in S} w_i$ is the normalizing constant — a weighted generalization of the binomial coefficient (when $\boldsymbol{w} = \mathbf{1}$, we recover $Z\binom{\mathbf{1}}{n} = \binom{N}{n}$).
+
+This is the **conditional Poisson distribution** (also called the *exponential* or *maximum-entropy* fixed-size design). It arises by running independent Bernoulli trials — include item $i$ with probability $p_i = w_i/(1+w_i)$ — and conditioning on exactly $n$ items being selected. The weight $w_i$ is the *odds* of the $i$-th coin flip: $w_i = p_i / (1 - p_i)$.
 
 ## Installation
 
@@ -24,7 +26,7 @@ Requires Python 3.8+ and NumPy.
 import numpy as np
 from conditional_poisson import ConditionalPoisson
 
-# From weights
+# From weights (Bernoulli odds)
 w = np.array([1.0, 2.0, 3.0, 0.5, 1.5])
 cp = ConditionalPoisson.from_weights(n=2, w=w)
 
@@ -51,7 +53,7 @@ print(cp.hvp(v))
 |---|---|
 | `ConditionalPoisson(n, theta)` | Direct from log-weights `theta`, where `theta[i]` $= \log w_i$ |
 | `ConditionalPoisson.uniform(N, n)` | Uniform: every item has inclusion probability $n/N$ |
-| `ConditionalPoisson.from_weights(n, w)` | From positive weight vector $\boldsymbol{w}$ |
+| `ConditionalPoisson.from_weights(n, w)` | From weight vector $\boldsymbol{w}$ |
 | `ConditionalPoisson.fit(pi_star, n)` | Find $\boldsymbol{w}$ that produces target inclusion probabilities $\pi^{\ast}$ |
 
 ### Fitting to target probabilities
@@ -68,17 +70,17 @@ This solves a convex optimization problem (Newton-CG with Armijo backtracking) t
 
 ## How it works
 
-The key computational challenge is that the normalizing constant sums over all $\binom{N}{n}$ subsets — far too many to enumerate. This library uses a **polynomial product tree** to compute everything in $O(N \log^2 n)$ time.
+The key computational challenge is that $Z\binom{\boldsymbol{w}}{n}$ sums over all $\binom{N}{n}$ subsets — far too many to enumerate. This library uses a **polynomial product tree** to compute everything in $O(N \log^2 n)$ time.
 
 The idea: encoding the sum over subsets as the $n$-th coefficient of a product of polynomials. Define one polynomial per item:
 
 $$(1 + w_1 z)(1 + w_2 z) \cdots (1 + w_N z)$$
 
-When you expand this product, the coefficient of $z^n$ equals the sum of all products of $n$ distinct weights — exactly the normalizing constant. This polynomial product can be computed efficiently using a binary tree.
+When you expand this product, the coefficient of $z^n$ equals $Z\binom{\boldsymbol{w}}{n}$. This polynomial product can be computed efficiently using a binary tree.
 
 ### Upward pass: building the product
 
-Each leaf holds one factor $(1 + w_i z)$. Internal nodes multiply their children's polynomials. The root holds the full product, whose $n$-th coefficient is the normalizing constant.
+Each leaf holds one factor $(1 + w_i z)$. Internal nodes multiply their children's polynomials. The root holds the full product, whose $n$-th coefficient is $Z\binom{\boldsymbol{w}}{n}$.
 
 ```mermaid
 graph BT
@@ -120,7 +122,7 @@ graph TB
     style L4 fill:#d4e8b8,color:#000
 ```
 
-At leaf $i$, the $(n-1)$-th coefficient of the leave-one-out polynomial gives the sum over all size- $(n-1)$ subsets from the remaining items. The inclusion probability is then $\pi_i = w_i \cdot \llbracket P^{(-i)} \rrbracket(z^{n-1}) / Z$ where $Z$ is the normalizing constant.
+At leaf $i$, the inclusion probability is $\pi_i = w_i \cdot \llbracket P^{(-i)} \rrbracket(z^{n-1}) / Z\binom{\boldsymbol{w}}{n}$.
 
 ### Sampling: top-down quota splitting
 
