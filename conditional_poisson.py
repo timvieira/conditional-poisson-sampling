@@ -4,7 +4,10 @@ conditional_poisson.py
 
 Conditional Poisson distribution over fixed-size subsets.
 
-    P(S; theta) = exp(sum_{i in S} theta_i) / e_n(exp(theta)),   |S| = n
+    P(S) ∝ prod_{i in S} w_i,   |S| = n
+
+where w_i are positive weights.  Internally parameterised by
+log-weights theta_i = log(w_i).
 
 Everything — forward pass, gradient, Hessian-vector product, and sampling —
 uses a single augmented polynomial product tree built once and cached.
@@ -13,8 +16,8 @@ Tree structure
 --------------
 Upward pass builds two ScaledPoly trees in one sweep:
 
-  P_T(z)  = prod_{i in T}(1 + q_i z)                  [degree <= n]
-  D_T(z)  = sum_{i in T} q_i v_i prod_{j in T, j!=i}(1+q_j z)   [degree <= n-1]
+  P_T(z)  = prod_{i in T}(1 + w_i z)                  [degree <= n]
+  D_T(z)  = sum_{i in T} w_i v_i prod_{j in T, j!=i}(1+w_j z)   [degree <= n-1]
 
   P[node] = P[L] * P[R]
   D[node] = D[L]*P[R] + P[L]*D[R]    (product rule; D depends on v)
@@ -25,8 +28,8 @@ Downward pass propagates outside-(P,D) pairs to every leaf:
   oD[leaf i] = D^{(-i)}(z)           leave-one-out weighted-deriv poly
 
 Extraction (at leaf i):
-  pi_i     = q_s[i] * [z^{n-1}] oP_i / e_n(q_s) * exp(oP_ls - root_ls)
-  SumZ_i   = q_s[i] * [z^{n-2}] oD_i / e_n(q_s) * exp(oD_ls - root_ls)
+  pi_i     = w_s[i] * [z^{n-1}] oP_i / e_n(w_s) * exp(oP_ls - root_ls)
+  SumZ_i   = w_s[i] * [z^{n-2}] oD_i / e_n(w_s) * exp(oD_ls - root_ls)
   (Cov v)_i = SumZ_i  +  pi_i v_i  -  pi_i (pi.v)
 
 Sampling
@@ -44,7 +47,7 @@ Numerics
 Every polynomial is a ScaledPoly (coeffs_norm, log_scale) with
 max|coeffs_norm| = 1. All FFTs operate on O(1) numbers, preventing
 float64 overflow and FFT rounding blowup. Geometric-mean normalisation
-q -> q/exp(mean(log q)) is applied before every tree build; pi and Cov[Z]v
+w -> w/exp(mean(log w)) is applied before every tree build; pi and Cov[Z]v
 are invariant under this rescaling.
 
 Complexity
@@ -141,7 +144,7 @@ def _build_p_tree(q_s, n):
 
 def _build_d_tree(Pn, Pls, q_s, v, n, S):
     """
-    Build scaled D-tree: D_T(z) = sum_{i in T} q_i v_i prod_{j!=i}(1+q_j z).
+    Build scaled D-tree: D_T(z) = sum_{i in T} w_i v_i prod_{j!=i}(1+w_j z).
 
     D[node] = D[L]*P[R] + P[L]*D[R]    (product rule)
 
@@ -218,7 +221,7 @@ def _extract(q_s, log_gm, Pn, Pls, oPn, oPls, oDn, oDls, S, N, n, v):
     Extract pi, Hv (optional), and log_en from tree + downward-pass results.
 
     Formulas (all numerically stable):
-      log e_n(q) = log|en_n| + root_ls + n * log_gm
+      log Z = log|en_n| + root_ls + n * log_gm
 
     At leaf i, with dP = oPls[i] - root_ls, dD = oDls[i] - root_ls:
       pi_i   = q_s[i] * oPn[i][n-1] / en_n * exp(dP)
@@ -343,19 +346,20 @@ class ConditionalPoisson:
     """
     Conditional Poisson distribution over fixed-size subsets.
 
-        P(S; theta) = exp(sum_{i in S} theta_i) / e_n(exp theta),  |S| = n
+        P(S) ∝ prod_{i in S} w_i,   |S| = n
 
     Construction
     ------------
-    ConditionalPoisson(n, theta)           direct
+    ConditionalPoisson(n, theta)           direct from log-weights theta = log(w)
     ConditionalPoisson.uniform(N, n)       uniform inclusion probs n/N
-    ConditionalPoisson.from_weights(n, q)  from positive weights q_i
+    ConditionalPoisson.from_weights(n, w)  from positive weights w_i
     ConditionalPoisson.fit(pi_star, n)     moment-match to target probs
 
     Properties  (all cached; cache invalidated when theta changes)
     ----------
     pi              (N,) inclusion probabilities
-    log_normalizer  log e_n(q)  — never overflows
+    w               (N,) weights (= exp(theta))
+    log_normalizer  log normalizing constant  — never overflows
 
     Methods
     -------
@@ -384,15 +388,15 @@ class ConditionalPoisson:
 
     @classmethod
     def uniform(cls, N: int, n: int) -> "ConditionalPoisson":
-        """Uniform: all theta_i = 0, pi_i = n/N."""
+        """Uniform: all weights equal, pi_i = n/N."""
         return cls(n, np.zeros(N))
 
     @classmethod
-    def from_weights(cls, n: int, q: np.ndarray) -> "ConditionalPoisson":
-        """Construct from positive weights q_i = exp(theta_i)."""
-        q = np.asarray(q, float)
-        if np.any(q <= 0): raise ValueError("all weights must be positive")
-        return cls(n, np.log(q))
+    def from_weights(cls, n: int, w: np.ndarray) -> "ConditionalPoisson":
+        """Construct from positive weights w_i."""
+        w = np.asarray(w, float)
+        if np.any(w <= 0): raise ValueError("all weights must be positive")
+        return cls(n, np.log(w))
 
     @classmethod
     def fit(
@@ -417,7 +421,7 @@ class ConditionalPoisson:
 
         Returns
         -------
-        ConditionalPoisson with theta fit to match pi_star.
+        ConditionalPoisson with weights fit to match pi_star.
         """
         obj = cls(n, np.zeros(len(pi_star)))
         obj.fit_inplace(pi_star, tol=tol, max_iter=max_iter, verbose=verbose)
@@ -432,7 +436,9 @@ class ConditionalPoisson:
     @property
     def theta(self) -> np.ndarray: return self._theta.copy()
     @property
-    def q(self) -> np.ndarray: return np.exp(self._theta)
+    def w(self) -> np.ndarray:
+        """Weights w_i = exp(theta_i)."""
+        return np.exp(self._theta)
 
     @theta.setter
     def theta(self, value):
@@ -470,7 +476,7 @@ class ConditionalPoisson:
 
     @property
     def log_normalizer(self) -> float:
-        """log e_n(q).  Never overflows.  O(N log^2 n), cached."""
+        """Log normalizing constant.  Never overflows.  O(N log^2 n), cached."""
         self._forward(); return self._cache["log_en"]
 
     # ── Log probability ───────────────────────────────────────────────────────
@@ -479,7 +485,7 @@ class ConditionalPoisson:
         """
         Log-probability of one subset or a batch.
 
-            log P(S) = sum_{i in S} theta_i  -  log e_n(q)
+            log P(S) = sum_{i in S} log(w_i)  -  log Z
 
         S may be:
           int array (n,)     single subset (item indices)
@@ -534,7 +540,7 @@ class ConditionalPoisson:
         """
         Compute Cov[Z] v.  O(N log^2 n).
 
-        Cov[Z] = d^2/dtheta^2 log e_n(q) is the Fisher information matrix.
+        Cov[Z] is the Fisher information matrix of the distribution.
         It is positive semi-definite with rank N-1; null space = span{1}
         since sum(Z_i) = n is constant.
 
@@ -559,11 +565,10 @@ class ConditionalPoisson:
         verbose: bool = False,
     ) -> "ConditionalPoisson":
         """
-        Update theta to match target inclusion probabilities pi*.
+        Update weights to match target inclusion probabilities pi*.
 
-        Maximises L(theta) = pi* . theta - log e_n(exp theta)
-        via Newton-CG with Armijo backtracking.
-        theta is zero-centred on completion (shift-invariant distribution).
+        Maximises the log-likelihood via Newton-CG with Armijo backtracking.
+        Log-weights are zero-centred on completion (shift-invariant distribution).
 
         Returns self (for chaining).
         """

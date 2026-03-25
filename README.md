@@ -26,7 +26,7 @@ from conditional_poisson import ConditionalPoisson
 
 # From weights
 w = np.array([1.0, 2.0, 3.0, 0.5, 1.5])
-cp = ConditionalPoisson.from_weights(n=2, q=w)
+cp = ConditionalPoisson.from_weights(n=2, w=w)
 
 # Inclusion probabilities: P(item i is in the sample)
 print(cp.pi)          # shape (5,), sums to n=2
@@ -51,7 +51,7 @@ print(cp.hvp(v))
 |---|---|
 | `ConditionalPoisson(n, theta)` | Direct from log-weights `theta`, where `theta[i]` $= \log w_i$ |
 | `ConditionalPoisson.uniform(N, n)` | Uniform: every item has inclusion probability $n/N$ |
-| `ConditionalPoisson.from_weights(n, q)` | From positive weights $w_i$ |
+| `ConditionalPoisson.from_weights(n, w)` | From positive weights $w_i$ |
 | `ConditionalPoisson.fit(pi_star, n)` | Find weights that produce target inclusion probabilities $\pi^{\ast}$ |
 
 ### Fitting to target probabilities
