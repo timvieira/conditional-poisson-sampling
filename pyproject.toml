@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "conditional-poisson-sampling"
+version = "0.1.0"
+description = "Conditional Poisson distribution over fixed-size subsets"
+requires-python = ">=3.8"
+license = "MIT"
+dependencies = ["numpy"]
+
+[tool.setuptools]
+py-modules = ["conditional_poisson"]

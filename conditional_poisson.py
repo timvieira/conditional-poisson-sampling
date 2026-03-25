@@ -62,6 +62,8 @@ from __future__ import annotations
 import numpy as np
 from typing import Optional, Union
 
+__all__ = ["ConditionalPoisson"]
+
 # ── Scaled polynomial arithmetic ─────────────────────────────────────────────
 #
 # ScaledPoly = (cn, ls) representing the polynomial cn * exp(ls),
@@ -393,10 +395,32 @@ class ConditionalPoisson:
         return cls(n, np.log(q))
 
     @classmethod
-    def fit(cls, pi_star: np.ndarray, n: int, **kw) -> "ConditionalPoisson":
-        """Fit to target inclusion probabilities. See fit_inplace for options."""
+    def fit(
+        cls,
+        pi_star: np.ndarray,
+        n: int,
+        *,
+        tol: float = 1e-10,
+        max_iter: int = 50,
+        verbose: bool = False,
+    ) -> "ConditionalPoisson":
+        """
+        Fit to target inclusion probabilities.
+
+        Parameters
+        ----------
+        pi_star : (N,) array with entries in (0, 1) summing to n
+        n       : subset size
+        tol     : convergence threshold on max|pi* - pi|
+        max_iter: maximum Newton iterations
+        verbose : print iteration progress
+
+        Returns
+        -------
+        ConditionalPoisson with theta fit to match pi_star.
+        """
         obj = cls(n, np.zeros(len(pi_star)))
-        obj.fit_inplace(pi_star, **kw)
+        obj.fit_inplace(pi_star, tol=tol, max_iter=max_iter, verbose=verbose)
         return obj
 
     # ── Parameters ───────────────────────────────────────────────────────────
@@ -583,5 +607,7 @@ class ConditionalPoisson:
         return self
 
     def __repr__(self) -> str:
-        return (f"ConditionalPoisson(N={self.N}, n={self._n}, "
-                f"log_normalizer={self.log_normalizer:.3f})")
+        if "log_en" in self._cache:
+            return (f"ConditionalPoisson(N={self.N}, n={self._n}, "
+                    f"log_normalizer={self._cache['log_en']:.3f})")
+        return f"ConditionalPoisson(N={self.N}, n={self._n})"

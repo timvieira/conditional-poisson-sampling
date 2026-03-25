@@ -6,13 +6,15 @@ $$P(S;\, \theta) = \frac{\exp\!\bigl(\sum_{i \in S} \theta_i\bigr)}{e_n(\exp \th
 
 where $e_n$ is the $n$-th elementary symmetric polynomial.
 
-## Features
+## Installation
 
-- **Inclusion probabilities** $\pi_i = P(i \in S)$ via product-tree downward pass
-- **Log-normalizer** $\log e_n(q)$ — numerically stable, never overflows
-- **Exact sampling** using divide-and-conquer on the product tree (no backward ESP table)
-- **Hessian-vector products** $\text{Cov}[Z]\, v$ for Newton-CG fitting
-- **Moment matching** — fit $\theta$ to target inclusion probabilities $\pi^*$ via Newton-CG with Armijo backtracking
+Single-file library — copy `conditional_poisson.py` into your project, or install from a local clone:
+
+```bash
+pip install .
+```
+
+Requires Python 3.8+ and NumPy.
 
 ## Usage
 
@@ -82,15 +84,19 @@ Every polynomial is stored as a **ScaledPoly** `(coeffs_norm, log_scale)` with $
 
 ## Tests
 
-Run the built-in test suite:
-
 ```bash
-python conditional_poisson.py
+pytest                              # with pytest
+python test_conditional_poisson.py  # standalone
 ```
 
-This verifies: forward-pass correctness, normalisation, sampling accuracy, HVP against finite differences, numerical stability at extreme parameter scales, and timing benchmarks.
+The test suite includes brute-force equivalence tests that verify `pi`, `log_normalizer`, `log_prob`, `hvp`, and sampling against explicit enumeration over all $\binom{N}{n}$ subsets.
 
-## Requirements
+## References
 
-- Python 3.8+
-- NumPy
+- Chen, Dempster & Liu (1994). "Weighted Finite Population Sampling to Maximize Entropy." *Biometrika*, 81(3), 457–469. — Introduces conditional Poisson sampling and the connection to elementary symmetric polynomials.
+
+- Vieira (2014). ["Subsets and Superset Sampling."](https://timvieira.github.io/blog/post/2014/08/01/gumbel-max-trick-and-weighted-reservoir-sampling/) — Blog post describing divide-and-conquer sampling on product trees.
+
+## License
+
+MIT
