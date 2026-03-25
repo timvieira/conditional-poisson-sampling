@@ -1,11 +1,11 @@
 """
 Benchmark: tree-based vs sequential CPS samplers.
 
-Sequential sampler (Kulesza & Taskar 2011 / Mirko's thesis Algorithm 3):
+Sequential sampler (Kulesza & Taskar 2011):
   Build O(NK) DP table, scan items deciding include/exclude.
 
 Tree-based sampler (this library):
-  Build P-tree in O(N log^2 n), sample by top-down quota splitting.
+  Build P-tree in O(N (log N)^2), sample by top-down quota splitting.
 
 This script compares:
   1. Numerical accuracy of inclusion probabilities (tree vs sequential)
