@@ -70,87 +70,121 @@ This solves a convex optimization problem (Newton-CG with Armijo backtracking) t
 
 ## How it works
 
-The key computational challenge is that $Z\binom{\boldsymbol{w}}{n}$ sums over all $\binom{N}{n}$ subsets — far too many to enumerate. This library uses a **polynomial product tree** to compute everything in $O(N \log^2 n)$ time.
+All operations use a **polynomial product tree** that computes $Z\binom{\boldsymbol{w}}{n}$, inclusion probabilities, and samples in $O(N \log^2 n)$ time. See the [blog post](content/conditional-poisson-sampling.ipynb) for a detailed walkthrough. The diagrams below give the high-level picture.
 
-The idea: encoding the sum over subsets as the $n$-th coefficient of a product of polynomials. Define one polynomial per item:
+### Upward pass: build the product tree
 
-$$(1 + w_1 z)(1 + w_2 z) \cdots (1 + w_N z)$$
-
-When you expand this product, the coefficient of $z^n$ equals $Z\binom{\boldsymbol{w}}{n}$. This polynomial product can be computed efficiently using a binary tree.
-
-### Upward pass: building the product
-
-Each leaf holds one factor $(1 + w_i z)$. Internal nodes multiply their children's polynomials. The root holds the full product, whose $n$-th coefficient is $Z\binom{\boldsymbol{w}}{n}$.
+Each leaf holds one factor $(1 + w_i z)$. Internal nodes multiply their children's polynomials (truncated to degree $n$). The root's $n$-th coefficient is $Z\binom{\boldsymbol{w}}{n}$.
 
 ```mermaid
 graph BT
-    L1["leaf 1<br/>(1 + w₁z)"] --> N12["node 1,2<br/>P₁ · P₂"]
-    L2["leaf 2<br/>(1 + w₂z)"] --> N12
-    L3["leaf 3<br/>(1 + w₃z)"] --> N34["node 3,4<br/>P₃ · P₄"]
-    L4["leaf 4<br/>(1 + w₄z)"] --> N34
-    N12 --> ROOT["root<br/>P₁₂ · P₃₄"]
-    N34 --> ROOT
+    L1["(1 + w₁z)"] --> N12["P₁₂ = P₁ · P₂"]
+    L2["(1 + w₂z)"] --> N12
+    L3["(1 + w₃z)"] --> N34["P₃₄ = P₃ · P₄"]
+    L4["(1 + w₄z)"] --> N34
+    L5["(1 + w₅z)"] --> N56["P₅₆ = P₅ · P₆"]
+    L6["(1 + w₆z)"] --> N56
+    L7["(1 + w₇z)"] --> N78["P₇₈ = P₇ · P₈"]
+    L8["(1 + w₈z)"] --> N78
+    N12 --> N1234["P₁₋₄ = P₁₂ · P₃₄"]
+    N34 --> N1234
+    N56 --> N5678["P₅₋₈ = P₅₆ · P₇₈"]
+    N78 --> N5678
+    N1234 --> ROOT["root: P₁₋₈"]
+    N5678 --> ROOT
 
     style ROOT fill:#4a90d9,color:#fff
+    style N1234 fill:#5fa0d9,color:#fff
+    style N5678 fill:#5fa0d9,color:#fff
     style N12 fill:#7ab8e0,color:#fff
     style N34 fill:#7ab8e0,color:#fff
+    style N56 fill:#7ab8e0,color:#fff
+    style N78 fill:#7ab8e0,color:#fff
     style L1 fill:#b8d4e8,color:#000
     style L2 fill:#b8d4e8,color:#000
     style L3 fill:#b8d4e8,color:#000
     style L4 fill:#b8d4e8,color:#000
+    style L5 fill:#b8d4e8,color:#000
+    style L6 fill:#b8d4e8,color:#000
+    style L7 fill:#b8d4e8,color:#000
+    style L8 fill:#b8d4e8,color:#000
 ```
 
-### Downward pass: inclusion probabilities
+### Downward pass: leave-one-out polynomials
 
-To compute the inclusion probability of item $i$, we need the "leave-one-out" product — the product of all factors *except* $i$. Rather than recomputing $N$ separate products, the downward pass propagates information from the root back to the leaves. Each child receives the product of its parent's outside context with its sibling's subtree:
+Each child receives the product of its parent's outside context with its sibling's subtree. At the leaves, this yields $P^{(-i)}(z) = \prod_{j \neq i}(1 + w_j z)$, from which $\pi_i = w_i \cdot \llbracket P^{(-i)} \rrbracket(z^{n-1}) / Z\binom{\boldsymbol{w}}{n}$.
 
 ```mermaid
 graph TB
-    ROOT["root<br/>outside = 1"] --> N12["node 1,2<br/>outside = P₃₄"]
-    ROOT --> N34["node 3,4<br/>outside = P₁₂"]
-    N12 --> L1["leaf 1<br/>P⁽⁻¹⁾ = P₃₄ · P₂"]
-    N12 --> L2["leaf 2<br/>P⁽⁻²⁾ = P₃₄ · P₁"]
-    N34 --> L3["leaf 3<br/>P⁽⁻³⁾ = P₁₂ · P₄"]
-    N34 --> L4["leaf 4<br/>P⁽⁻⁴⁾ = P₁₂ · P₃"]
+    ROOT["outside = 1"] --> N1234["outside = P₅₋₈"]
+    ROOT --> N5678["outside = P₁₋₄"]
+    N1234 --> N12["outside = P₅₋₈ · P₃₄"]
+    N1234 --> N34["outside = P₅₋₈ · P₁₂"]
+    N5678 --> N56["outside = P₁₋₄ · P₇₈"]
+    N5678 --> N78["outside = P₁₋₄ · P₅₆"]
+    N12 --> L1["P⁽⁻¹⁾ = out₁₂ · P₂"]
+    N12 --> L2["P⁽⁻²⁾ = out₁₂ · P₁"]
+    N34 --> L3["P⁽⁻³⁾ = out₃₄ · P₄"]
+    N34 --> L4["P⁽⁻⁴⁾ = out₃₄ · P₃"]
+    N56 --> L5["P⁽⁻⁵⁾ = out₅₆ · P₆"]
+    N56 --> L6["P⁽⁻⁶⁾ = out₅₆ · P₅"]
+    N78 --> L7["P⁽⁻⁷⁾ = out₇₈ · P₈"]
+    N78 --> L8["P⁽⁻⁸⁾ = out₇₈ · P₇"]
 
     style ROOT fill:#4a90d9,color:#fff
+    style N1234 fill:#5fa0d9,color:#fff
+    style N5678 fill:#5fa0d9,color:#fff
     style N12 fill:#7ab8e0,color:#fff
     style N34 fill:#7ab8e0,color:#fff
+    style N56 fill:#7ab8e0,color:#fff
+    style N78 fill:#7ab8e0,color:#fff
     style L1 fill:#d4e8b8,color:#000
     style L2 fill:#d4e8b8,color:#000
     style L3 fill:#d4e8b8,color:#000
     style L4 fill:#d4e8b8,color:#000
+    style L5 fill:#d4e8b8,color:#000
+    style L6 fill:#d4e8b8,color:#000
+    style L7 fill:#d4e8b8,color:#000
+    style L8 fill:#d4e8b8,color:#000
 ```
-
-At leaf $i$, the inclusion probability is $\pi_i = w_i \cdot \llbracket P^{(-i)} \rrbracket(z^{n-1}) / Z\binom{\boldsymbol{w}}{n}$.
 
 ### Sampling: top-down quota splitting
 
-Sampling walks the tree top-down with a quota $k$ (starting at $n$). At each internal node, the quota is randomly split between children, weighted by their polynomial coefficients:
+Starting with quota $k = n$ at the root, each internal node splits its quota between children: draw $j$ from the left with probability $\propto P_L[j] \cdot P_R[k-j]$. Leaves with quota 1 are included; quota 0 excluded.
 
 ```mermaid
 graph TB
-    ROOT["root<br/>quota k = n"] -->|"j items"| LEFT["left subtree<br/>quota = j"]
-    ROOT -->|"k − j items"| RIGHT["right subtree<br/>quota = k − j"]
-    LEFT -->|"..."| LL["..."]
-    LEFT -->|"..."| LR["..."]
-    RIGHT -->|"..."| RL["..."]
-    RIGHT -->|"..."| RR["..."]
+    ROOT["quota = n"] -->|"j₁ items"| LEFT["quota = j₁"]
+    ROOT -->|"n − j₁ items"| RIGHT["quota = n − j₁"]
+    LEFT -->|"j₂"| LL["quota = j₂"]
+    LEFT -->|"j₁ − j₂"| LR["quota = j₁ − j₂"]
+    RIGHT -->|"j₃"| RL["quota = j₃"]
+    RIGHT -->|"n−j₁−j₃"| RR["quota = n−j₁−j₃"]
+    LL --> L1["0 or 1"]
+    LL --> L2["0 or 1"]
+    LR --> L3["0 or 1"]
+    LR --> L4["0 or 1"]
+    RL --> L5["0 or 1"]
+    RL --> L6["0 or 1"]
+    RR --> L7["0 or 1"]
+    RR --> L8["0 or 1"]
 
     style ROOT fill:#4a90d9,color:#fff
-    style LEFT fill:#7ab8e0,color:#fff
-    style RIGHT fill:#7ab8e0,color:#fff
-    style LL fill:#b8d4e8,color:#000
-    style LR fill:#b8d4e8,color:#000
-    style RL fill:#b8d4e8,color:#000
-    style RR fill:#b8d4e8,color:#000
+    style LEFT fill:#5fa0d9,color:#fff
+    style RIGHT fill:#5fa0d9,color:#fff
+    style LL fill:#7ab8e0,color:#fff
+    style LR fill:#7ab8e0,color:#fff
+    style RL fill:#7ab8e0,color:#fff
+    style RR fill:#7ab8e0,color:#fff
+    style L1 fill:#b8d4e8,color:#000
+    style L2 fill:#b8d4e8,color:#000
+    style L3 fill:#b8d4e8,color:#000
+    style L4 fill:#b8d4e8,color:#000
+    style L5 fill:#b8d4e8,color:#000
+    style L6 fill:#b8d4e8,color:#000
+    style L7 fill:#b8d4e8,color:#000
+    style L8 fill:#b8d4e8,color:#000
 ```
-
-At each split, $j$ is drawn with probability proportional to $P_L[j] \cdot P_R[k-j]$. Leaves with quota 1 are included in the sample; quota 0 are excluded. This produces exact samples without ever building the $\binom{N}{n}$-sized probability table.
-
-### Numerical stability
-
-Every polynomial is stored in a scaled representation `(coeffs_norm, log_scale)` with $\max \lvert c_k \rvert = 1$. FFT convolutions operate on $O(1)$-magnitude numbers, preventing float64 overflow and FFT rounding blowup. Weights are geometrically normalised before each tree build.
 
 ### Complexity
 
