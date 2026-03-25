@@ -10,313 +10,315 @@ where w_i are positive weights.  Internally parameterised by
 log-weights theta_i = log(w_i).
 
 Everything — forward pass, gradient, Hessian-vector product, and sampling —
-uses a single augmented polynomial product tree built once and cached.
+uses a polynomial product tree built once and cached.
 
 Tree structure
 --------------
-Upward pass builds two ScaledPoly trees in one sweep:
+Upward pass (divide-and-conquer):
 
-  P_T(z)  = prod_{i in T}(1 + w_i z)                  [degree <= n]
-  D_T(z)  = sum_{i in T} w_i v_i prod_{j in T, j!=i}(1+w_j z)   [degree <= n-1]
+  P_T(z)  = prod_{i in T}(1 + w_i z)
 
-  P[node] = P[L] * P[R]
-  D[node] = D[L]*P[R] + P[L]*D[R]    (product rule; D depends on v)
+  P[node] = convolve(P[L], P[R])
 
-Downward pass propagates outside-(P,D) pairs to every leaf:
+The root polynomial's k-th coefficient is Z(w choose k), the elementary
+symmetric polynomial e_k(w).  No degree truncation is applied; each node
+holds the full-degree polynomial for its subtree.
 
-  oP[leaf i] = P^{(-i)}(z)           leave-one-out product poly
-  oD[leaf i] = D^{(-i)}(z)           leave-one-out weighted-deriv poly
+Downward pass propagates outside polynomials to every leaf:
 
-Extraction (at leaf i):
-  pi_i     = w_s[i] * [z^{n-1}] oP_i / e_n(w_s) * exp(oP_ls - root_ls)
-  SumZ_i   = w_s[i] * [z^{n-2}] oD_i / e_n(w_s) * exp(oD_ls - root_ls)
-  (Cov v)_i = SumZ_i  +  pi_i v_i  -  pi_i (pi.v)
+  oP[leaf i] = P^{(-i)}(z) = prod_{j != i}(1 + w_j z)
+
+Extraction:
+  pi_i   = w_i * [z^{n-1}] P^{(-i)} / [z^n] P_root
 
 Sampling
 --------
-The P-tree (upward pass only, no D) is cached and reused for sampling.
+The P-tree is cached and reused for sampling.
 At each internal node with quota k, sample the left/right quota split:
 
-  P(j items from L | k, T) ∝ P_L[j] * P_R[k-j]       (Pls factors cancel)
+  P(j items from L | k, T) ∝ P_L[j] * P_R[k-j]
 
 Recurse down the tree; each sample costs O(n log N) in expectation.
-No O(Nn) backward table is built or stored.
 
 Numerics
 --------
-Every polynomial is a ScaledPoly (coeffs_norm, log_scale) with
-max|coeffs_norm| = 1. All FFTs operate on O(1) numbers, preventing
-float64 overflow and FFT rounding blowup. Geometric-mean normalisation
-w -> w/exp(mean(log w)) is applied before every tree build; pi and Cov[Z]v
-are invariant under this rescaling.
+Geometric-mean normalisation w -> w/exp(mean(log w)) is applied before
+every tree build.  The scale factor alpha = exp(mean(log w)) is tracked
+separately and compensated when extracting log Z:
+
+  log Z = log(P_root[n]) + n * log(alpha)
 
 Complexity
 ----------
-  _build_p_tree          O(N log^2 n)
-  _build_d_tree          O(N log^2 n)
-  _downward_pass         O(N log^2 n)
-  pi / log_normalizer    O(N log^2 n)  [cached]
-  hvp(v)                 O(N log^2 n)  [P-tree cached; D-tree + downward fresh]
-  sample(M)              O(N log^2 n + M n log N)
-  fit(pi_star)           O(N log^2 n * Newton_iters * CG_iters)
+  _build_p_tree          O(N (log N)^2)
+  _downward_pass         O(N (log N)^2)
+  pi / log_normalizer    O(N (log N)^2)  [cached]
+  hvp(v)                 O(N (log N)^2)  [P-tree cached; D-tree + downward fresh]
+  sample(M)              O(N (log N)^2 + M n log N)
+  fit(pi_star)           O(N (log N)^2 * Newton_iters * CG_iters)
 """
 
 from __future__ import annotations
 import numpy as np
 from typing import Optional, Union
+from scipy.signal import convolve
 
 __all__ = ["ConditionalPoisson"]
 
+
 # ── Scaled polynomial arithmetic ─────────────────────────────────────────────
 #
-# ScaledPoly = (cn, ls) representing the polynomial cn * exp(ls),
-# with invariant  max|cn[k]| == 1  (or cn all-zero and ls == -inf).
-# Keeps all FFT inputs in [-1, 1]: no overflow, rounding stays O(eps).
+# Each polynomial is a pair (c, ls) where the true polynomial is c * exp(ls)
+# and max|c| = 1.  Unlike the previous implementation, polynomials are NOT
+# truncated — they keep their full natural degree.
 
-_DIRECT = 48
-_NEGINF = -np.inf
-
-def _pmul_raw(a, b, d):
-    if d < 0: return np.zeros(0)
-    la, lb = len(a), len(b)
-    if la == 0 or lb == 0: return np.zeros(d + 1)
-    if la + lb - 2 <= _DIRECT:
-        c = np.convolve(a, b)
-    else:
-        m  = la + lb - 1
-        nf = 1 << (m - 1).bit_length()
-        c  = np.fft.irfft(np.fft.rfft(a, nf) * np.fft.rfft(b, nf), nf).real
-    out = np.zeros(d + 1)
-    out[:min(len(c), d + 1)] = c[:d + 1]
-    return out
-
-def _pad(a, d):
-    out = np.zeros(d + 1); out[:min(len(a), d + 1)] = a[:d + 1]; return out
-
-def _scale(c, d):
-    c = _pad(c, d); m = np.max(np.abs(c))
-    if m == 0: return np.zeros(d + 1), _NEGINF
+def _scale(c):
+    """Normalise so max|c| = 1, return (normalised_coeffs, log_scale)."""
+    m = np.max(np.abs(c))
+    if m == 0:
+        return c, -np.inf
     return c / m, np.log(m)
 
-def _pmul_s(an, als, bn, bls, d):
-    cn, inc = _scale(_pmul_raw(an, bn, d), d)
+def _pmul(a, als, b, bls):
+    """Multiply two scaled polynomials. Returns (c, cls)."""
+    c = convolve(a, b)
+    cn, inc = _scale(c)
     return cn, als + bls + inc
 
-def _padd_s(an, als, bn, bls, d):
-    if als == _NEGINF: return _pad(bn, d), bls
-    if bls == _NEGINF: return _pad(an, d), als
+def _padd(a, als, b, bls):
+    """Add two scaled polynomials (possibly different lengths). Returns (c, cls)."""
+    if als == -np.inf:
+        return b.copy(), bls
+    if bls == -np.inf:
+        return a.copy(), als
     s = max(als, bls)
-    c = _pad(an, d) * np.exp(als - s) + _pad(bn, d) * np.exp(bls - s)
-    cn, inc = _scale(c, d); return cn, s + inc
+    la, lb = len(a), len(b)
+    if la >= lb:
+        out = a * np.exp(als - s)
+        out[:lb] += b * np.exp(bls - s)
+    else:
+        out = b * np.exp(bls - s)
+        out[:la] += a * np.exp(als - s)
+    cn, inc = _scale(out)
+    return cn, s + inc
 
 
-# ── Upward pass: P-tree (for pi, log_en, sampling) ───────────────────────────
+# ── Upward pass: P-tree ──────────────────────────────────────────────────────
 
-def _build_p_tree(q_s, n):
+def _build_p_tree(q_s):
     """
-    Build scaled product tree for P_T(z) = prod_{i in T}(1 + q_i z).
+    Build product tree for P_T(z) = prod_{i in T}(1 + q_i z).
 
-    Returns (Pn, Pls, S) where Pn[i], Pls[i] is the ScaledPoly at node i,
+    Each node stores a scaled polynomial (c, ls) for its subtree.
+    No degree truncation.  Uses scipy.signal.convolve (auto FFT/direct).
+
+    Returns (Pc, Pls, S) where Pc[i], Pls[i] is the scaled poly at node i,
     S is the leaf offset (power of 2 >= N).
 
-    Complexity: O(N log^2 n).
+    Complexity: O(N (log N)^2).
     """
-    N = len(q_s); S = 1
-    while S < N: S <<= 1
-    Pn  = [None] * (2 * S)
-    Pls = np.full(2 * S, _NEGINF)
+    N = len(q_s)
+    S = 1
+    while S < N:
+        S <<= 1
+    Pc  = [None] * (2 * S)
+    Pls = np.full(2 * S, -np.inf)
 
     for i in range(S):
         if i < N:
-            p = np.array([1.0, q_s[i]]) if n >= 1 else np.array([1.0])
-            Pn[S+i], Pls[S+i] = _scale(p, min(1, n))
+            c = np.array([1.0, q_s[i]])
+            Pc[S + i], Pls[S + i] = _scale(c)
         else:
-            Pn[S+i] = np.array([1.0]); Pls[S+i] = 0.0   # identity
+            Pc[S + i] = np.array([1.0])
+            Pls[S + i] = 0.0   # identity
 
     for i in range(S - 1, 0, -1):
-        l, r = 2*i, 2*i+1
-        Pn[i], Pls[i] = _pmul_s(Pn[l], Pls[l], Pn[r], Pls[r], n)
+        l, r = 2 * i, 2 * i + 1
+        Pc[i], Pls[i] = _pmul(Pc[l], Pls[l], Pc[r], Pls[r])
 
-    return Pn, Pls, S
+    return Pc, Pls, S
 
 
 # ── Upward pass: D-tree (for HVP; requires P-tree already built) ─────────────
 
-def _build_d_tree(Pn, Pls, q_s, v, n, S):
+def _build_d_tree(Pc, Pls, q_s, v, S):
     """
-    Build scaled D-tree: D_T(z) = sum_{i in T} w_i v_i prod_{j!=i}(1+w_j z).
+    Build D-tree: D_T(z) = sum_{i in T} q_i v_i prod_{j in T, j!=i}(1+q_j z).
 
-    D[node] = D[L]*P[R] + P[L]*D[R]    (product rule)
+    D[node] = convolve(D[L], P[R]) + convolve(P[L], D[R])   (product rule)
 
-    Requires the P-tree (Pn, Pls) already built for this q_s.
-
-    Complexity: O(N log^2 n).
+    Complexity: O(N (log N)^2).
     """
     N = len(q_s)
-    Dn  = [None] * (2 * S)
-    Dls = np.full(2 * S, _NEGINF)
+    Dc  = [None] * (2 * S)
+    Dls = np.full(2 * S, -np.inf)
 
     for i in range(S):
         d_val = q_s[i] * v[i] if i < N else 0.0
         if d_val == 0.0:
-            Dn[S+i] = np.zeros(1); Dls[S+i] = _NEGINF
+            Dc[S + i] = np.zeros(1)
+            Dls[S + i] = -np.inf
         else:
             sign = 1.0 if d_val > 0 else -1.0
-            Dn[S+i] = np.array([sign]); Dls[S+i] = np.log(abs(d_val))
+            Dc[S + i] = np.array([sign])
+            Dls[S + i] = np.log(abs(d_val))
 
     for i in range(S - 1, 0, -1):
-        l, r = 2*i, 2*i+1
-        t1n, t1s      = _pmul_s(Dn[l], Dls[l], Pn[r], Pls[r], n - 1)
-        t2n, t2s      = _pmul_s(Pn[l], Pls[l], Dn[r], Dls[r], n - 1)
-        Dn[i], Dls[i] = _padd_s(t1n, t1s, t2n, t2s, n - 1)
+        l, r = 2 * i, 2 * i + 1
+        t1c, t1s = _pmul(Dc[l], Dls[l], Pc[r], Pls[r])
+        t2c, t2s = _pmul(Pc[l], Pls[l], Dc[r], Dls[r])
+        Dc[i], Dls[i] = _padd(t1c, t1s, t2c, t2s)
 
-    return Dn, Dls
+    return Dc, Dls
 
 
 # ── Downward pass ─────────────────────────────────────────────────────────────
 
-def _downward_pass(Pn, Pls, Dn, Dls, S, n):
+def _downward_pass(Pc, Pls, Dc, Dls, S):
     """
-    Top-down pass propagating outside-(P, D) pairs to every leaf.
+    Top-down pass propagating outside polynomials to every leaf.
 
-    Pass Dn=None, Dls=None to skip D (pi-only mode, for forward pass).
+    Pass Dc=None, Dls=None to skip D (pi-only mode).
 
     At leaf i on return:
-      oPn[S+i], oPls[S+i]  encodes  P^{(-i)}(z)  mod z^n
-      oDn[S+i], oDls[S+i]  encodes  D^{(-i)}(z)  mod z^{n-1}  (if D requested)
+      oPc[S+i], oPls[S+i]  encodes  P^{(-i)}(z)
+      oDc[S+i], oDls[S+i]  encodes  D^{(-i)}(z)  (if D requested)
 
     Update rule (child c with sibling s):
       oP[c] = oP[parent] * P[s]
       oD[c] = oD[parent] * P[s]  +  oP[parent] * D[s]
 
-    Complexity: O(N log^2 n).
+    Complexity: O(N (log N)^2).
     """
-    do_d = (Dn is not None)
-    N2   = 2 * S
+    do_d = (Dc is not None)
+    N2 = 2 * S
 
-    oPn  = [None] * N2;  oPls = np.full(N2, _NEGINF)
-    oDn  = [None] * N2;  oDls = np.full(N2, _NEGINF)
+    oPc  = [None] * N2;  oPls = np.full(N2, -np.inf)
+    oDc  = [None] * N2;  oDls = np.full(N2, -np.inf)
 
-    oPn[1] = np.array([1.0]); oPls[1] = 0.0
+    oPc[1] = np.array([1.0]); oPls[1] = 0.0
     if do_d:
-        oDn[1] = np.zeros(1); oDls[1] = _NEGINF
+        oDc[1] = np.zeros(1); oDls[1] = -np.inf
 
     for i in range(1, S):
-        if oPn[i] is None: continue
-        l, r = 2*i, 2*i+1
+        if oPc[i] is None:
+            continue
+        l, r = 2 * i, 2 * i + 1
         for c, s in ((l, r), (r, l)):
-            oPn[c], oPls[c] = _pmul_s(oPn[i], oPls[i], Pn[s], Pls[s], n - 1)
+            oPc[c], oPls[c] = _pmul(oPc[i], oPls[i], Pc[s], Pls[s])
             if do_d:
-                t1n, t1s        = _pmul_s(oDn[i], oDls[i], Pn[s], Pls[s], n - 1)
-                t2n, t2s        = _pmul_s(oPn[i], oPls[i], Dn[s], Dls[s], n - 1)
-                oDn[c], oDls[c] = _padd_s(t1n, t1s, t2n, t2s, n - 1)
+                t1c, t1s = _pmul(oDc[i], oDls[i], Pc[s], Pls[s])
+                t2c, t2s = _pmul(oPc[i], oPls[i], Dc[s], Dls[s])
+                oDc[c], oDls[c] = _padd(t1c, t1s, t2c, t2s)
 
-    return oPn, oPls, oDn, oDls
+    return oPc, oPls, oDc, oDls
 
 
-# ── Extraction: pi, log_en, and (optionally) Hv ──────────────────────────────
+# ── Extraction: pi, log_Z, and (optionally) Hv ───────────────────────────────
 
-def _extract(q_s, log_gm, Pn, Pls, oPn, oPls, oDn, oDls, S, N, n, v):
+def _extract(q_s, log_gm, Pc, Pls, oPc, oPls, oDc, oDls, S, N, n, v):
     """
-    Extract pi, Hv (optional), and log_en from tree + downward-pass results.
+    Extract pi, Hv (optional), and log_Z from tree + downward-pass results.
 
-    Formulas (all numerically stable):
-      log Z = log|en_n| + root_ls + n * log_gm
-
-    At leaf i, with dP = oPls[i] - root_ls, dD = oDls[i] - root_ls:
-      pi_i   = q_s[i] * oPn[i][n-1] / en_n * exp(dP)
-      SumZ_i = q_s[i] * oDn[i][n-2] / en_n * exp(dD)
-             = sum_{j != i} pi_{ij} v_j
-
-    (Cov[Z] v)_i = SumZ_i  +  pi_i v_i  -  pi_i (pi . v)
-
-    exp(dP) and exp(dD) are bounded because pi_i in (0,1).
+    pi_i   = q_s[i] * oPc[S+i][n-1] / Pc[1][n]  * exp(oPls[S+i] - Pls[1])
+    log Z  = log|Pc[1][n]| + Pls[1] + n * log_gm
     """
-    en_n    = float(Pn[1][n]) if len(Pn[1]) > n else 0.0
+    en_n    = float(Pc[1][n]) if len(Pc[1]) > n else 0.0
     root_ls = float(Pls[1])
-    log_en  = (np.log(abs(en_n)) + root_ls + n * log_gm) if en_n != 0.0 else _NEGINF
+    log_Z   = (np.log(abs(en_n)) + root_ls + n * log_gm) if en_n != 0.0 else -np.inf
 
-    do_hv = (oDn is not None) and (v is not None)
-    pi    = np.zeros(N)
-    SumZ  = np.zeros(N) if do_hv else None
+    do_hv = (oDc is not None) and (v is not None)
+    pi   = np.zeros(N)
+    SumZ = np.zeros(N) if do_hv else None
 
     for i in range(N):
-        oP    = oPn[S + i];  oP_ls = float(oPls[S + i])
-        if en_n != 0.0 and oP_ls != _NEGINF:
-            oP_c   = float(oP[n-1]) if len(oP) > n - 1 else 0.0
-            pi[i]  = q_s[i] * oP_c / en_n * np.exp(oP_ls - root_ls)
+        op = oPc[S + i]
+        op_ls = float(oPls[S + i])
+        if en_n != 0.0 and op is not None and len(op) > n - 1:
+            pi[i] = q_s[i] * float(op[n - 1]) / en_n * np.exp(op_ls - root_ls)
         if do_hv and n >= 2:
-            oD    = oDn[S + i];  oD_ls = float(oDls[S + i])
-            if en_n != 0.0 and oD_ls != _NEGINF:
-                oD_c      = float(oD[n-2]) if len(oD) > n - 2 else 0.0
-                SumZ[i]   = q_s[i] * oD_c / en_n * np.exp(oD_ls - root_ls)
+            od = oDc[S + i]
+            od_ls = float(oDls[S + i])
+            if en_n != 0.0 and od is not None and len(od) > n - 2:
+                SumZ[i] = q_s[i] * float(od[n - 2]) / en_n * np.exp(od_ls - root_ls)
 
     if do_hv:
         alpha = float(np.dot(pi, v))
-        Hv    = SumZ + pi * v - pi * alpha
+        Hv = SumZ + pi * v - pi * alpha
     else:
         Hv = None
 
-    return pi, Hv, log_en
+    return pi, Hv, log_Z
 
 
 # ── Sampler: divide-and-conquer on the P-tree ─────────────────────────────────
 
-def _tree_sample(Pn, Pls, S, N, n, M, rng):
+def _tree_sample(Pc, S, N, n, M, rng):
     """
     Sample M subsets of size n using the cached P-tree.
 
     At each internal node with quota k, the split distribution is:
 
-      P(j items from L | k) ∝ Pn_L[j] * Pn_R[k-j],   j = 0..k
+      P(j items from L | k) ∝ Pc_L[j] * Pc_R[k-j],   j = 0..k
 
-    The Pls log-scale factors are common across j and cancel in the ratio,
-    so only the normalised coefficient arrays Pn are needed — no new
-    polynomial evaluations.
+    The log-scale factors cancel in the ratio, so only the normalised
+    coefficient arrays Pc are needed.
 
     Complexity: O(n log N) per sample, O(M n log N) total.
     """
-    # quotas[node] = (M,) array of how many items to pick from this subtree
     quotas = np.zeros((2 * S, M), dtype=np.int32)
     quotas[1] = n
 
     for node in range(1, S):
-        l, r  = 2 * node, 2 * node + 1
+        l, r = 2 * node, 2 * node + 1
         k_arr = quotas[node]
-        Pl    = Pn[l]
-        Pr    = Pn[r]
+        Pl = Pc[l]
+        Pr = Pc[r]
         max_l = len(Pl)
         max_r = len(Pr)
         j_arr = np.zeros(M, dtype=np.int32)
 
-        for k in np.unique(k_arr):
-            if k == 0:
-                continue
-            mask  = k_arr == k
-            count = int(mask.sum())
+        max_k = int(k_arr.max())
+        if max_k == 0:
+            quotas[l] = 0
+            quotas[r] = 0
+            continue
 
-            # w[j] = Pl[j] * Pr[k-j]  for j = 0..k
-            # (Pls factors cancel; coefficients are non-negative for ESP of q>0)
-            jv    = np.arange(k + 1, dtype=int)
-            kv    = k - jv
-            safe_j  = np.minimum(jv, max_l - 1)
-            safe_kv = np.minimum(kv, max_r - 1)
-            wl    = np.where(jv  < max_l, Pl[safe_j],  0.0)
-            wr    = np.where(kv  < max_r, Pr[safe_kv], 0.0)
-            w     = np.maximum(wl, 0.0) * np.maximum(wr, 0.0)  # clip FFT rounding
-            ws    = w.sum()
-            if ws > 0:
-                j_arr[mask] = rng.choice(k + 1, size=count, p=w / ws)
-            # ws == 0 only for padding subtrees with no real items; j stays 0
+        # Precompute CDF for each possible quota k = 1..max_k at this node.
+        cdf = np.zeros((max_k + 1, max_k + 1))
+        for k in range(1, max_k + 1):
+            km = min(k + 1, max_l)
+            jv = np.arange(km)
+            kv = k - jv
+            valid = kv < max_r
+            if not valid.any():
+                continue
+            jv_v = jv[valid]
+            kv_v = kv[valid]
+            w = np.maximum(Pl[jv_v], 0.0) * np.maximum(Pr[kv_v], 0.0)
+            cdf[k, jv_v] = w
+        np.cumsum(cdf, axis=1, out=cdf)
+        row_totals = cdf[:, -1].copy()
+        row_totals[row_totals == 0] = 1.0
+        cdf /= row_totals[:, None]
+
+        u = rng.random(M)
+        active = k_arr > 0
+        if active.any():
+            active_idx = np.where(active)[0]
+            ki = k_arr[active_idx]
+            sample_cdfs = cdf[ki]
+            j_arr[active_idx] = np.argmax(
+                sample_cdfs >= u[active_idx, None], axis=1,
+            )
 
         quotas[l] = j_arr
         quotas[r] = k_arr - j_arr
 
-    # Collect leaf decisions into (M, n) output
-    out     = np.full((M, n), -1, dtype=np.int32)
+    out = np.full((M, n), -1, dtype=np.int32)
     cursors = np.zeros(M, dtype=np.int32)
     for i in range(N):
-        inc = quotas[S + i] > 0       # quota 1 = include, 0 = skip
+        inc = quotas[S + i] > 0
         idx = np.where(inc)[0]
         out[idx, cursors[idx]] = i
         cursors[idx] += 1
@@ -445,39 +447,39 @@ class ConditionalPoisson:
         self._theta = np.asarray(value, float).copy()
         self._cache.clear()
 
-    # ── Internal: P-tree (shared by pi, log_en, sampling) ────────────────────
+    # ── Internal: P-tree (shared by pi, log_Z, sampling) ──────────────────────
 
     def _get_p_tree(self):
         """Build and cache the P-tree and normalised weights."""
         if "p_tree" not in self._cache:
             log_gm = float(np.mean(self._theta))
             q_s    = np.exp(self._theta - log_gm)
-            Pn, Pls, S = _build_p_tree(q_s, self._n)
-            self._cache["p_tree"] = (Pn, Pls, S, q_s, log_gm)
+            Pc, Pls, S = _build_p_tree(q_s)
+            self._cache["p_tree"] = (Pc, Pls, S, q_s, log_gm)
         return self._cache["p_tree"]
 
-    # ── Internal: forward pass (pi, log_en) ──────────────────────────────────
+    # ── Internal: forward pass (pi, log_Z) ────────────────────────────────────
 
     def _forward(self):
         if "pi" not in self._cache:
-            Pn, Pls, S, q_s, log_gm = self._get_p_tree()
-            oPn, oPls, _, _ = _downward_pass(Pn, Pls, None, None, S, self._n)
-            pi, _, log_en = _extract(q_s, log_gm, Pn, Pls, oPn, oPls,
-                                     None, None, S, self.N, self._n, None)
-            self._cache["pi"]     = pi
-            self._cache["log_en"] = log_en
+            Pc, Pls, S, q_s, log_gm = self._get_p_tree()
+            oPc, oPls, _, _ = _downward_pass(Pc, Pls, None, None, S)
+            pi, _, log_Z = _extract(q_s, log_gm, Pc, Pls, oPc, oPls,
+                                    None, None, S, self.N, self._n, None)
+            self._cache["pi"]    = pi
+            self._cache["log_Z"] = log_Z
 
     # ── Public properties ─────────────────────────────────────────────────────
 
     @property
     def pi(self) -> np.ndarray:
-        """Inclusion probabilities pi_i = P(i in S).  O(N log^2 n), cached."""
+        """Inclusion probabilities pi_i = P(i in S).  O(N (log N)^2), cached."""
         self._forward(); return self._cache["pi"].copy()
 
     @property
     def log_normalizer(self) -> float:
-        """Log normalizing constant.  Never overflows.  O(N log^2 n), cached."""
-        self._forward(); return self._cache["log_en"]
+        """Log normalizing constant.  Never overflows.  O(N (log N)^2), cached."""
+        self._forward(); return self._cache["log_Z"]
 
     # ── Log probability ───────────────────────────────────────────────────────
 
@@ -511,14 +513,6 @@ class ConditionalPoisson:
         """
         Draw independent samples using the cached P-tree.
 
-        At each internal node with quota k, sample the left/right split:
-
-            P(j from L | k) ∝ Pn_L[j] * Pn_R[k-j]
-
-        The Pls log-scale factors cancel; only the normalised Pn arrays
-        are needed, which are already in the cached tree. No separate
-        backward-ESP table is built.
-
         Parameters
         ----------
         size : number of subsets to draw
@@ -528,17 +522,17 @@ class ConditionalPoisson:
         -------
         (size, n) int array; each row is a sorted list of n item indices.
 
-        Complexity: O(N log^2 n) to build tree [cached] + O(size * n * log N).
+        Complexity: O(N (log N)^2) to build tree [cached] + O(size * n * log N).
         """
-        rng             = np.random.default_rng(rng)
-        Pn, Pls, S, q_s, _ = self._get_p_tree()
-        return _tree_sample(Pn, Pls, S, self.N, self._n, size, rng)
+        rng                    = np.random.default_rng(rng)
+        Pc, Pls, S, q_s, _     = self._get_p_tree()
+        return _tree_sample(Pc, S, self.N, self._n, size, rng)
 
     # ── Hessian-vector product ────────────────────────────────────────────────
 
     def hvp(self, v: np.ndarray) -> np.ndarray:
         """
-        Compute Cov[Z] v.  O(N log^2 n).
+        Compute Cov[Z] v.  O(N (log N)^2).
 
         Cov[Z] is the Fisher information matrix of the distribution.
         It is positive semi-definite with rank N-1; null space = span{1}
@@ -547,10 +541,10 @@ class ConditionalPoisson:
         Uses the cached P-tree; rebuilds D-tree (which depends on v).
         """
         v = np.asarray(v, float)
-        Pn, Pls, S, q_s, log_gm = self._get_p_tree()
-        Dn, Dls = _build_d_tree(Pn, Pls, q_s, v, self._n, S)
-        oPn, oPls, oDn, oDls = _downward_pass(Pn, Pls, Dn, Dls, S, self._n)
-        _, Hv, _ = _extract(q_s, log_gm, Pn, Pls, oPn, oPls, oDn, oDls,
+        Pc, Pls, S, q_s, log_gm = self._get_p_tree()
+        Dc, Dls = _build_d_tree(Pc, Pls, q_s, v, S)
+        oPc, oPls, oDc, oDls = _downward_pass(Pc, Pls, Dc, Dls, S)
+        _, Hv, _ = _extract(q_s, log_gm, Pc, Pls, oPc, oPls, oDc, oDls,
                             S, self.N, self._n, v)
         return Hv
 
@@ -585,7 +579,7 @@ class ConditionalPoisson:
         for it in range(max_iter):
             self.theta  = theta          # sets theta, clears cache
             pi          = self._cache.get("pi") or self.pi
-            log_en      = self._cache["log_en"]
+            log_Z       = self._cache["log_Z"]
             grad        = pi_star - pi
             err         = float(np.max(np.abs(grad)))
             if verbose:
@@ -596,7 +590,7 @@ class ConditionalPoisson:
             delta = _cg(self.hvp, grad)
 
             slope = float(np.dot(grad, delta))
-            L0    = float(np.dot(pi_star, theta)) - log_en
+            L0    = float(np.dot(pi_star, theta)) - log_Z
             step  = 1.0
             for _ in range(20):
                 th_new        = theta + step * delta
@@ -612,7 +606,7 @@ class ConditionalPoisson:
         return self
 
     def __repr__(self) -> str:
-        if "log_en" in self._cache:
+        if "log_Z" in self._cache:
             return (f"ConditionalPoisson(N={self.N}, n={self._n}, "
-                    f"log_normalizer={self._cache['log_en']:.3f})")
+                    f"log_normalizer={self._cache['log_Z']:.3f})")
         return f"ConditionalPoisson(N={self.N}, n={self._n})"
