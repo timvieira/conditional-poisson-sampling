@@ -24,3 +24,4 @@ When changing notation or API names, update **all** of these in the same commit:
 
 - Commit and push after every logical change
 - Run tests before committing
+- **Never write citations without verifying them** — check title, authors, year, venue, and URL against the actual publication. Hallucinated references are unacceptable.

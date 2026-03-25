@@ -172,9 +172,13 @@ The test suite includes brute-force equivalence tests that verify `pi`, `log_nor
 
 ## References
 
-- Chen, Dempster & Liu (1994). "Weighted Finite Population Sampling to Maximize Entropy." *Biometrika*, 81(3), 457–469. — Introduces conditional Poisson sampling and the connection to elementary symmetric polynomials.
+- Hájek (1964). ["Asymptotic Theory of Rejective Sampling with Varying Probabilities from a Finite Population."](https://doi.org/10.1214/aoms/1177700375) *The Annals of Mathematical Statistics*, 35(4), 1491–1523. — Introduces the conditional Poisson sampling design.
 
-- Vieira (2014). ["Subsets and Superset Sampling."](https://timvieira.github.io/blog/post/2014/08/01/gumbel-max-trick-and-weighted-reservoir-sampling/) — Blog post describing divide-and-conquer sampling on product trees.
+- Chen, Dempster & Liu (1994). ["Weighted Finite Population Sampling to Maximize Entropy."](https://academic.oup.com/biomet/article-abstract/81/3/457/256956) *Biometrika*, 81(3), 457–469. — Characterizes CPS as maximum-entropy and establishes uniqueness of weights given inclusion probabilities.
+
+- Tillé (2006). [*Sampling Algorithms*](https://link.springer.com/book/10.1007/978-0-387-34240-0). Springer. — Comprehensive reference on sampling-without-replacement designs including CPS.
+
+- Meister, Amini, Vieira & Cotterell (2021). ["Conditional Poisson Stochastic Beams."](https://aclanthology.org/2021.emnlp-main.52/) *Proceedings of EMNLP 2021*. — Applies CPS to stochastic beam search in NLP; uses the $O(NK)$ dynamic programming recurrence for the normalizing constant.
 
 ## License
 
