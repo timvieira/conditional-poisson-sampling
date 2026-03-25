@@ -1,10 +1,10 @@
 # Conditional Poisson Sampling
 
-Sample random subsets of exactly $n$ items from a universe of $N$, where each item $i$ has a specified inclusion probability $\pi_i$.
+Sample random subsets of exactly $n$ items from a universe $\mathcal{S}$ of $N$ items, where each item $i$ has a specified inclusion probability $\pi_i$.
 
-Given positive weights $w_1, \dots, w_N$, the probability of drawing a particular subset $S$ of size $n$ is proportional to the product of its weights:
+Given a positive weight vector $\boldsymbol{w} = (w_1, \dots, w_N)$, the probability of drawing a particular subset $S \in \binom{\mathcal{S}}{n}$ is proportional to the product of its weights:
 
-$$P(S) \propto \prod_{i \in S} w_i, \quad \lvert S \rvert = n$$
+$$P(S) \propto \prod_{i \in S} w_i, \quad S \in \tbinom{\mathcal{S}}{n}$$
 
 This is the **conditional Poisson distribution** (also called the *exponential* or *maximum-entropy* fixed-size design). It is the unique maximum-entropy distribution over size- $n$ subsets for given marginal inclusion probabilities — the fixed-size analogue of independent Bernoulli sampling.
 
@@ -51,8 +51,8 @@ print(cp.hvp(v))
 |---|---|
 | `ConditionalPoisson(n, theta)` | Direct from log-weights `theta`, where `theta[i]` $= \log w_i$ |
 | `ConditionalPoisson.uniform(N, n)` | Uniform: every item has inclusion probability $n/N$ |
-| `ConditionalPoisson.from_weights(n, w)` | From positive weights $w_i$ |
-| `ConditionalPoisson.fit(pi_star, n)` | Find weights that produce target inclusion probabilities $\pi^{\ast}$ |
+| `ConditionalPoisson.from_weights(n, w)` | From positive weight vector $\boldsymbol{w}$ |
+| `ConditionalPoisson.fit(pi_star, n)` | Find $\boldsymbol{w}$ that produces target inclusion probabilities $\pi^{\ast}$ |
 
 ### Fitting to target probabilities
 
@@ -64,7 +64,7 @@ cp = ConditionalPoisson.fit(pi_star, n=3, tol=1e-10, verbose=True)
 print(np.max(np.abs(cp.pi - pi_star)))  # should be < tol
 ```
 
-This solves a convex optimization problem (Newton-CG with Armijo backtracking) to find weights such that the resulting inclusion probabilities match $\pi^{\ast}$.
+This solves a convex optimization problem (Newton-CG with Armijo backtracking) to find $\boldsymbol{w}$ such that the resulting inclusion probabilities match $\pi^{\ast}$.
 
 ## How it works
 
@@ -120,7 +120,7 @@ graph TB
     style L4 fill:#d4e8b8,color:#000
 ```
 
-At leaf $i$, the $(n-1)$-th coefficient of the leave-one-out polynomial gives the sum over all size- $(n-1)$ subsets from the remaining items. The inclusion probability is then $\pi_i = w_i \cdot [z^{n-1}] P^{(-i)}(z) / Z$ where $Z$ is the normalizing constant.
+At leaf $i$, the $(n-1)$-th coefficient of the leave-one-out polynomial gives the sum over all size- $(n-1)$ subsets from the remaining items. The inclusion probability is then $\pi_i = w_i \cdot \llbracket P^{(-i)} \rrbracket(z^{n-1}) / Z$ where $Z$ is the normalizing constant.
 
 ### Sampling: top-down quota splitting
 
