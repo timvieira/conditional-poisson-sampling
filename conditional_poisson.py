@@ -275,64 +275,107 @@ def _tree_sample(Pc, S, N, n, M, rng):
     The log-scale factors cancel in the ratio, so only the normalised
     coefficient arrays Pc are needed.
 
+    Processes each tree level as a batch to minimise Python loop overhead.
+
     Complexity: O(n log N) per sample, O(M n log N) total.
     """
     quotas = np.zeros((2 * S, M), dtype=np.int32)
     quotas[1] = n
 
-    for node in range(1, S):
-        l, r = 2 * node, 2 * node + 1
-        k_arr = quotas[node]
-        Pl = Pc[l]
-        Pr = Pc[r]
-        max_l = len(Pl)
-        max_r = len(Pr)
-        j_arr = np.zeros(M, dtype=np.int32)
+    depth = int(np.log2(S))  # number of levels (S is a power of 2)
+    for d in range(depth):
+        level_start = 1 << d        # first node at this depth
+        level_end   = 1 << (d + 1)  # one past last node at this depth
 
-        max_k = int(k_arr.max())
-        if max_k == 0:
-            quotas[l] = 0
-            quotas[r] = 0
+        # ── Fast path: levels where max quota ≤ 1 (Bernoulli decisions) ──
+        # Check if all nodes at this level have max_k ≤ 1
+        level_quotas = quotas[level_start:level_end]   # (num_nodes, M)
+        global_max_k = int(level_quotas.max())
+
+        if global_max_k == 0:
+            # All quotas are 0 — nothing to split
+            quotas[level_start * 2 : level_end * 2] = 0
             continue
 
-        # Precompute CDF for each possible quota k = 1..max_k at this node.
-        cdf = np.zeros((max_k + 1, max_k + 1))
-        for k in range(1, max_k + 1):
-            km = min(k + 1, max_l)
-            jv = np.arange(km)
-            kv = k - jv
-            valid = kv < max_r
-            if not valid.any():
-                continue
-            jv_v = jv[valid]
-            kv_v = kv[valid]
-            w = np.maximum(Pl[jv_v], 0.0) * np.maximum(Pr[kv_v], 0.0)
-            cdf[k, jv_v] = w
-        np.cumsum(cdf, axis=1, out=cdf)
-        row_totals = cdf[:, -1].copy()
-        row_totals[row_totals == 0] = 1.0
-        cdf /= row_totals[:, None]
+        if global_max_k == 1:
+            # All decisions are Bernoulli: include in left child or right?
+            # prob(j=1|k=1) = Pl[1]*Pr[0] / (Pl[1]*Pr[0] + Pl[0]*Pr[1])
+            num_nodes = level_end - level_start
+            probs = np.zeros(num_nodes)
+            for idx in range(num_nodes):
+                node = level_start + idx
+                Pl, Pr = Pc[2 * node], Pc[2 * node + 1]
+                w1 = max(Pl[1], 0.0) * max(Pr[0], 0.0) if len(Pl) > 1 else 0.0
+                w0 = max(Pl[0], 0.0) * (max(Pr[1], 0.0) if len(Pr) > 1 else 0.0)
+                total = w0 + w1
+                probs[idx] = w1 / total if total > 0 else 0.5
 
-        u = rng.random(M)
-        active = k_arr > 0
-        if active.any():
-            active_idx = np.where(active)[0]
-            ki = k_arr[active_idx]
-            sample_cdfs = cdf[ki]
-            j_arr[active_idx] = np.argmax(
-                sample_cdfs >= u[active_idx, None], axis=1,
+            # Vectorised Bernoulli across all nodes × all samples
+            u = rng.random((num_nodes, M))
+            is_k1 = level_quotas == 1  # (num_nodes, M)
+            j_left = (is_k1 & (u < probs[:, None])).astype(np.int32)
+
+            # Batch assignment to children
+            quotas[level_start * 2 : level_end * 2 : 2] = j_left
+            quotas[level_start * 2 + 1 : level_end * 2 + 1 : 2] = (
+                level_quotas - j_left
             )
+            continue
 
-        quotas[l] = j_arr
-        quotas[r] = k_arr - j_arr
+        # ── General case: per-node CDF sampling ──
+        for node in range(level_start, level_end):
+            k_arr = quotas[node]
+            Pl = Pc[2 * node]
+            Pr = Pc[2 * node + 1]
+            max_l = len(Pl)
+            max_r = len(Pr)
+            j_arr = np.zeros(M, dtype=np.int32)
 
-    out = np.full((M, n), -1, dtype=np.int32)
-    cursors = np.zeros(M, dtype=np.int32)
-    for i in range(N):
-        inc = quotas[S + i] > 0
-        idx = np.where(inc)[0]
-        out[idx, cursors[idx]] = i
-        cursors[idx] += 1
+            max_k = int(k_arr.max())
+            if max_k == 0:
+                quotas[2 * node] = 0
+                quotas[2 * node + 1] = 0
+                continue
+
+            # Precompute CDF for each possible quota k = 1..max_k
+            cdf = np.zeros((max_k + 1, max_k + 1))
+            for k in range(1, max_k + 1):
+                km = min(k + 1, max_l)
+                jv = np.arange(km)
+                kv = k - jv
+                valid = kv < max_r
+                if not valid.any():
+                    continue
+                jv_v = jv[valid]
+                kv_v = kv[valid]
+                w = np.maximum(Pl[jv_v], 0.0) * np.maximum(Pr[kv_v], 0.0)
+                cdf[k, jv_v] = w
+            np.cumsum(cdf, axis=1, out=cdf)
+            row_totals = cdf[:, -1].copy()
+            row_totals[row_totals == 0] = 1.0
+            cdf /= row_totals[:, None]
+
+            u = rng.random(M)
+            active = k_arr > 0
+            if active.any():
+                active_idx = np.where(active)[0]
+                ki = k_arr[active_idx]
+                sample_cdfs = cdf[ki]
+                j_arr[active_idx] = np.argmax(
+                    sample_cdfs >= u[active_idx, None], axis=1,
+                )
+
+            quotas[2 * node] = j_arr
+            quotas[2 * node + 1] = k_arr - j_arr
+
+    # Collect leaf decisions into (M, n) output
+    # leaf_quotas[i, m] > 0 means item i is included in sample m
+    leaf_quotas = quotas[S : S + N]          # (N, M)
+    included = leaf_quotas.T > 0             # (M, N) bool
+    # Each row of `included` has exactly n True entries.
+    # np.where gives (sample_idx, item_idx) pairs sorted by sample then item.
+    sample_idx, item_idx = np.where(included)
+    out = item_idx.astype(np.int32).reshape(M, n)
 
     return out
 
