@@ -49,7 +49,7 @@ print(cp.hvp(v))
 
 | Constructor | Description |
 |---|---|
-| `ConditionalPoisson(n, theta)` | Direct from log-weights $\theta_i = \log w_i$ |
+| `ConditionalPoisson(n, theta)` | Direct from log-weights `theta`, where `theta[i]` $= \log w_i$ |
 | `ConditionalPoisson.uniform(N, n)` | Uniform: every item has inclusion probability $n/N$ |
 | `ConditionalPoisson.from_weights(n, q)` | From positive weights $w_i$ |
 | `ConditionalPoisson.fit(pi_star, n)` | Find weights that produce target inclusion probabilities $\pi^{\ast}$ |
@@ -64,7 +64,7 @@ cp = ConditionalPoisson.fit(pi_star, n=3, tol=1e-10, verbose=True)
 print(np.max(np.abs(cp.pi - pi_star)))  # should be < tol
 ```
 
-This solves a convex optimization problem (Newton-CG with Armijo backtracking) to find $\theta$ such that the resulting inclusion probabilities match $\pi^{\ast}$.
+This solves a convex optimization problem (Newton-CG with Armijo backtracking) to find weights such that the resulting inclusion probabilities match $\pi^{\ast}$.
 
 ## How it works
 
