@@ -407,7 +407,6 @@ class ConditionalPoisson:
     Construction
     ------------
     ConditionalPoisson(n, theta)           direct from log-weights theta = log(w)
-    ConditionalPoisson.uniform(N, n)       uniform inclusion probs n/N
     ConditionalPoisson.from_weights(n, w)  from non-negative weights w_i
     ConditionalPoisson.fit(pi_star, n)     moment-match to target probs
 
@@ -468,11 +467,6 @@ class ConditionalPoisson:
             # else: fully degenerate (all items determined), no reduced instance
 
     # ── Constructors ──────────────────────────────────────────────────────────
-
-    @classmethod
-    def uniform(cls, N: int, n: int) -> "ConditionalPoisson":
-        """Uniform: all weights equal, pi_i = n/N."""
-        return cls(n, np.zeros(N))
 
     @classmethod
     def from_weights(cls, n: int, w: np.ndarray) -> "ConditionalPoisson":

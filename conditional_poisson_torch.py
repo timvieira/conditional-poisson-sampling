@@ -68,7 +68,6 @@ class ConditionalPoissonTorch:
     Construction
     ------------
     ConditionalPoissonTorch(n, theta)                    direct from log-weights
-    ConditionalPoissonTorch.uniform(N, n)                uniform: pi_i = n/N
     ConditionalPoissonTorch.from_weights(n, w, items=)   from non-negative weights
     ConditionalPoissonTorch.fit(pi_star, n, items=)      fit to target probs
 
@@ -117,13 +116,6 @@ class ConditionalPoissonTorch:
         return len(self._forced_in_idx) > 0 or len(self._forced_out_idx) > 0
 
     # ── Constructors ──────────────────────────────────────────────────────────
-
-    @classmethod
-    def uniform(cls, N: int, n: int, *, items=None, **kw) -> "ConditionalPoissonTorch":
-        """Uniform: all weights equal, pi_i = n/N."""
-        cp = cls(n, torch.zeros(N, dtype=kw.get('dtype', torch.float64)),
-                 items=items, **kw)
-        return cp
 
     @classmethod
     def from_weights(cls, n: int, w, *, items=None, **kw) -> "ConditionalPoissonTorch":

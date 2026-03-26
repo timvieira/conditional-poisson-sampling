@@ -123,7 +123,7 @@ def test_small_N():
 # ── Constructors ──────────────────────────────────────────────────────────────
 
 def test_uniform():
-    cp = ConditionalPoisson.uniform(10, 3)
+    cp = ConditionalPoisson.from_weights(3, np.ones(10))
     pi = cp.pi
     assert np.allclose(pi, 0.3)
     assert abs(pi.sum() - 3.0) < 1e-10

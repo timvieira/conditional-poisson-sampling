@@ -48,8 +48,7 @@ print(cp.hvp(v))
 | Constructor | Description |
 |---|---|
 | `ConditionalPoisson(n, theta)` | Direct from log-weights `theta`, where `theta[i]` $= \log w_i$ |
-| `ConditionalPoisson.uniform(N, n)` | Uniform: every item has inclusion probability $n/N$ |
-| `ConditionalPoisson.from_weights(n, w)` | From weight vector $\boldsymbol{w}$ |
+| `ConditionalPoisson.from_weights(n, w)` | From weight vector $\boldsymbol{w}$ (uniform: `from_weights(n, np.ones(N))`) |
 | `ConditionalPoisson.fit(pi_star, n)` | Find $\boldsymbol{w}$ that produces target inclusion probabilities $\pi^{\ast}$ |
 
 ### Fitting to target probabilities
