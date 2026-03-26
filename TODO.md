@@ -112,7 +112,7 @@
 ## Notation / Formatting
 
 - [x] Bold vectors consistently: added `\btheta` and `\bpip` macros, applied throughout notebook. Scalars (θ_i, π_i) stay unbolded.
-- [x] Title case all subsection headings
+- [ ] ~~Title case all subsection headings~~ — REVERT: title case is terrible. Switch all headings to sentence case (only capitalize the first word and proper nouns). Update the style guide.
 - [x] Verification checkmark pills: placed after punctuation like footnote markers. (Sizing/padding still TODO.)
 - [x] Contour scaling section rewritten with full derivation: Cauchy integral formula motivation, why we get to choose r, saddlepoint/tilting-parameter derivation, connection to Poisson expected size. Title-cased heading.
 - [ ] Add a diagram of the contour integral in the complex plane — show the circle |z|=r with the generating function's poles at z = -1/w_i, and how changing r shifts which poles are inside/outside the contour. (The text now explains the math; a visual would reinforce it.)
@@ -127,6 +127,8 @@
 - [ ] Sampling timing plot (right panel) just shows one line with no baseline — it's not clear what the reader should take away. Add baselines: rejection sampling (Bernoulli construction), sequential DP-based sampling, or at minimum show cost per sample vs amortized cost (tree build once, then O(n log N) per sample). Or cut the plot and just state the complexity.
 - [x] Mention alternative O(Nn) algorithm: added note after Pascal recurrence in Cell 41 — DP forward gives Z, backprop gives π, all in O(Nn).
 - [x] Rename tree subsections: "Upward Pass" → "Computing the Normalizing Constant Z", "Downward Pass (Backpropagation)" → "Computing Inclusion Probabilities π", "Sampling" → "Drawing Exact Samples". Updated #Sampling anchor in Cell 41.
+- [ ] Remove the NumPy downward/backward pass code and explanation from the blog post. The PyTorch implementation uses autograd—there's no need to show a hand-coded downward pass. Keep the *concept* (π = gradient of log Z) but cut the NumPy implementation of it.
+- [ ] Audit and remove stale "pass" terminology throughout the blog post. The headings were renamed but the body text still references "upward pass", "downward pass", "forward pass", "backward pass" etc. Since the PyTorch implementation uses autograd (no hand-coded downward pass), much of this language is outdated. Reframe in terms of *what is computed* (Z, π, samples) rather than implementation passes. Check: Cell 6 outline, Cell 13 body, Cell 27 D-tree section, Cell 35 intro, summary table.
 - [x] Explain polynomial = coefficient array + FFT trick: added "Polynomials as arrays" paragraph to Cell 11, covering representation, convolution, and O(d log d) FFT speedup. References (3B1B, CLRS) can be added later.
 - [x] Rejection sampling Cell 9: converted from executable code + histogram plots to pseudocode in a markdown cell.
 - [x] Smooth out the opening: dropped bold question, removed unsupported applications, used ∝, merged imports into first code cell, tightened Cell 3→5 flow.
@@ -147,7 +149,7 @@
 
 Apply before every commit touching the notebook:
 - [x] All vector quantities use `\boldsymbol` in LaTeX
-- [x] All subsection titles are Title Case
+- [ ] All subsection titles use sentence case (not Title Case)
 - [x] Verification pills appear after punctuation, not before
 - [x] Color coding removed; legend removed
 - [ ] Every mathematical claim has a ✓ pill linking to its test
