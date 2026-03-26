@@ -87,12 +87,12 @@
 
 ## Bugs
 
-- [ ] HT section (Cell 40): orphaned sentence "gives an unbiased estimate: E[μ̂_HT] = μ ✓, provided π_i > 0..." is stranded after the example paragraph — should be right after the estimator formula. Leftover from the restructuring.
-- [ ] HT section (Cell 40): "advantage over Monte Carlo" paragraph is now partially redundant with the new Setup paragraph that already explains i.i.d. repetition
-- [ ] Speedup discussion (Cell 39): `torch_fft_prototype.py` link still points to repo root, not `/blob/main/torch_fft_prototype.py` — missed when fixing links elsewhere
-- [ ] Identities parameterization table (Cell 41): says `\bw \in [0,\infty)^N` (excludes infinity) but intro says `[0, \infty]` (includes infinity) — inconsistent
-- [ ] Fitting section (Cell 27): says "This is convex because log Z is the log-partition function" but the objective L = π*ᵀθ - log Z is actually *concave* (log Z is convex, so L is concave). Sloppy wording.
-- [ ] Jaynes (1957) is cited in Cell 5 but not listed in the References section (Cell 42)
+- [x] HT section (Cell 40): orphaned sentence — rewrote section, moved unbiasedness right after formula
+- [x] HT section (Cell 40): redundant "advantage over MC" paragraph — removed, covered by Setup
+- [x] Speedup discussion (Cell 39): fixed `torch_fft_prototype.py` link to `/blob/main/`
+- [x] Identities parameterization table (Cell 41): fixed `[0,∞)` → `[0,∞]` to match intro
+- [x] Fitting section (Cell 27): fixed "convex" → "concave (since log Z is convex as a log-partition function)"
+- [x] Jaynes (1957) added to References section (Cell 42)
 
 ## Confusing
 
