@@ -59,24 +59,10 @@ def _preprocess_weights(w, n):
     return interior_idx, forced_in_idx, forced_out_idx, interior_theta, n_interior
 
 
-def _tree_sample(theta, n, size, rng):
-    """Sample size-n subsets via top-down tree walk.
+def _build_sample_tree(theta, n):
+    """Build the product tree for sampling (cached, called once).
 
-    Build a balanced binary product tree from the leaf polynomials
-    (1 + w_i z), using contour scaling for numerical stability.
-    Then walk top-down: at each node with quota k, split between
-    children with probability proportional to P_L[j] * P_R[k-j].
-
-    Parameters
-    ----------
-    theta : (N,) numpy array of log-weights
-    n     : subset size
-    size  : number of samples to draw
-    rng   : numpy random generator
-
-    Returns
-    -------
-    (size, n) int array; each row is sorted item indices.
+    Returns (tree, tree_n, N) where tree[i] is the polynomial at node i.
     """
     import torch as _torch
     from scipy.signal import fftconvolve
@@ -85,60 +71,49 @@ def _tree_sample(theta, n, size, rng):
     N = len(theta)
     w = np.exp(theta)
 
-    # ── Contour scaling: find r such that sum w_i r / (1 + w_i r) = n ──
-    if n == 0:
-        return np.empty((size, 0), dtype=int)
-    if n == N:
-        return np.tile(np.arange(N), (size, 1))
-
     r = _find_r(_torch.tensor(w, dtype=_torch.float64), n)
     w_scaled = w * r
 
-    # ── Build balanced binary tree (bottom-up) ──
-    # Pad to next power of 2
     tree_n = 1 << (N - 1).bit_length()
-
-    # Tree stored as array: node i has children 2i, 2i+1
-    # Leaves at positions tree_n .. 2*tree_n-1
-    # tree[i] = polynomial coefficients (numpy array, truncated to degree n)
     tree = [None] * (2 * tree_n)
 
-    # Leaves
     for i in range(N):
         tree[tree_n + i] = np.array([1.0, w_scaled[i]])
     for i in range(N, tree_n):
-        tree[tree_n + i] = np.array([1.0])  # identity
+        tree[tree_n + i] = np.array([1.0])
 
-    # Internal nodes (bottom-up)
     for i in range(tree_n - 1, 0, -1):
-        left = tree[2 * i]
-        right = tree[2 * i + 1]
-        p = fftconvolve(left, right)
+        p = fftconvolve(tree[2 * i], tree[2 * i + 1])
         if len(p) > n + 1:
             p = p[:n + 1]
-        # Renormalize to prevent overflow/underflow
         mx = np.abs(p).max()
         if mx > 0:
             p /= mx
         tree[i] = p
 
-    # ── Top-down sampling ──
+    return tree, tree_n, N
+
+
+def _sample_from_tree(tree, tree_n, N, n, size, rng):
+    """Draw samples from a prebuilt product tree via top-down quota splitting."""
+    if n == 0:
+        return np.empty((size, 0), dtype=int)
+    if n == N:
+        return np.tile(np.arange(N), (size, 1))
+
     samples = np.empty((size, n), dtype=int)
     for m in range(size):
         selected = []
-        # Stack of (node_index, quota)
         stack = [(1, n)]
         while stack:
             node, k = stack.pop()
             if k == 0:
                 continue
             if node >= tree_n:
-                # Leaf
                 leaf = node - tree_n
                 if leaf < N and k == 1:
                     selected.append(leaf)
                 continue
-            # Split quota between children
             left_poly = tree[2 * node]
             right_poly = tree[2 * node + 1]
             probs = np.zeros(k + 1)
@@ -201,6 +176,7 @@ class ConditionalPoissonTorch:
         self._forced_in_idx = np.array([], dtype=int)
         self._forced_out_idx = np.array([], dtype=int)
         self._N_full = self._N_interior  # overridden if boundary items exist
+        self._sample_tree = None  # lazily built on first sample() call
 
     def _with_boundary(self, interior_idx, forced_in_idx, forced_out_idx, N_full):
         """Attach boundary mapping (called by factory methods)."""
@@ -354,6 +330,7 @@ class ConditionalPoissonTorch:
         if value.shape != self._theta.shape:
             raise ValueError(f"theta must have shape {self._theta.shape}, got {value.shape}")
         self._theta = value.detach().clone()
+        self._sample_tree = None  # invalidate cached tree
 
     @property
     def w(self) -> torch.Tensor:
@@ -473,8 +450,12 @@ class ConditionalPoissonTorch:
             forced = np.sort(self._forced_in_idx)
             raw = np.tile(forced, (size, 1))
         else:
-            int_samples = _tree_sample(
-                self._theta.detach().cpu().numpy(), self._n, size, rng)
+            # Build tree once, cache for subsequent samples
+            if self._sample_tree is None:
+                self._sample_tree = _build_sample_tree(
+                    self._theta.detach().cpu().numpy(), self._n)
+            tree, tree_n, N_tree = self._sample_tree
+            int_samples = _sample_from_tree(tree, tree_n, N_tree, self._n, size, rng)
 
             if self._has_boundary:
                 int_samples = self._interior_idx[int_samples]
