@@ -83,12 +83,19 @@ class ConditionalPoissonTorch:
         Fit to target inclusion probabilities via L-BFGS.
 
         All values in pi_star must be in (0, 1) and sum to n.
+
+        Parameters
+        ----------
+        tol : convergence tolerance on max|pi - pi_star|.
+              Since the gradient of the objective is exactly pi_star - pi(theta),
+              this is equivalent to an infinity-norm gradient tolerance.
         """
         pi_star = _to_tensor(pi_star, dtype).to(device=device)
         theta = torch.log(pi_star / (1.0 - pi_star)).clone().requires_grad_(True)
 
         optimizer = torch.optim.LBFGS(
-            [theta], line_search_fn='strong_wolfe', tolerance_grad=tol,
+            [theta], line_search_fn='strong_wolfe',
+            tolerance_grad=0, tolerance_change=0,  # we check convergence ourselves
         )
 
         def closure():
@@ -98,6 +105,14 @@ class ConditionalPoissonTorch:
             return loss
 
         optimizer.step(closure)
+
+        # Check fit quality: grad = -(pi_star - pi), so |grad|_inf = max|pi - pi_star|
+        fit_err = theta.grad.abs().max().item()
+        if fit_err > tol:
+            import warnings
+            warnings.warn(
+                f"fit did not reach tol={tol:.0e}: max|pi - pi*| = {fit_err:.2e}. "
+                f"The LBFGS line search terminated early.")
 
         with torch.no_grad():
             theta -= theta.mean()
