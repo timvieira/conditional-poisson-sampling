@@ -130,6 +130,7 @@
 - [x] Explain polynomial = coefficient array + FFT trick: added "Polynomials as arrays" paragraph to Cell 11, covering representation, convolution, and O(d log d) FFT speedup. References (3B1B, CLRS) can be added later.
 - [x] Rejection sampling Cell 9: converted from executable code + histogram plots to pseudocode in a markdown cell.
 - [x] Small example uses non-integer weights: changed to w = (1.5, 3.2, 0.8, 4.5). Updated Cell 4 table, Z, π values, bar chart, and Cell 12 w_ex.
+- [ ] Worked examples should not assume N is a clean power of 2 — currently N=4 (micro-example) and N=8 (tree diagrams/worked example). Using e.g. N=5 or N=7 would show how padding works and avoid the impression that the algorithm requires power-of-2 input. The tree diagrams and w_ex array in Cell 12 would need updating.
 - [x] Reconcile w_i domain: added WLOG blockquote in Cell 41 parameterizations section — w_i=0 excluded, w_i=∞ deterministically included, general case reduces to finite positive.
 - [ ] Refactor display-heavy code cells into `display_utils.py` — many notebook cells are mostly formatting cruft (html_table, display(HTML(...)), plot boilerplate). Move these to helper functions so cells become one-liners like `show_upward_pass(w_ex, n_ex)`. Alternatively, use cell metadata `"jupyter": {"source_hidden": true}` to collapse pure-display cells.
 - [x] Removed color coding from all macros (kept macro structure). Removed color legend.
