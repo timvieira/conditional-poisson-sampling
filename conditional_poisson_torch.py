@@ -9,10 +9,6 @@ O(N log² n) complexity and full autograd support.  Gradients (π), HVP
 (Cov·v), and fitting come from torch.autograd — no hand-coded downward
 pass or D-tree needed.
 
-Supports an optional `items` parameter: a list of labels for the universe
-elements.  When provided, pi returns a dict, sample returns lists of items,
-and log_prob accepts item-valued subsets.
-
 Weights must be finite and positive.  For forced inclusion/exclusion,
 pre-filter the universe before constructing.
 
@@ -41,14 +37,14 @@ class ConditionalPoissonTorch:
 
     Construction
     ------------
-    ConditionalPoissonTorch(n, theta)                    direct from log-weights
-    ConditionalPoissonTorch.from_weights(n, w, items=)   from positive weights
-    ConditionalPoissonTorch.fit(pi_star, n, items=)      fit to target probs
+    ConditionalPoissonTorch(n, theta)                direct from log-weights
+    ConditionalPoissonTorch.from_weights(n, w)       from positive weights
+    ConditionalPoissonTorch.fit(pi_star, n)           fit to target probs
 
     Properties
     ----------
-    pi              inclusion probabilities (dict if items, else tensor)
-    w               weights (= exp(theta))
+    pi              (N,) inclusion probabilities
+    w               (N,) weights (= exp(theta))
     log_normalizer  log normalizing constant
 
     Methods
@@ -58,135 +54,78 @@ class ConditionalPoissonTorch:
     hvp(v)              Cov[1_S] v
     """
 
-    def __init__(self, n: int, theta, *, items=None,
-                 dtype=torch.float64, device=None):
+    def __init__(self, n: int, theta, *, dtype=torch.float64, device=None):
         """Construct from log-weights theta_i = log(w_i)."""
         self._theta = _to_tensor(theta, dtype).detach().clone().to(device=device)
         self._n = int(n)
         self._N = len(self._theta)
-        self._items = items
-        self._sample_tree = None  # lazily built on first sample() call
+        self._sample_tree = None
 
         if self._n < 0 or self._n > self._N:
             raise ValueError(f"n={self._n} must be in [0, {self._N}]")
-        if items is not None and len(items) != self._N:
-            raise ValueError(f"items has {len(items)} elements but theta has {self._N}")
 
     # ── Constructors ──────────────────────────────────────────────────────────
 
     @classmethod
-    def from_weights(cls, n: int, w, *, items=None, **kw) -> "ConditionalPoissonTorch":
+    def from_weights(cls, n: int, w, **kw) -> "ConditionalPoissonTorch":
         """Construct from positive weights w_i."""
         w = _to_tensor(w, kw.get('dtype', torch.float64))
         if (w <= 0).any() or not torch.isfinite(w).all():
             raise ValueError("all weights must be finite and positive")
         with torch.no_grad():
             theta = torch.log(w)
-        return cls(n, theta, items=items, **kw)
+        return cls(n, theta, **kw)
 
     @classmethod
-    def fit(
-        cls,
-        pi_star,
-        n: int,
-        *,
-        items=None,
-        tol: float = 1e-7,
-        max_iter: int = 200,
-        verbose: bool = False,
-        dtype=torch.float64,
-        device=None,
-    ) -> "ConditionalPoissonTorch":
+    def fit(cls, pi_star, n: int, *, tol: float = 1e-7,
+            dtype=torch.float64, device=None, **kw) -> "ConditionalPoissonTorch":
         """
         Fit to target inclusion probabilities via L-BFGS.
 
-        Parameters
-        ----------
-        pi_star : target inclusion probabilities (tensor, list, or dict)
-                  All values must be in (0, 1) and sum to n.
-        n       : subset size
-        items   : optional item labels
-        tol     : convergence tolerance on max|pi - pi_star|
-        max_iter: maximum L-BFGS iterations
-        verbose : print progress
+        All values in pi_star must be in (0, 1) and sum to n.
         """
-        if isinstance(pi_star, dict):
-            if items is None:
-                items = list(pi_star.keys())
-            pi_star = torch.tensor([pi_star[k] for k in items], dtype=dtype, device=device)
-
         pi_star = _to_tensor(pi_star, dtype).to(device=device)
-
-        # Warm start: logit(pi*) is asymptotically exact (Hájek 1964)
         theta = torch.log(pi_star / (1.0 - pi_star)).clone().requires_grad_(True)
 
         optimizer = torch.optim.LBFGS(
-            [theta], lr=1.0, max_iter=20, history_size=20,
-            line_search_fn='strong_wolfe',
-            tolerance_grad=1e-14, tolerance_change=1e-16,
+            [theta], line_search_fn='strong_wolfe', tolerance_grad=tol,
         )
 
-        nit = [0]
-        last_grad = [float('inf')]
-
         def closure():
-            nit[0] += 1
             optimizer.zero_grad()
-            log_Z = forward_log_Z(theta, n)
-            loss = -(pi_star @ theta - log_Z)
+            loss = -(pi_star @ theta - forward_log_Z(theta, n))
             loss.backward()
-            last_grad[0] = theta.grad.abs().max().item()
             return loss
 
-        for _ in range(max_iter // 20 + 1):
-            optimizer.step(closure)
-            if verbose:
-                print(f"  iter {nit[0]:3d}  max|pi - pi*| = {last_grad[0]:.2e}")
-            if last_grad[0] < tol:
-                break
-
-        if last_grad[0] >= tol:
-            import warnings
-            warnings.warn(f"fit did not converge: max|pi - pi*| = {last_grad[0]:.2e} "
-                          f"after {nit[0]} iterations (tol={tol})")
+        optimizer.step(closure)
 
         with torch.no_grad():
             theta -= theta.mean()
 
-        return cls(n, theta.detach(), items=items, dtype=dtype, device=device)
+        return cls(n, theta.detach(), dtype=dtype, device=device, **kw)
 
     # ── Properties ────────────────────────────────────────────────────────────
 
     @property
     def n(self) -> int:
-        """Subset size."""
         return self._n
 
     @property
     def N(self) -> int:
-        """Universe size."""
         return self._N
 
     @property
     def theta(self) -> torch.Tensor:
-        """Log-weights."""
         return self._theta.clone()
 
     @property
     def w(self) -> torch.Tensor:
-        """Weights."""
         return torch.exp(self._theta)
 
     @property
-    def pi(self):
-        """Inclusion probabilities.
-
-        Returns dict {item: prob} if items were provided, else (N,) tensor.
-        """
-        pi_val = compute_pi(self._theta, self._n).detach()
-        if self._items is not None:
-            return {item: pi_val[i].item() for i, item in enumerate(self._items)}
-        return pi_val
+    def pi(self) -> torch.Tensor:
+        """Inclusion probabilities pi_i = P(i in S)."""
+        return compute_pi(self._theta, self._n).detach()
 
     @property
     def log_normalizer(self) -> float:
@@ -197,31 +136,17 @@ class ConditionalPoissonTorch:
 
     def log_prob(self, S) -> Union[float, torch.Tensor]:
         """
-        Log-probability of one subset or a batch.
+        Log-probability: log P(S) = sum_{i in S} theta_i - log Z.
 
-        S may be:
-          - list of items (if items were provided)
-          - (n,) or (M, n) int tensor/list of indices
-          - (N,) or (M, N) bool tensor
-
-        Returns log P(S) = sum_{i in S} theta_i - log Z.
+        S: (n,) or (M, n) int tensor, or (N,) or (M, N) bool tensor.
         """
-        if self._items is not None and not isinstance(S, torch.Tensor):
-            if isinstance(S, (list, tuple)) and len(S) > 0:
-                item_to_idx = {item: i for i, item in enumerate(self._items)}
-                if isinstance(S[0], (list, tuple)):
-                    S = torch.tensor([[item_to_idx[x] for x in sub] for sub in S])
-                elif not isinstance(S[0], int):
-                    S = torch.tensor([item_to_idx[x] for x in S])
-
         S = _to_tensor(S, torch.long) if not isinstance(S, torch.Tensor) else S
-        single = S.dim() == 1
         th = self._theta.detach()
         lz = self.log_normalizer
 
         if S.dtype == torch.bool:
             if S.dim() == 2:
-                return (th @ S.float().T - lz)
+                return th @ S.float().T - lz
             return float(th[S].sum() - lz)
         if S.dim() == 2:
             return torch.stack([th[row].sum() - lz for row in S])
@@ -232,9 +157,8 @@ class ConditionalPoissonTorch:
     def _build_sample_tree(self):
         """Build the product tree for sampling (cached on first call).
 
-        Each tree[node][k] = Z(w_T, k) for items in subtree T (up to
-        a per-node scale factor that cancels in the sampling ratios).
-        Uses torch FFT for polynomial multiplication with contour scaling.
+        tree[node][k] = Z(w_T, k) for items in subtree T (up to a
+        per-node scale factor that cancels in the sampling ratios).
         """
         N = self._N
         n = self._n
@@ -298,19 +222,11 @@ class ConditionalPoissonTorch:
 
         return torch.sort(torch.tensor(selected, dtype=torch.long))[0]
 
-    def sample(self, size: int = 1, rng: Optional[int] = None):
+    def sample(self, size: int = 1, rng: Optional[int] = None) -> torch.Tensor:
         """
         Draw independent samples.
 
-        Parameters
-        ----------
-        size : number of subsets to draw
-        rng  : random seed (int) or None
-
-        Returns
-        -------
-        If items: list of lists of items
-        If no items: (size, n) long tensor of sorted indices
+        Returns (size, n) long tensor of sorted indices.
         """
         generator = torch.Generator()
         if rng is not None:
@@ -322,15 +238,11 @@ class ConditionalPoissonTorch:
             self._build_sample_tree()
 
         if self._n == 0:
-            raw = torch.empty(size, 0, dtype=torch.long)
-        elif self._n == self._N:
-            raw = torch.arange(self._N).unsqueeze(0).expand(size, -1)
-        else:
-            raw = torch.stack([self._draw_one_sample(generator) for _ in range(size)])
+            return torch.empty(size, 0, dtype=torch.long)
+        if self._n == self._N:
+            return torch.arange(self._N).unsqueeze(0).expand(size, -1)
 
-        if self._items is not None:
-            return [[self._items[i] for i in row.tolist()] for row in raw]
-        return raw
+        return torch.stack([self._draw_one_sample(generator) for _ in range(size)])
 
     # ── Hessian-vector product ────────────────────────────────────────────────
 
