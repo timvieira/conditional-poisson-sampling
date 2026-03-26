@@ -135,6 +135,7 @@
 - [ ] Refactor display-heavy code cells into `display_utils.py` — many notebook cells are mostly formatting cruft (html_table, display(HTML(...)), plot boilerplate). Move these to helper functions so cells become one-liners like `show_upward_pass(w_ex, n_ex)`. Alternatively, use cell metadata `"jupyter": {"source_hidden": true}` to collapse pure-display cells.
 - [x] Removed color coding from all macros (kept macro structure). Removed color legend.
 - [x] Vector concatenation notation: defined on first use before Vandermonde identity in Cell 41.
+- [ ] Weighted Vandermonde identity is an original result — promote to a proposition environment with a proof. The proof follows from expanding the product $\prod_{i \in A \cup B}(1 + w_i z) = \prod_{i \in A}(1 + w_i z) \cdot \prod_{i \in B}(1 + w_i z)$ and collecting the coefficient of $z^k$ via convolution. Currently stated without proof in the Recurrences and Algorithms subsection of Cell 42. Cite the unweighted version: [Vandermonde's identity](https://en.wikipedia.org/wiki/Vandermonde%27s_identity). Include a short proof (e.g., in a footnote or `<details>` block) — it's only one line: factor the product, equate z^k coefficients.
 
 ## Visualization
 

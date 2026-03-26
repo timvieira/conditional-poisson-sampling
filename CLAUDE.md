@@ -13,6 +13,7 @@ Code and documentation must use identical notation. Stale or inconsistent notati
 - **Subsets**: `S \in \binom{\mathcal{S}}{n}` for size-n subsets of the universe `\mathcal{S}`
 - **Scott brackets**: `\llbracket f \rrbracket(z^k)` for coefficient extraction — not `[z^k]`
 - **Big-O notation**: `\mathcal{O}(\cdot)` in LaTeX — not plain `O(\cdot)`
+- **Em-dashes**: tight, no spaces — `word—word` not `word — word`
 
 When changing notation or API names, update **all** of these in the same commit:
 1. Code (parameter names, property names)
