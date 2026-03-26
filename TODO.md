@@ -150,6 +150,9 @@
 Apply before every commit touching the notebook:
 - [x] All vector quantities use `\boldsymbol` in LaTeX
 - [ ] All subsection titles use sentence case (not Title Case)
+- [ ] Add a consolidated notation/definitions box early in the post (after the intro, before the tree). Define all key symbols in one place: w (weights/odds), θ (log-weights), p (coin-flip probabilities), π (inclusion probabilities), Z (normalizing constant), n, N, S, z (formal variable). Currently these are scattered across multiple cells and the reader has to piece them together. A single reference box makes it easy to look things up and harder for us to be sloppy.
+- [ ] Clean up w/p/θ parameterization confusion. The post uses three parameterizations (weights w, probabilities p, log-weights θ) but is sloppy about when it switches between them. Some formulas use w, others use θ, without always being clear which parameterization is in play. The identities section has a parameterizations table, but the rest of the post doesn't consistently signal which one it's using. Consider: pick one primary parameterization (probably w) and be explicit every time θ or p appears about the relationship. Or add a small "notation reminder" near each section that switches.
+- [ ] "is asymptotically exact" (Cell 26, optimizer paragraph) is vague—what is being taken to the limit? Presumably N→∞ with the Hájek (1964) result, but this needs to be stated explicitly. What does "exact" mean here—the warm start converges to the true θ*, or the inclusion probabilities match π*? Clarify or replace with a precise statement.
 - [x] Verification pills appear after punctuation, not before
 - [x] Color coding removed; legend removed
 - [ ] Every mathematical claim has a ✓ pill linking to its test
