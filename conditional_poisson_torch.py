@@ -93,9 +93,17 @@ class ConditionalPoissonTorch:
         pi_star = _to_tensor(pi_star, dtype).to(device=device)
         theta = torch.log(pi_star / (1.0 - pi_star)).clone().requires_grad_(True)
 
+        # L-BFGS (Nocedal & Wright, Ch. 7): memory m, Wolfe line search,
+        # run until convergence.  We disable torch's stopping criteria
+        # and check max|pi - pi*| ourselves afterward.
+        m = 5                          # memory budget (Nocedal & Wright Table 7.1)
         optimizer = torch.optim.LBFGS(
-            [theta], line_search_fn='strong_wolfe',
-            tolerance_grad=0, tolerance_change=0,  # we check convergence ourselves
+            [theta],
+            max_iter=200,              # iteration budget
+            history_size=m,
+            line_search_fn='strong_wolfe',
+            tolerance_grad=0,
+            tolerance_change=0,
         )
 
         def closure():
