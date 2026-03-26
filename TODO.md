@@ -109,6 +109,24 @@
 - [x] Cell 10: "**The gap.**" split into its own paragraph
 - [x] Cell 42: extra blank line before References removed
 
+## Notation / Formatting
+
+- [ ] Bold vectors consistently: `\theta` → `\boldsymbol{\theta}`, `\pi` → `\boldsymbol{\pi}`, and any other vectors that are currently unbolded. Scalars (θ_i, π_i) stay unbolded.
+- [ ] Title case all subsection headings (e.g., "### Downward pass (backpropagation)" → "### Downward Pass (Backpropagation)")
+- [ ] Verification checkmark pills: remove padding, make smaller (footnote-sized). Place after punctuation (commas, periods) like a footnote marker, not before.
+
+## Checklist (standing editorial rules)
+
+Apply before every commit touching the notebook:
+- [ ] All vector quantities use `\boldsymbol` in LaTeX
+- [ ] All subsection titles are Title Case
+- [ ] Verification pills appear after punctuation, not before
+- [ ] Color coding legend is present (cell 1)
+- [ ] Every mathematical claim has a ✓ pill linking to its test
+- [ ] Code and math use consistent notation (per CLAUDE.md)
+- [ ] No undefined abbreviations (spell out on first use)
+- [ ] Citations verified against the actual publication
+
 ## Minor
 
 - [x] Fold brute-force verification into a collapsible block or just reference the test suite
