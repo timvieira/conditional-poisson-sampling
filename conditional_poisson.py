@@ -436,9 +436,36 @@ class ConditionalPoisson:
         if theta.ndim != 1:   raise ValueError("theta must be 1-D")
         if len(theta) < n:    raise ValueError(f"N={len(theta)} must be >= n={n}")
         if n < 1:             raise ValueError("n must be >= 1")
+
+        forced_in  = np.where(theta == np.inf)[0]
+        forced_out = np.where(theta == -np.inf)[0]
+        interior   = np.where(np.isfinite(theta))[0]
+
+        n_in = len(forced_in)
+        n_red = n - n_in
+        if n_in > n:
+            raise ValueError(f"{n_in} items have w=inf but n={n}")
+        if n_red > len(interior):
+            raise ValueError(
+                f"Need {n_red} items from {len(interior)} interior items "
+                f"(after {n_in} forced-in), impossible"
+            )
+
         self._n     = int(n)
         self._theta = theta.copy()
         self._cache: dict = {}
+
+        # Boundary handling by reduction: strip forced-in/out items,
+        # delegate to a reduced instance on interior items with adjusted n.
+        self._forced_in  = forced_in
+        self._forced_out = forced_out
+        self._interior   = interior
+        self._reduced: Optional["ConditionalPoisson"] = None
+
+        if len(forced_in) > 0 or len(forced_out) > 0:
+            if n_red > 0 and len(interior) > 0:
+                self._reduced = ConditionalPoisson(n_red, theta[interior])
+            # else: fully degenerate (all items determined), no reduced instance
 
     # ── Constructors ──────────────────────────────────────────────────────────
 
@@ -449,10 +476,11 @@ class ConditionalPoisson:
 
     @classmethod
     def from_weights(cls, n: int, w: np.ndarray) -> "ConditionalPoisson":
-        """Construct from positive weights w_i."""
+        """Construct from non-negative weights w_i (0 and inf allowed)."""
         w = np.asarray(w, float)
-        if np.any(w <= 0): raise ValueError("all weights must be positive")
-        return cls(n, np.log(w))
+        if np.any(w < 0): raise ValueError("all weights must be non-negative")
+        with np.errstate(divide='ignore'):
+            return cls(n, np.log(w))
 
     @classmethod
     def fit(
@@ -498,8 +526,11 @@ class ConditionalPoisson:
 
     @theta.setter
     def theta(self, value):
-        self._theta = np.asarray(value, float).copy()
-        self._cache.clear()
+        value = np.asarray(value, float)
+        if len(value) != self.N:
+            raise ValueError(f"len(theta)={len(value)} != N={self.N}")
+        # Re-initialize to re-partition boundary items
+        self.__init__(self._n, value)
 
     # ── Internal: P-tree (shared by pi, log_Z, sampling) ──────────────────────
 
@@ -528,11 +559,25 @@ class ConditionalPoisson:
     @property
     def pi(self) -> np.ndarray:
         """Inclusion probabilities pi_i = P(i in S).  O(N (log N)^2), cached."""
+        if self._reduced is not None:
+            pi = np.zeros(self.N)
+            pi[self._forced_in] = 1.0
+            pi[self._interior] = self._reduced.pi
+            return pi
+        if len(self._forced_in) > 0:
+            # Fully degenerate: all forced-in, rest forced-out
+            pi = np.zeros(self.N)
+            pi[self._forced_in] = 1.0
+            return pi
         self._forward(); return self._cache["pi"].copy()
 
     @property
     def log_normalizer(self) -> float:
         """Log normalizing constant.  Never overflows.  O(N (log N)^2), cached."""
+        if self._reduced is not None:
+            return self._reduced.log_normalizer
+        if len(self._forced_in) > 0:
+            return 0.0  # only one possible subset
         self._forward(); return self._cache["log_Z"]
 
     # ── Log probability ───────────────────────────────────────────────────────
@@ -543,19 +588,51 @@ class ConditionalPoisson:
 
             log P(S) = sum_{i in S} log(w_i)  -  log Z
 
+        Returns -inf for impossible subsets (containing a w=0 item or
+        missing a w=inf item).
+
         S may be:
           int array (n,)     single subset (item indices)
           bool array (N,)    single subset (indicator)
           int array (M, n)   batch of M subsets
           bool array (M, N)  batch of M subsets
         """
-        S   = np.asarray(S)
-        lz  = self.log_normalizer
-        th  = self._theta
+        if self._reduced is None and len(self._forced_in) == 0:
+            # No boundary items — fast path using theta directly
+            S   = np.asarray(S)
+            lz  = self.log_normalizer
+            th  = self._theta
+            if S.dtype == bool:
+                return (th @ S.T - lz) if S.ndim == 2 else float(th[S].sum() - lz)
+            else:
+                return (th[S].sum(axis=1) - lz) if S.ndim == 2 else float(th[S].sum() - lz)
+
+        # Has boundary items — convert to bool indicator, validate, reduce.
+        S = np.asarray(S)
+        single = S.ndim == 1
         if S.dtype == bool:
-            return (th @ S.T - lz) if S.ndim == 2 else float(th[S].sum() - lz)
+            indicators = S if S.ndim == 2 else S[None, :]
         else:
-            return (th[S].sum(axis=1) - lz) if S.ndim == 2 else float(th[S].sum() - lz)
+            idx = S if S.ndim == 2 else S[None, :]
+            indicators = np.zeros((idx.shape[0], self.N), dtype=bool)
+            for m in range(idx.shape[0]):
+                indicators[m, idx[m]] = True
+
+        results = np.full(indicators.shape[0], -np.inf)
+        for m in range(indicators.shape[0]):
+            ind = indicators[m]
+            # Check boundary: forced-in must be in S, forced-out must not
+            if not np.all(ind[self._forced_in]):
+                continue  # -inf
+            if np.any(ind[self._forced_out]):
+                continue  # -inf
+            if self._reduced is None:
+                results[m] = 0.0  # degenerate: only one valid subset
+            else:
+                int_ind = ind[self._interior]
+                results[m] = self._reduced.log_prob(int_ind)
+
+        return float(results[0]) if single else results
 
     # ── Sampling ──────────────────────────────────────────────────────────────
 
@@ -578,8 +655,18 @@ class ConditionalPoisson:
 
         Complexity: O(N (log N)^2) to build tree [cached] + O(size * n * log N).
         """
-        rng                    = np.random.default_rng(rng)
-        Pc, Pls, S, q_s, _     = self._get_p_tree()
+        rng = np.random.default_rng(rng)
+        if self._reduced is not None:
+            # Sample from reduced problem, map indices back, merge with forced-in
+            int_samples = self._reduced.sample(size, rng)
+            int_samples = self._interior[int_samples]  # remap to full indices
+            forced_tile = np.tile(self._forced_in, (size, 1))
+            merged = np.concatenate([forced_tile, int_samples], axis=1)
+            merged.sort(axis=1)
+            return merged
+        if len(self._forced_in) > 0:
+            return np.tile(np.sort(self._forced_in), (size, 1))
+        Pc, Pls, S, q_s, _ = self._get_p_tree()
         return _tree_sample(Pc, S, self.N, self._n, size, rng)
 
     # ── Hessian-vector product ────────────────────────────────────────────────
@@ -595,6 +682,12 @@ class ConditionalPoisson:
         Uses the cached P-tree; rebuilds D-tree (which depends on v).
         """
         v = np.asarray(v, float)
+        if self._reduced is not None:
+            Hv = np.zeros(self.N)
+            Hv[self._interior] = self._reduced.hvp(v[self._interior])
+            return Hv
+        if len(self._forced_in) > 0:
+            return np.zeros(self.N)
         Pc, Pls, S, q_s, log_gm = self._get_p_tree()
         Dc, Dls = _build_d_tree(Pc, Pls, q_s, v, S)
         oPc, oPls, oDc, oDls = _downward_pass(Pc, Pls, Dc, Dls, S)
