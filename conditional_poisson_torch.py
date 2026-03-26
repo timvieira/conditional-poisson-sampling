@@ -106,8 +106,9 @@ class ConditionalPoissonTorch:
 
         optimizer.step(closure)
 
-        # Check fit quality: grad = -(pi_star - pi), so |grad|_inf = max|pi - pi_star|
-        fit_err = theta.grad.abs().max().item()
+        # Check fit quality: how close are the fitted π to the targets?
+        pi_fit = compute_pi(theta.detach(), n)
+        fit_err = (pi_fit - pi_star).abs().max().item()
         if fit_err > tol:
             import warnings
             warnings.warn(
