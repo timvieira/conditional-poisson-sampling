@@ -59,6 +59,111 @@ def _preprocess_weights(w, n):
     return interior_idx, forced_in_idx, forced_out_idx, interior_theta, n_interior
 
 
+def _tree_sample(theta, n, size, rng):
+    """Sample size-n subsets via top-down tree walk.
+
+    Build a balanced binary product tree from the leaf polynomials
+    (1 + w_i z), using contour scaling for numerical stability.
+    Then walk top-down: at each node with quota k, split between
+    children with probability proportional to P_L[j] * P_R[k-j].
+
+    Parameters
+    ----------
+    theta : (N,) numpy array of log-weights
+    n     : subset size
+    size  : number of samples to draw
+    rng   : numpy random generator
+
+    Returns
+    -------
+    (size, n) int array; each row is sorted item indices.
+    """
+    from scipy.optimize import brentq
+    from scipy.signal import fftconvolve
+
+    N = len(theta)
+    w = np.exp(theta)
+
+    # ── Contour scaling: find r such that sum w_i r / (1 + w_i r) = n ──
+    if n == 0:
+        return np.empty((size, 0), dtype=int)
+    if n == N:
+        return np.tile(np.arange(N), (size, 1))
+
+    def expected_size(log_r):
+        r = np.exp(log_r)
+        return np.sum(w * r / (1 + w * r)) - n
+
+    log_r = brentq(expected_size, -50, 50)
+    r = np.exp(log_r)
+    w_scaled = w * r
+
+    # ── Build balanced binary tree (bottom-up) ──
+    # Pad to next power of 2
+    tree_n = 1
+    while tree_n < N:
+        tree_n *= 2
+
+    # Tree stored as array: node i has children 2i, 2i+1
+    # Leaves at positions tree_n .. 2*tree_n-1
+    # tree[i] = polynomial coefficients (numpy array, truncated to degree n)
+    tree = [None] * (2 * tree_n)
+
+    # Leaves
+    for i in range(N):
+        tree[tree_n + i] = np.array([1.0, w_scaled[i]])
+    for i in range(N, tree_n):
+        tree[tree_n + i] = np.array([1.0])  # identity
+
+    # Internal nodes (bottom-up)
+    for i in range(tree_n - 1, 0, -1):
+        left = tree[2 * i]
+        right = tree[2 * i + 1]
+        p = fftconvolve(left, right)
+        if len(p) > n + 1:
+            p = p[:n + 1]
+        # Renormalize to prevent overflow/underflow
+        mx = np.abs(p).max()
+        if mx > 0:
+            p /= mx
+        tree[i] = p
+
+    # ── Top-down sampling ──
+    samples = np.empty((size, n), dtype=int)
+    for m in range(size):
+        selected = []
+        # Stack of (node_index, quota)
+        stack = [(1, n)]
+        while stack:
+            node, k = stack.pop()
+            if k == 0:
+                continue
+            if node >= tree_n:
+                # Leaf
+                leaf = node - tree_n
+                if leaf < N and k == 1:
+                    selected.append(leaf)
+                continue
+            # Split quota between children
+            left_poly = tree[2 * node]
+            right_poly = tree[2 * node + 1]
+            probs = np.zeros(k + 1)
+            for j in range(k + 1):
+                rem = k - j
+                if j < len(left_poly) and rem < len(right_poly):
+                    probs[j] = max(left_poly[j], 0.0) * max(right_poly[rem], 0.0)
+            total = probs.sum()
+            if total <= 0:
+                continue
+            probs /= total
+            j = rng.choice(k + 1, p=probs)
+            stack.append((2 * node + 1, k - j))
+            stack.append((2 * node, j))
+        samples[m] = np.sort(selected)
+
+    return samples
+
+
 class ConditionalPoissonTorch:
     """
     Conditional Poisson distribution over fixed-size subsets (PyTorch).
@@ -374,13 +479,10 @@ class ConditionalPoissonTorch:
             forced = np.sort(self._forced_in_idx)
             raw = np.tile(forced, (size, 1))
         else:
-            # Sample interior items via NumPy implementation
-            from conditional_poisson import ConditionalPoisson
-            cp_np = ConditionalPoisson(self._n, self._theta.detach().cpu().numpy())
-            int_samples = cp_np.sample(size, rng)
+            int_samples = _tree_sample(
+                self._theta.detach().cpu().numpy(), self._n, size, rng)
 
             if self._has_boundary:
-                # Remap interior indices to full indices, merge with forced-in
                 int_samples = self._interior_idx[int_samples]
                 forced = np.tile(self._forced_in_idx, (size, 1))
                 raw = np.concatenate([forced, int_samples], axis=1)
