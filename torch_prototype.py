@@ -2,143 +2,238 @@
 torch_prototype.py
 ==================
 
-PyTorch autograd prototype for the conditional Poisson forward pass.
+PyTorch implementation of the conditional Poisson forward pass.
 
-Validates that:
-1. torch.autograd.grad on log_Z gives inclusion probabilities (matching the
-   hand-coded downward pass)
-2. torch.autograd.functional.vhp on log_Z gives the Hessian-vector product
-   (matching the hand-coded D-tree)
+Only the forward pass (tree-structured polynomial multiplication) is
+implemented explicitly.  Everything else comes from autograd:
+  - Inclusion probabilities: backprop on log Z  (Baur & Strassen)
+  - Hessian-vector products: backprop on pi      (Pearlmutter)
+
+The forward pass is numerically stable (per-level renormalization with
+truncation to degree n), so Griewank-Walther guarantees that the
+autograd-computed derivatives are also stable.
+
+Performance: batched grouped conv1d reduces O(N) torch calls to O(log N)
+per tree level.  Polynomials are truncated to degree n (we only need
+the n-th coefficient of the root), bounding memory and preventing
+high-degree coefficients from drowning out the signal.
 """
 
 import torch
-import numpy as np
-import time
+import torch.nn.functional as F
 
 
-def poly_mul(a, b):
-    """Multiply two 1-D polynomials via conv1d.
-
-    a, b: 1-D tensors of polynomial coefficients.
-    Returns 1-D tensor of length len(a) + len(b) - 1.
-    """
-    # conv1d expects (batch, channels, length)
-    # We flip b for convolution (conv1d does cross-correlation)
-    out = torch.nn.functional.conv1d(
-        a.view(1, 1, -1),
-        b.flip(0).view(1, 1, -1),
-        padding=len(b) - 1,
-    )
-    return out.view(-1)
-
-
-def forward_log_Z(theta, n):
-    """Compute log Z via binary tree of polynomial multiplications.
+def _batch_poly_mul(a_batch, b_batch):
+    """Multiply pairs of polynomials in a batch via grouped conv1d.
 
     Parameters
     ----------
-    theta : 1-D tensor of log-weights (requires_grad=True)
-    n     : subset size
+    a_batch : (B, La) tensor — left polynomials
+    b_batch : (B, Lb) tensor — right polynomials
+
+    Returns
+    -------
+    (B, La + Lb - 1) tensor of product polynomials
+    """
+    B = a_batch.shape[0]
+    Lb = b_batch.shape[1]
+    # grouped conv1d: input (1, B, La), weight (B, 1, Lb)
+    out = F.conv1d(
+        a_batch.unsqueeze(0),
+        b_batch.flip(-1).unsqueeze(1),
+        padding=Lb - 1,
+        groups=B,
+    )
+    return out.squeeze(0)
+
+
+def forward_log_Z(theta, n):
+    """Compute log Z via batched binary tree of polynomial multiplications.
+
+    Each level of the tree renormalizes polynomial coefficients to have
+    max |c| = 1, tracking the scale factor through the log domain.
+    This keeps all conv1d inputs O(1) while remaining differentiable.
+
+    Parameters
+    ----------
+    theta : (N,) tensor of log-weights (requires_grad=True for differentiation)
+    n     : subset size (int)
 
     Returns
     -------
     log_Z : scalar tensor (differentiable)
     """
     N = theta.shape[0]
+    dtype = theta.dtype
+    device = theta.device
 
-    # Geometric-mean normalisation
+    # Geometric-mean normalisation (keeps polynomial coefficients O(1))
     log_gm = theta.mean()
     q = torch.exp(theta - log_gm)
 
-    # Build leaf polynomials: (1 + q_i * z)
-    polys = []
-    for i in range(N):
-        polys.append(torch.stack([torch.ones(1, dtype=theta.dtype, device=theta.device).squeeze(), q[i]]))
+    # Leaf polynomials: (1 + q_i * z), shape (N, 2)
+    ones = torch.ones(N, dtype=dtype, device=device)
+    polys = torch.stack([ones, q], dim=1)  # (N, 2)
 
-    # Bottom-up tree multiplication
-    while len(polys) > 1:
-        new_polys = []
-        for i in range(0, len(polys), 2):
-            if i + 1 < len(polys):
-                new_polys.append(poly_mul(polys[i], polys[i + 1]))
-            else:
-                new_polys.append(polys[i])
-        polys = new_polys
+    # Track log-scale per polynomial: true poly = polys[i] * exp(log_scales[i])
+    log_scales = torch.zeros(N, dtype=dtype, device=device)
 
-    root = polys[0]
-    log_Z = torch.log(root[n]) + n * log_gm
+    # Bottom-up: batch all multiplications at each level
+    while polys.shape[0] > 1:
+        B = polys.shape[0]
+        if B % 2 == 1:
+            leftover_poly = polys[-1:]
+            leftover_scale = log_scales[-1:]
+            polys = polys[:-1]
+            log_scales = log_scales[:-1]
+            B -= 1
+        else:
+            leftover_poly = None
+            leftover_scale = None
+
+        left = polys[0::2]                 # (B//2, L)
+        right = polys[1::2]                # (B//2, L)
+
+        # Truncate inputs to degree n before multiplying: coeff[k] of the
+        # product for k <= n depends only on coeff[0..n] of each factor.
+        # This bounds polynomial size, prevents FFT from wasting precision
+        # on high-degree coefficients we'll never use, and gives O(N log²n).
+        if left.shape[1] > n + 1:
+            left = left[:, :n + 1]
+        if right.shape[1] > n + 1:
+            right = right[:, :n + 1]
+
+        products = _batch_poly_mul(left, right)  # (B//2, ≤ 2n+1)
+
+        # Truncate output to degree n
+        if products.shape[1] > n + 1:
+            products = products[:, :n + 1]
+
+        # Combined scales: left_scale + right_scale
+        new_scales = log_scales[0::2] + log_scales[1::2]
+
+        # Renormalize: divide out max|c| per polynomial, track in log_scales
+        max_abs = products.abs().max(dim=1).values.clamp(min=1e-300)
+        products = products / max_abs.unsqueeze(1)
+        new_scales = new_scales + torch.log(max_abs)
+
+        if leftover_poly is not None:
+            pad_size = products.shape[1] - leftover_poly.shape[1]
+            if pad_size > 0:
+                leftover_poly = F.pad(leftover_poly, (0, pad_size))
+            products = torch.cat([products, leftover_poly], dim=0)
+            new_scales = torch.cat([new_scales, leftover_scale], dim=0)
+
+        polys = products
+        log_scales = new_scales
+
+    root = polys[0]                        # (N+1,) polynomial
+    log_Z = torch.log(root[n]) + log_scales[0] + n * log_gm
     return log_Z
 
 
-def compute_pi_autograd(theta_np, n):
-    """Compute inclusion probabilities via autograd on log_Z."""
-    theta = torch.tensor(theta_np, dtype=torch.float64, requires_grad=True)
+def compute_pi(theta, n):
+    """Compute inclusion probabilities via autograd.
+
+    Parameters
+    ----------
+    theta : (N,) tensor of log-weights
+    n     : subset size
+
+    Returns
+    -------
+    pi : (N,) tensor of inclusion probabilities
+    """
+    theta = theta.detach().requires_grad_(True)
     log_Z = forward_log_Z(theta, n)
     pi = torch.autograd.grad(log_Z, theta, create_graph=True)[0]
-    return pi.detach().numpy()
+    return pi
 
 
-def compute_hvp_autograd(theta_np, n, v_np):
-    """Compute Hessian-vector product via torch.autograd.functional.vhp."""
-    theta = torch.tensor(theta_np, dtype=torch.float64)
-    v = torch.tensor(v_np, dtype=torch.float64)
+def compute_hvp(theta, n, v):
+    """Compute Hessian-vector product Cov[1_S] v via double backward.
 
-    def f(th):
-        return forward_log_Z(th, n)
+    Parameters
+    ----------
+    theta : (N,) tensor of log-weights
+    n     : subset size
+    v     : (N,) tensor direction
 
-    # vhp returns (f(theta), v^T H) — but H is symmetric so v^T H = H v
-    _, hvp = torch.autograd.functional.vhp(f, theta, v)
-    return hvp.numpy()
+    Returns
+    -------
+    hv : (N,) tensor
+    """
+    theta = theta.detach().requires_grad_(True)
+    log_Z = forward_log_Z(theta, n)
+    grad = torch.autograd.grad(log_Z, theta, create_graph=True)[0]
+    hv = torch.autograd.grad(grad, theta, grad_outputs=v)[0]
+    return hv
 
 
 # ══ Comparison script ═══════════════════════════════════════════════════════
 
 if __name__ == "__main__":
+    import numpy as np
+    import time
     from conditional_poisson import ConditionalPoisson
 
     np.random.seed(42)
-    N, n = 50, 20
-    theta = np.random.randn(N) * 0.5
 
-    cp = ConditionalPoisson(n, theta)
+    for N, n in [(50, 20), (200, 80), (500, 200), (1000, 400)]:
+        theta_np = np.random.randn(N) * 0.5
+        v_np = np.random.randn(N)
+        theta_t = torch.tensor(theta_np, dtype=torch.float64)
+        v_t = torch.tensor(v_np, dtype=torch.float64)
 
-    # ── Inclusion probabilities ──────────────────────────────────────────────
+        cp = ConditionalPoisson(n, theta_np)
 
-    t0 = time.perf_counter()
-    pi_numpy = cp.pi
-    t_numpy_pi = time.perf_counter() - t0
+        # ── Correctness ──
+        pi_np = cp.pi
+        pi_t = compute_pi(theta_t, n).detach().numpy()
+        err_pi = np.max(np.abs(pi_np - pi_t))
 
-    t0 = time.perf_counter()
-    pi_torch = compute_pi_autograd(theta, n)
-    t_torch_pi = time.perf_counter() - t0
+        hv_np = cp.hvp(v_np)
+        hv_t = compute_hvp(theta_t, n, v_t).detach().numpy()
+        err_hv = np.max(np.abs(hv_np - hv_t))
 
-    err_pi = np.max(np.abs(pi_numpy - pi_torch))
-    print(f"Inclusion probabilities (pi)")
-    print(f"  NumPy  time: {t_numpy_pi:.4f}s")
-    print(f"  Torch  time: {t_torch_pi:.4f}s")
-    print(f"  Max |error|: {err_pi:.2e}")
-    print()
+        # ── Timing (warm start) ──
+        reps = max(3, 100 // max(1, N // 50))
 
-    # ── Hessian-vector product ───────────────────────────────────────────────
+        # NumPy pi
+        for _ in range(3):
+            cp._cache.clear(); cp.pi
+        t0 = time.perf_counter()
+        for _ in range(reps):
+            cp._cache.clear(); cp.pi
+        t_np_pi = (time.perf_counter() - t0) / reps
 
-    v = np.random.randn(N)
+        # Torch pi
+        for _ in range(3):
+            compute_pi(theta_t, n)
+        t0 = time.perf_counter()
+        for _ in range(reps):
+            compute_pi(theta_t, n)
+        t_t_pi = (time.perf_counter() - t0) / reps
 
-    t0 = time.perf_counter()
-    hvp_numpy = cp.hvp(v)
-    t_numpy_hvp = time.perf_counter() - t0
+        # NumPy hvp
+        _ = cp.pi  # ensure tree cached
+        for _ in range(3):
+            cp.hvp(v_np)
+        t0 = time.perf_counter()
+        for _ in range(reps):
+            cp.hvp(v_np)
+        t_np_hv = (time.perf_counter() - t0) / reps
 
-    t0 = time.perf_counter()
-    hvp_torch = compute_hvp_autograd(theta, n, v)
-    t_torch_hvp = time.perf_counter() - t0
+        # Torch hvp
+        for _ in range(3):
+            compute_hvp(theta_t, n, v_t)
+        t0 = time.perf_counter()
+        for _ in range(reps):
+            compute_hvp(theta_t, n, v_t)
+        t_t_hv = (time.perf_counter() - t0) / reps
 
-    err_hvp = np.max(np.abs(hvp_numpy - hvp_torch))
-    print(f"Hessian-vector product (Hv)")
-    print(f"  NumPy  time: {t_numpy_hvp:.4f}s")
-    print(f"  Torch  time: {t_torch_hvp:.4f}s")
-    print(f"  Max |error|: {err_hvp:.2e}")
-    print()
-
-    # ── Sanity checks ────────────────────────────────────────────────────────
-
-    print(f"pi sum (should be {n}): numpy={pi_numpy.sum():.6f}, torch={pi_torch.sum():.6f}")
-    print(f"Hv . 1 (should be ~0):  numpy={hvp_numpy.sum():.2e}, torch={hvp_torch.sum():.2e}")
+        print(f"N={N:>5d}, n={n:>4d}  |  "
+              f"pi: np={t_np_pi*1000:.1f}ms  torch={t_t_pi*1000:.1f}ms  "
+              f"err={err_pi:.1e}  |  "
+              f"hvp: np={t_np_hv*1000:.1f}ms  torch={t_t_hv*1000:.1f}ms  "
+              f"err={err_hv:.1e}")
