@@ -17,6 +17,13 @@ Performance: batched grouped conv1d reduces O(N) torch calls to O(log N)
 per tree level.  Polynomials are truncated to degree n (we only need
 the n-th coefficient of the root), bounding memory and preventing
 high-degree coefficients from drowning out the signal.
+
+Complexity: O(Nn) — conv1d uses direct convolution (oneDNN/MKLDNN on
+CPU, never FFT).  Same asymptotic cost as the naive DP, but faster in
+practice due to oneDNN's vectorized kernels and batched execution.
+Recovering O(N log² n) requires numerically stable FFT-based polynomial
+multiplication (open problem: FFT rounding errors corrupt small
+coefficients after renormalization).
 """
 
 import torch

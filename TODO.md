@@ -76,6 +76,12 @@
 - [ ] K-DPP connection: decide whether it belongs in the main text or an appendix — it's interesting but tangential to the main narrative
 - [ ] The summary repeats but doesn't synthesize — add a takeaway ("the tree unifies normalizing constant computation, marginal inference, sampling, and parameter fitting into a single data structure")
 
+## Implementation
+
+- [ ] Batch polynomial multiplications per tree level in the NumPy implementation (same trick as torch_prototype: one vectorized operation per level instead of O(N) individual convolve calls). The torch version gets 3-5x from this; NumPy should see similar gains.
+- [ ] Investigate numerically stable FFT-based polynomial multiplication to recover O(N log² n) — current torch version is O(Nn) because conv1d always uses direct convolution (oneDNN on CPU). FFT rounding errors corrupt small polynomial coefficients; the fundamental issue is that convolution of two degree-n polynomials with O(1) coefficients produces a peak at degree ~n but the coefficient we need (also at degree n) can be much smaller in magnitude.
+- [ ] Test GPU performance — cuDNN has FFT and Winograd codepaths for conv1d (unlike CPU's oneDNN which is always direct), so GPU could recover O(n log n) per multiply but at the cost of the FFT precision issue. Also: float32 on GPU adds further precision risk for the renormalization scheme.
+
 ## Minor
 
 - [x] Fold brute-force verification into a collapsible block or just reference the test suite
