@@ -100,9 +100,7 @@ def _tree_sample(theta, n, size, rng):
 
     # ── Build balanced binary tree (bottom-up) ──
     # Pad to next power of 2
-    tree_n = 1
-    while tree_n < N:
-        tree_n *= 2
+    tree_n = 1 << (N - 1).bit_length()
 
     # Tree stored as array: node i has children 2i, 2i+1
     # Leaves at positions tree_n .. 2*tree_n-1
