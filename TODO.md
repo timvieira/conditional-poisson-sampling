@@ -46,14 +46,14 @@
 
 ## Structure and Flow
 
-- [ ] Add a roadmap after the intro so readers know the arc of the post (rejection samplers → tree → fitting)
-- [ ] Lead with a small concrete example before the abstract generating function machinery — anchor notation in numbers before abstraction
-- [ ] Integrate the N=4 worked example *into* the tree explanation (upward/downward) rather than placing it after all three passes
-- [ ] The intro paragraph does too much at once — split definition, etymology, max-entropy property, and exponential family connection into digestible chunks
-- [ ] "Basic usage" (Cells 7-10) arrives before the reader understands what it's computing — either commit to a tutorial-first framing (and say so) or defer until after the tree explanation
-- [ ] The rejection sampling section's punchline ("neither gives you Z, π, or gradients") should be emphasized as the gap the tree fills — frame the contrast as "easy to understand, impossible to scale" vs. "the tree makes it all efficient"
-- [ ] The intro introduces ~10 symbols ($\mathcal{S}$, $N$, $n$, $w_i$, $S$, $\binom{\mathcal{S}}{n}$, $Z$, $p_i$, $\theta_i$, $\pi_i$) before any concrete example — anchor notation in numbers first
-- [ ] The product tree section covers too much in one pass (upward, downward, sampling, worked example, brute-force) — consider breaking it into smaller sections or interleaving explanation with examples
+- [x] Add a roadmap after the intro so readers know the arc of the post (rejection samplers → tree → fitting)
+- [x] Lead with a small concrete example before the abstract generating function machinery — anchor notation in numbers before abstraction
+- [x] Integrate the N=4 worked example *into* the tree explanation (upward/downward) rather than placing it after all three passes
+- [x] The intro paragraph does too much at once — split definition, etymology, max-entropy property, and exponential family connection into digestible chunks
+- [x] "Basic usage" (Cells 7-10) arrives before the reader understands what it's computing — either commit to a tutorial-first framing (and say so) or defer until after the tree explanation
+- [x] The rejection sampling section's punchline ("neither gives you Z, π, or gradients") should be emphasized as the gap the tree fills — frame the contrast as "easy to understand, impossible to scale" vs. "the tree makes it all efficient"
+- [x] The intro introduces ~10 symbols ($\mathcal{S}$, $N$, $n$, $w_i$, $S$, $\binom{\mathcal{S}}{n}$, $Z$, $p_i$, $\theta_i$, $\pi_i$) before any concrete example — anchor notation in numbers first
+- [x] The product tree section covers too much in one pass (upward, downward, sampling, worked example, brute-force) — consider breaking it into smaller sections or interleaving explanation with examples
 
 ## Exposition Gaps
 
@@ -89,7 +89,7 @@
 
 - [x] Fold brute-force verification into a collapsible block or just reference the test suite
 - [x] Sampling cost $O(n \log N)$ assumes $n \ll N$; when $n \approx N$ essentially all nodes are visited — note this or clarify
-- [ ] Consider switching from Scott bracket notation to the more standard $[z^k] f(z)$ — less notation to introduce
+- [x] Consider switching from Scott bracket notation to the more standard $[z^k] f(z)$ — keeping Scott brackets (less familiar but avoids ambiguity)
 - [x] Link to `conditional_poisson.py` points to repo root, not the file itself
 - [x] HTML acceptance rate table (Cell 5) — kept as HTML because Jupyter doesn't render LaTeX in markdown tables
 - [x] DP baseline in timing section (Cell 25) is $O(N^2 n)$ (recomputes from scratch per leave-one-out), not $O(Nn)$ as stated
