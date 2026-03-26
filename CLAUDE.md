@@ -12,7 +12,7 @@ Code and documentation must use identical notation. Stale or inconsistent notati
 - **Inclusion probabilities**: `pi` (or `pi_i`)
 - **Subsets**: `S \in \binom{\mathcal{S}}{n}` for size-n subsets of the universe `\mathcal{S}`
 - **Scott brackets**: `\llbracket f \rrbracket(z^k)` for coefficient extraction — not `[z^k]`
-- **Color coding** (notebook only): weights blue (#2196F3), inclusion probs crimson (#E91E63), Z orange (#FF9800)
+- **Big-O notation**: `\mathcal{O}(\cdot)` in LaTeX — not plain `O(\cdot)`
 
 When changing notation or API names, update **all** of these in the same commit:
 1. Code (parameter names, property names)
