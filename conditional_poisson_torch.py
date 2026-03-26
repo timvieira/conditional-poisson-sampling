@@ -21,116 +21,7 @@ import numpy as np
 import torch
 from typing import Optional, Union
 
-from torch_fft_prototype import forward_log_Z, compute_pi, compute_hvp
-
-
-def _preprocess_weights(w, n):
-    """Separate boundary items from interior, validate, return mapping.
-
-    Returns
-    -------
-    interior_idx : int array — indices of finite positive-weight items
-    forced_in_idx : int array — indices of w=∞ items
-    forced_out_idx : int array — indices of w=0 items
-    interior_theta : tensor — log-weights for interior items only
-    n_interior : int — reduced subset size (n minus forced-in count)
-    items : list or None — original items (passed through)
-    """
-    if isinstance(w, np.ndarray):
-        w = torch.tensor(w, dtype=torch.float64)
-    w = w.double()
-
-    forced_out_idx = torch.where(w == 0)[0].numpy()
-    forced_in_idx = torch.where(torch.isinf(w))[0].numpy()
-    interior_idx = torch.where(torch.isfinite(w) & (w > 0))[0].numpy()
-
-    n_forced = len(forced_in_idx)
-    n_interior = n - n_forced
-
-    if n_interior < 0:
-        raise ValueError(f"More forced-in items ({n_forced}) than n={n}")
-    if n_interior > len(interior_idx):
-        raise ValueError(f"Not enough interior items ({len(interior_idx)}) "
-                         f"for n - forced_in = {n_interior}")
-
-    with torch.no_grad():
-        interior_theta = torch.log(w[interior_idx])
-
-    return interior_idx, forced_in_idx, forced_out_idx, interior_theta, n_interior
-
-
-def _build_sample_tree(theta, n):
-    """Build the product tree for sampling (cached, called once).
-
-    Returns (tree, tree_n, N) where tree[i] is the polynomial at node i.
-    """
-    import torch as _torch
-    from scipy.signal import fftconvolve
-    from torch_fft_prototype import _find_r
-
-    N = len(theta)
-    w = np.exp(theta)
-
-    r = _find_r(_torch.tensor(w, dtype=_torch.float64), n)
-    w_scaled = w * r
-
-    tree_n = 1 << (N - 1).bit_length()
-    tree = [None] * (2 * tree_n)
-
-    for i in range(N):
-        tree[tree_n + i] = np.array([1.0, w_scaled[i]])
-    for i in range(N, tree_n):
-        tree[tree_n + i] = np.array([1.0])
-
-    for i in range(tree_n - 1, 0, -1):
-        p = fftconvolve(tree[2 * i], tree[2 * i + 1])
-        if len(p) > n + 1:
-            p = p[:n + 1]
-        mx = np.abs(p).max()
-        if mx > 0:
-            p /= mx
-        tree[i] = p
-
-    return tree, tree_n, N
-
-
-def _sample_from_tree(tree, tree_n, N, n, size, rng):
-    """Draw samples from a prebuilt product tree via top-down quota splitting."""
-    if n == 0:
-        return np.empty((size, 0), dtype=int)
-    if n == N:
-        return np.tile(np.arange(N), (size, 1))
-
-    samples = np.empty((size, n), dtype=int)
-    for m in range(size):
-        selected = []
-        stack = [(1, n)]
-        while stack:
-            node, k = stack.pop()
-            if k == 0:
-                continue
-            if node >= tree_n:
-                leaf = node - tree_n
-                if leaf < N and k == 1:
-                    selected.append(leaf)
-                continue
-            left_poly = tree[2 * node]
-            right_poly = tree[2 * node + 1]
-            probs = np.zeros(k + 1)
-            for j in range(k + 1):
-                rem = k - j
-                if j < len(left_poly) and rem < len(right_poly):
-                    probs[j] = max(left_poly[j], 0.0) * max(right_poly[rem], 0.0)
-            total = probs.sum()
-            if total <= 0:
-                continue
-            probs /= total
-            j = rng.choice(k + 1, p=probs)
-            stack.append((2 * node + 1, k - j))
-            stack.append((2 * node, j))
-        samples[m] = np.sort(selected)
-
-    return samples
+from torch_fft_prototype import forward_log_Z, compute_pi, compute_hvp, _find_r
 
 
 class ConditionalPoissonTorch:
@@ -190,6 +81,33 @@ class ConditionalPoissonTorch:
     def _has_boundary(self):
         return len(self._forced_in_idx) > 0 or len(self._forced_out_idx) > 0
 
+    # ── Preprocessing ─────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _preprocess_weights(w, n):
+        """Separate boundary items from interior, validate, return mapping."""
+        if isinstance(w, np.ndarray):
+            w = torch.tensor(w, dtype=torch.float64)
+        w = w.double()
+
+        forced_out_idx = torch.where(w == 0)[0].numpy()
+        forced_in_idx = torch.where(torch.isinf(w))[0].numpy()
+        interior_idx = torch.where(torch.isfinite(w) & (w > 0))[0].numpy()
+
+        n_forced = len(forced_in_idx)
+        n_interior = n - n_forced
+
+        if n_interior < 0:
+            raise ValueError(f"More forced-in items ({n_forced}) than n={n}")
+        if n_interior > len(interior_idx):
+            raise ValueError(f"Not enough interior items ({len(interior_idx)}) "
+                             f"for n - forced_in = {n_interior}")
+
+        with torch.no_grad():
+            interior_theta = torch.log(w[interior_idx])
+
+        return interior_idx, forced_in_idx, forced_out_idx, interior_theta, n_interior
+
     # ── Constructors ──────────────────────────────────────────────────────────
 
     @classmethod
@@ -207,7 +125,7 @@ class ConditionalPoissonTorch:
             raise ValueError(f"items has {len(items)} elements but w has {N_full}")
 
         interior_idx, forced_in_idx, forced_out_idx, interior_theta, n_int = \
-            _preprocess_weights(w, n)
+            cls._preprocess_weights(w, n)
 
         if n_int == 0:
             # Fully determined: all selected items are forced-in
@@ -323,14 +241,6 @@ class ConditionalPoissonTorch:
         """Log-weights for interior items."""
         return self._theta.clone()
 
-    @theta.setter
-    def theta(self, value):
-        if isinstance(value, np.ndarray):
-            value = torch.tensor(value, dtype=self._theta.dtype, device=self._theta.device)
-        if value.shape != self._theta.shape:
-            raise ValueError(f"theta must have shape {self._theta.shape}, got {value.shape}")
-        self._theta = value.detach().clone()
-        self._sample_tree = None  # invalidate cached tree
 
     @property
     def w(self) -> torch.Tensor:
@@ -430,6 +340,78 @@ class ConditionalPoissonTorch:
 
     # ── Sampling ──────────────────────────────────────────────────────────────
 
+    def _build_sample_tree(self):
+        """Build the product tree for sampling (cached on first call)."""
+        from scipy.signal import fftconvolve
+
+        theta_np = self._theta.detach().cpu().numpy()
+        N = len(theta_np)
+        n = self._n
+        w = np.exp(theta_np)
+
+        r = _find_r(torch.tensor(w, dtype=torch.float64), n)
+        w_scaled = w * r
+
+        tree_n = 1 << (N - 1).bit_length()
+        tree = [None] * (2 * tree_n)
+
+        for i in range(N):
+            tree[tree_n + i] = np.array([1.0, w_scaled[i]])
+        for i in range(N, tree_n):
+            tree[tree_n + i] = np.array([1.0])
+
+        for i in range(tree_n - 1, 0, -1):
+            p = fftconvolve(tree[2 * i], tree[2 * i + 1])
+            if len(p) > n + 1:
+                p = p[:n + 1]
+            mx = np.abs(p).max()
+            if mx > 0:
+                p /= mx
+            tree[i] = p
+
+        self._sample_tree = (tree, tree_n, N)
+
+    def _draw_samples(self, size, rng):
+        """Draw samples from the cached product tree via top-down quota splitting."""
+        tree, tree_n, N = self._sample_tree
+        n = self._n
+
+        if n == 0:
+            return np.empty((size, 0), dtype=int)
+        if n == N:
+            return np.tile(np.arange(N), (size, 1))
+
+        samples = np.empty((size, n), dtype=int)
+        for m in range(size):
+            selected = []
+            stack = [(1, n)]
+            while stack:
+                node, k = stack.pop()
+                if k == 0:
+                    continue
+                if node >= tree_n:
+                    leaf = node - tree_n
+                    if leaf < N and k == 1:
+                        selected.append(leaf)
+                    continue
+                left_poly = tree[2 * node]
+                right_poly = tree[2 * node + 1]
+                probs = np.zeros(k + 1)
+                for j in range(k + 1):
+                    rem = k - j
+                    if j < len(left_poly) and rem < len(right_poly):
+                        probs[j] = max(left_poly[j], 0.0) * max(right_poly[rem], 0.0)
+                total = probs.sum()
+                if total <= 0:
+                    continue
+                probs /= total
+                j = rng.choice(k + 1, p=probs)
+                stack.append((2 * node + 1, k - j))
+                stack.append((2 * node, j))
+            samples[m] = np.sort(selected)
+
+        return samples
+
     def sample(
         self,
         size: int = 1,
@@ -446,16 +428,12 @@ class ConditionalPoissonTorch:
         rng = np.random.default_rng(rng)
 
         if self._n == 0 or self._N_interior == 0:
-            # Fully determined
             forced = np.sort(self._forced_in_idx)
             raw = np.tile(forced, (size, 1))
         else:
-            # Build tree once, cache for subsequent samples
             if self._sample_tree is None:
-                self._sample_tree = _build_sample_tree(
-                    self._theta.detach().cpu().numpy(), self._n)
-            tree, tree_n, N_tree = self._sample_tree
-            int_samples = _sample_from_tree(tree, tree_n, N_tree, self._n, size, rng)
+                self._build_sample_tree()
+            int_samples = self._draw_samples(size, rng)
 
             if self._has_boundary:
                 int_samples = self._interior_idx[int_samples]
