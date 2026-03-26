@@ -78,8 +78,9 @@ def _tree_sample(theta, n, size, rng):
     -------
     (size, n) int array; each row is sorted item indices.
     """
-    from scipy.optimize import brentq
+    import torch as _torch
     from scipy.signal import fftconvolve
+    from torch_fft_prototype import _find_r
 
     N = len(theta)
     w = np.exp(theta)
@@ -90,12 +91,7 @@ def _tree_sample(theta, n, size, rng):
     if n == N:
         return np.tile(np.arange(N), (size, 1))
 
-    def expected_size(log_r):
-        r = np.exp(log_r)
-        return np.sum(w * r / (1 + w * r)) - n
-
-    log_r = brentq(expected_size, -50, 50)
-    r = np.exp(log_r)
+    r = _find_r(_torch.tensor(w, dtype=_torch.float64), n)
     w_scaled = w * r
 
     # ── Build balanced binary tree (bottom-up) ──
