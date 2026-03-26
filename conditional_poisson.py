@@ -84,7 +84,7 @@ __all__ = ["ConditionalPoisson"]
 # truncated — they keep their full natural degree.
 
 def _scale(c):
-    """Normalise so max|c| = 1, return (normalised_coeffs, log_scale)."""
+    """Normalize so max|c| = 1, return (normalized_coeffs, log_scale)."""
     m = np.max(np.abs(c))
     if m == 0:
         return c, -np.inf
@@ -272,7 +272,7 @@ def _tree_sample(Pc, S, N, n, M, rng):
 
       P(j items from L | k) ∝ Pc_L[j] * Pc_R[k-j],   j = 0..k
 
-    The log-scale factors cancel in the ratio, so only the normalised
+    The log-scale factors cancel in the ratio, so only the normalized
     coefficient arrays Pc are needed.
 
     Processes each tree level as a batch to minimise Python loop overhead.
@@ -428,7 +428,7 @@ class ConditionalPoisson:
     -----
     - The P-tree is built once on first access and shared by pi, log_normalizer,
       and sample. The D-tree is rebuilt per hvp(v) call (depends on v).
-    - theta is zero-centred after fitting (shift-invariant distribution).
+    - theta is zero-centered after fitting (shift-invariant distribution).
     """
 
     def __init__(self, n: int, theta: np.ndarray):
@@ -504,7 +504,7 @@ class ConditionalPoisson:
     # ── Internal: P-tree (shared by pi, log_Z, sampling) ──────────────────────
 
     def _get_p_tree(self):
-        """Build and cache the P-tree and normalised weights."""
+        """Build and cache the P-tree and normalized weights."""
         if "p_tree" not in self._cache:
             log_gm = float(np.mean(self._theta))
             q_s    = np.exp(self._theta - log_gm)
@@ -615,8 +615,8 @@ class ConditionalPoisson:
         """
         Update weights to match target inclusion probabilities pi*.
 
-        Maximises the log-likelihood via Newton-CG with Armijo backtracking.
-        Log-weights are zero-centred on completion (shift-invariant distribution).
+        Maximizes the log-likelihood via Newton-CG with Armijo backtracking.
+        Log-weights are zero-centered on completion (shift-invariant distribution).
 
         Returns self (for chaining).
         """
@@ -666,7 +666,7 @@ class ConditionalPoisson:
                 stacklevel=3,
             )
 
-        theta      -= theta.mean()   # zero-centre (shift-invariant)
+        theta      -= theta.mean()   # zero-center (shift-invariant)
         self.theta  = theta
         return self
 

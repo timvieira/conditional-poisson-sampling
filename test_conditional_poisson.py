@@ -26,7 +26,7 @@ def test_fitting():
     assert np.max(np.abs(cp.pi - cp_fit.pi)) < 1e-8
 
 
-def test_log_prob_normalises():
+def test_log_prob_normalizes():
     rng = np.random.default_rng(0)
     cp = ConditionalPoisson.from_weights(3, rng.exponential(1.0, 6))
     all_S = list(combinations(range(6), 3))
@@ -224,7 +224,7 @@ def _brute_force(theta, n):
     N = len(theta)
     all_S = list(combinations(range(N), n))
 
-    # unnormalised log-probs
+    # unnormalized log-probs
     log_w = np.array([theta[list(s)].sum() for s in all_S])
     log_w_max = log_w.max()
     w = np.exp(log_w - log_w_max)
@@ -335,7 +335,7 @@ if __name__ == "__main__":
     tests = [
         test_forward_pass,
         test_fitting,
-        test_log_prob_normalises,
+        test_log_prob_normalizes,
         test_sampling,
         test_hvp,
         test_numerical_stability,
