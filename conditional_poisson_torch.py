@@ -445,9 +445,11 @@ class ConditionalPoissonTorch:
             int_samples = self._draw_samples(size, generator)
 
             if self._has_boundary:
-                int_samples = self._interior_idx[int_samples]
-                forced = self._forced_in_idx.unsqueeze(0).expand(size, -1)
-                raw = torch.cat([forced, int_samples], dim=1)
+                n_total = self._n + len(self._forced_in_idx)
+                raw = torch.empty(size, n_total, dtype=torch.long)
+                n_forced = len(self._forced_in_idx)
+                raw[:, :n_forced] = self._forced_in_idx
+                raw[:, n_forced:] = self._interior_idx[int_samples]
                 raw = torch.sort(raw, dim=1)[0]
             else:
                 raw = int_samples
