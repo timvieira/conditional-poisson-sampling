@@ -79,8 +79,11 @@
 ## Implementation
 
 - [ ] Batch polynomial multiplications per tree level in the NumPy implementation (same trick as torch_prototype: one vectorized operation per level instead of O(N) individual convolve calls). The torch version gets 3-5x from this; NumPy should see similar gains.
-- [ ] Investigate numerically stable FFT-based polynomial multiplication to recover O(N log² n) — current torch version is O(Nn) because conv1d always uses direct convolution (oneDNN on CPU). FFT rounding errors corrupt small polynomial coefficients; the fundamental issue is that convolution of two degree-n polynomials with O(1) coefficients produces a peak at degree ~n but the coefficient we need (also at degree n) can be much smaller in magnitude.
-- [ ] Test GPU performance — cuDNN has FFT and Winograd codepaths for conv1d (unlike CPU's oneDNN which is always direct), so GPU could recover O(n log n) per multiply but at the cost of the FFT precision issue. Also: float32 on GPU adds further precision risk for the renormalization scheme.
+- [ ] Recover sub-O(Nn) complexity with numerical stability. The fundamental obstacle: any polynomial multiplication that avoids the full O(d²) sum (FFT, Karatsuba) introduces subtractions that cancel out small coefficients. Direct convolution maintains precision because each output coefficient is a sum of positive terms (our polynomials have non-negative coefficients), with no cancellation. Tested approaches:
+    - FFT: O(d log d) but spectral rounding errors corrupt small coefficients at N≥1000
+    - Karatsuba: O(d^1.585) but (a0+a1)(b0+b1) - a0b0 - a1b1 subtraction causes same cancellation, breaks at N≥1000
+    - Possible directions: batchable DP recurrence, extracting just the n-th coefficient without full polynomial product, or compensated arithmetic (error-free transformations) to preserve precision through subtractions
+- [ ] Test GPU performance — cuDNN has FFT and Winograd codepaths for conv1d (unlike CPU's oneDNN which is always direct), so GPU could recover O(n log n) per multiply but at the cost of the precision issue above. Also: float32 on GPU adds further precision risk for the renormalization scheme.
 
 ## Minor
 
