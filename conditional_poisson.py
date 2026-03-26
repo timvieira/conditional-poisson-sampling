@@ -586,11 +586,11 @@ class ConditionalPoisson:
 
     def hvp(self, v: np.ndarray) -> np.ndarray:
         """
-        Compute Cov[Z] v.  O(N (log N)^2).
+        Compute Cov[1_S] v.  O(N (log N)^2).
 
-        Cov[Z] is the Fisher information matrix of the distribution.
+        Cov[1_S] is the covariance matrix of the inclusion indicators.
         It is positive semi-definite with rank N-1; null space = span{1}
-        since sum(Z_i) = n is constant.
+        since sum(1_{i in S}) = n is constant.
 
         Uses the cached P-tree; rebuilds D-tree (which depends on v).
         """

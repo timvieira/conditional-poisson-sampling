@@ -44,7 +44,41 @@
 - [x] Horvitz-Thompson estimator (Cell 23) not cited — add Horvitz & Thompson (1952)
 - [x] Pull key intuition from the "heaps for incremental computation" link forward instead of just linking
 
+## Structure and Flow
+
+- [ ] Add a roadmap after the intro so readers know the arc of the post (rejection samplers → tree → fitting)
+- [ ] Lead with a small concrete example before the abstract generating function machinery — anchor notation in numbers before abstraction
+- [ ] Integrate the N=4 worked example *into* the tree explanation (upward/downward) rather than placing it after all three passes
+- [ ] The intro paragraph does too much at once — split definition, etymology, max-entropy property, and exponential family connection into digestible chunks
+- [ ] "Basic usage" (Cells 7-10) arrives before the reader understands what it's computing — either commit to a tutorial-first framing (and say so) or defer until after the tree explanation
+- [ ] The rejection sampling section's punchline ("neither gives you Z, π, or gradients") should be emphasized as the gap the tree fills — frame the contrast as "easy to understand, impossible to scale" vs. "the tree makes it all efficient"
+- [ ] The intro introduces ~10 symbols ($\mathcal{S}$, $N$, $n$, $w_i$, $S$, $\binom{\mathcal{S}}{n}$, $Z$, $p_i$, $\theta_i$, $\pi_i$) before any concrete example — anchor notation in numbers first
+- [ ] The product tree section covers too much in one pass (upward, downward, sampling, worked example, brute-force) — consider breaking it into smaller sections or interleaving explanation with examples
+
+## Exposition Gaps
+
+- [ ] Give the D-tree significantly more space — currently a single sentence for a non-trivial algorithm, vs. multi-paragraph + diagrams for the P-tree
+- [ ] The fitting section is compressed overall — objective, convexity, gradient, Hessian, Newton-CG, and D-tree are all packed into one paragraph; the D-tree is the worst case but the whole section needs room to breathe
+- [ ] Explain *why* the sampling split is exact — the specific insight is that the split probabilities $P_L[j] \cdot P_R[k-j]$ are the *conditional* probabilities of the target distribution (via Vandermonde); state this explicitly near the pseudocode
+- [ ] The downward pass *is* backpropagation (not an analogy) — the post should make this unmistakable: define the forward pass (polynomial multiplication in a tree), then the backward pass follows mechanically. The current explanation jumps through too many intermediate framings (gradient, exponential family, leave-one-out, backprop, tree walk) instead of letting backprop do the explanatory work
+- [ ] State the cheap gradient principle explicitly: reverse-mode autodiff is a mechanical program transformation that guarantees the gradient costs O(1)× the forward pass — this makes the downward pass's $O(N \log^2 N)$ cost a corollary, not something that needs its own argument. Keep the existing blog post links ("evaluating ∇f(x) is as fast as f(x)", "gradient of a product") as the primary exposition; add Baur & Strassen (1983) and/or Griewank & Walther (2008) to the references for readers who want the original theorem
+- [ ] The Horvitz-Thompson section needs both setup/framing (it arrives with no transition) and a small worked example — currently reads as "see also" rather than a demonstration
+- [ ] The max-entropy property is stated with a citation but never demonstrated or given intuition
+
+## Restructuring
+
+- [ ] Restructure the "Identities" section (Cell 27) — it's a grab-bag; promote Vandermonde identity to the tree section (it's *why* the tree works), move parameterization table earlier (clarifies the intro), demote the rest to an appendix
+- [ ] The identities section has redundancy — repeats the $\pi_i$ formula and convexity argument from earlier sections; deduplicate or make the second occurrence explicitly a "recap for reference"
+- [ ] K-DPP connection: decide whether it belongs in the main text or an appendix — it's interesting but tangential to the main narrative
+- [ ] The summary repeats but doesn't synthesize — add a takeaway ("the tree unifies normalizing constant computation, marginal inference, sampling, and parameter fitting into a single data structure")
+
 ## Minor
 
 - [x] Fold brute-force verification into a collapsible block or just reference the test suite
 - [x] Sampling cost $O(n \log N)$ assumes $n \ll N$; when $n \approx N$ essentially all nodes are visited — note this or clarify
+- [ ] Consider switching from Scott bracket notation to the more standard $[z^k] f(z)$ — less notation to introduce
+- [ ] Link to `conditional_poisson.py` points to repo root, not the file itself
+- [ ] HTML acceptance rate table (Cell 5) is visually inconsistent with the rest of the markdown
+- [ ] DP baseline in timing section (Cell 25) is $O(N^2 n)$ (recomputes from scratch per leave-one-out), not $O(Nn)$ as stated
+- [ ] Color coding (weights blue, π crimson, Z orange) is never explained in the text; invisible to colorblind readers or raw markdown viewers
+- [ ] Several forward references (exponential family, D-tree) introduce concepts long before they're used — consider deferring or adding a brief "we'll return to this" signpost

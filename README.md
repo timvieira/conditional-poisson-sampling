@@ -14,7 +14,7 @@ Single-file library — copy `conditional_poisson.py` into your project, or inst
 pip install .
 ```
 
-Requires Python 3.8+ and NumPy.
+Requires Python 3.8+, NumPy, and SciPy.
 
 ## Usage
 
@@ -38,7 +38,7 @@ samples = cp.sample(1000, rng=42)   # shape (1000, 2)
 # Log-probability of a specific subset
 print(cp.log_prob([0, 3]))
 
-# Hessian-vector product: Cov[Z] v
+# Hessian-vector product: Cov[1_S] v
 v = np.random.randn(5)
 print(cp.hvp(v))
 ```
