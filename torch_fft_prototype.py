@@ -90,6 +90,9 @@ def _find_r(w, n, tol=1e-12, max_iter=100):
 def _batch_poly_mul_fft(a_batch, b_batch):
     """Multiply pairs of polynomials via batched FFT.
 
+    O(B * d log d) where d = La + Lb.  Uses torch.fft which is
+    differentiable, so autograd can backpropagate through this.
+
     Parameters
     ----------
     a_batch : (B, La) tensor
@@ -102,13 +105,14 @@ def _batch_poly_mul_fft(a_batch, b_batch):
     La = a_batch.shape[1]
     Lb = b_batch.shape[1]
     n_out = La + Lb - 1
+    # Convolution theorem: poly_mul(a, b) = ifft(fft(a) * fft(b))
     fa = torch.fft.rfft(a_batch, n=n_out)
     fb = torch.fft.rfft(b_batch, n=n_out)
     return torch.fft.irfft(fa * fb, n=n_out)
 
 
 def _batch_poly_mul_direct(a_batch, b_batch):
-    """Multiply pairs of polynomials via grouped conv1d (direct)."""
+    """Multiply pairs of polynomials via grouped conv1d (direct O(d²))."""
     B = a_batch.shape[0]
     Lb = b_batch.shape[1]
     out = F.conv1d(
@@ -157,18 +161,36 @@ def forward_log_Z(theta, n):
 
     w = torch.exp(theta)
 
-    # Step 1: find optimal contour radius (not on autograd graph)
+    # Step 1: find optimal contour radius (not on autograd graph).
+    #
+    # Why this works: the product polynomial P(z) = prod_i (1 + w_i z) has
+    # its peak coefficient near degree N/2 (for uniform weights).  The
+    # coefficient at degree n can be ~10^{-300} smaller.  FFT introduces
+    # errors ~eps * max|c|, which drowns the small coefficient.
+    #
+    # Rescaling z -> r*z gives P(r*z) = prod_i (1 + w_i*r*z).  The k-th
+    # coefficient of P(r*z) is c_k * r^k, so choosing r shifts the peak.
+    # The optimal r makes the expected sample size under Poisson sampling
+    # equal n, placing the peak at degree n — exactly where we need it.
+    #
+    # r is NOT on the autograd graph: it's a numerical conditioning choice,
+    # not part of the mathematical function.  The gradient of log_Z w.r.t.
+    # theta flows through w_scaled = w * r (where r is a constant).
     r = _find_r(w.detach(), n)
     log_r = math.log(r)
 
-    # Step 2: rescale weights (this IS on the autograd graph)
+    # Step 2: rescale weights (this IS on the autograd graph).
+    # After rescaling, the product polynomial's peak is near degree n,
+    # so FFT rounding errors are relative to the coefficient we need.
     w_scaled = w * r
 
     # Step 3: build leaf polynomials (1 + w_i' * z)
     ones = torch.ones(N, dtype=dtype, device=device)
     polys = torch.stack([ones, w_scaled], dim=1)  # (N, 2)
 
-    # Per-polynomial log-scale for renormalization
+    # Per-polynomial log-scale for renormalization.
+    # True polynomial = polys[i] * exp(log_scales[i]).
+    # Keeps convolution inputs O(1) for numerical stability.
     log_scales = torch.zeros(N, dtype=dtype, device=device)
 
     # Bottom-up tree with batched multiplication
@@ -225,7 +247,13 @@ def forward_log_Z(theta, n):
 # ── Convenience wrappers (same interface as torch_prototype) ─────────────────
 
 def compute_pi(theta, n):
-    """Inclusion probabilities via autograd on log_Z."""
+    """Inclusion probabilities via autograd on log_Z.
+
+    pi_i = d(log Z) / d(theta_i).  This is backpropagation (reverse-mode AD)
+    applied to the forward pass — the Baur-Strassen theorem guarantees the
+    cost is O(1)x the forward pass.  Griewank-Walther guarantees the numerical
+    stability is inherited from the forward pass.
+    """
     theta = theta.detach().requires_grad_(True)
     log_Z = forward_log_Z(theta, n)
     pi = torch.autograd.grad(log_Z, theta, create_graph=True)[0]
@@ -233,7 +261,12 @@ def compute_pi(theta, n):
 
 
 def compute_hvp(theta, n, v):
-    """Hessian-vector product Cov[1_S] v via double backward."""
+    """Hessian-vector product Cov[1_S] v via double backward.
+
+    Pearlmutter's R-operator: forward-mode AD applied to the backward pass
+    (or equivalently, backward-mode applied to the gradient computation).
+    Cost is O(1)x the gradient, i.e., O(1)x the forward pass.
+    """
     theta = theta.detach().requires_grad_(True)
     log_Z = forward_log_Z(theta, n)
     grad = torch.autograd.grad(log_Z, theta, create_graph=True)[0]
