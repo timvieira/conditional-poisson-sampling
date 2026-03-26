@@ -628,7 +628,11 @@ class ConditionalPoisson:
         if not np.all((pi_star > 0) & (pi_star < 1)):
             raise ValueError("all pi_star must lie strictly in (0, 1)")
 
-        theta = np.log(pi_star / (1.0 - pi_star))   # warm start
+        # Warm start: logit(pi*) = log(pi*/(1-pi*)).  This is the Poisson
+        # sampling odds — asymptotically exact by Hájek (1964), Thm 5.2:
+        # the CPS inclusion probs satisfy pi_i = p_i + O(1/N) where
+        # p_i = w_i/(1+w_i) are the unconditional Poisson probs.
+        theta = np.log(pi_star / (1.0 - pi_star))
 
         converged = False
         for it in range(max_iter):
