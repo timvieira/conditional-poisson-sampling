@@ -132,7 +132,7 @@
 - [x] Small example uses non-integer weights: changed to w = (1.5, 3.2, 0.8, 4.5). Updated Cell 4 table, Z, π values, bar chart, and Cell 12 w_ex.
 - [x] Reconcile w_i domain: added WLOG blockquote in Cell 41 parameterizations section — w_i=0 excluded, w_i=∞ deterministically included, general case reduces to finite positive.
 - [ ] Refactor display-heavy code cells into `display_utils.py` — many notebook cells are mostly formatting cruft (html_table, display(HTML(...)), plot boilerplate). Move these to helper functions so cells become one-liners like `show_upward_pass(w_ex, n_ex)`. Alternatively, use cell metadata `"jupyter": {"source_hidden": true}` to collapse pure-display cells.
-- [ ] Reconsider color coding — the colored symbols (weights blue, π crimson, Z orange, z purple) add visual noise without clearly aiding comprehension. They're invisible in raw markdown, inaccessible to colorblind readers, and require a legend. Consider removing them entirely.
+- [x] Removed color coding from all macros (kept macro structure). Removed color legend.
 - [x] Vector concatenation notation: defined on first use before Vandermonde identity in Cell 41.
 
 ## Visualization
@@ -145,7 +145,7 @@ Apply before every commit touching the notebook:
 - [x] All vector quantities use `\boldsymbol` in LaTeX
 - [x] All subsection titles are Title Case
 - [x] Verification pills appear after punctuation, not before
-- [ ] Color coding legend is present (cell 1)
+- [x] Color coding removed; legend removed
 - [ ] Every mathematical claim has a ✓ pill linking to its test
 - [ ] Code and math use consistent notation (per CLAUDE.md)
 - [ ] No undefined abbreviations (spell out on first use)
