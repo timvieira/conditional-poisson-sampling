@@ -21,6 +21,8 @@
 - [x] Add the Mermaid tree diagrams from the README into the blog post (upward pass, downward pass, sampling)
 - [x] Add pseudocode for the sampling procedure (recursive quota-splitting, ~5-10 lines)
 - [x] Add a scatter plot of $w_i$ vs $\pi_i$ to build intuition for the nonlinear relationship
+- [x] Small example (Cell 4): added bar chart comparing rescaled weights ($w_i / W \cdot n$) vs $\pi_i$ — both sum to $n$ for visual comparability
+- [ ] Investigate whether there's a more principled scale correction factor (tilting parameter $\lambda$, saddlepoint, etc.) for comparing weights and inclusion probabilities
 - [x] Justify convexity of the fitting problem in one sentence (log-partition function of an exponential family)
 - [x] Move the "maximum entropy" characterization earlier — it's a major selling point, currently buried in the summary
 - [x] Add a "Motivation" paragraph with 2-3 concrete use cases (survey sampling, beam search, subset selection in ML)
