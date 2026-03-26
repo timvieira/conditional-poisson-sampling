@@ -1,6 +1,6 @@
 # Conditional Poisson Sampling
 
-Sample random subsets of exactly $n$ items from a universe of $N$ items, where each item has a weight $w_i > 0$. The probability of drawing subset $S$ is proportional to $\prod_{i \in S} w_i$.
+Sample random subsets of exactly $n$ items from a universe of $N$ items, where each item has a weight $w_i \ge 0$ (including $w_i = \infty$ for forced inclusion). The probability of drawing subset $S$ is proportional to $\prod_{i \in S} w_i$.
 
 This is the **conditional Poisson distribution** — the unique maximum-entropy distribution over fixed-size subsets with given inclusion probabilities. It arises by running independent Bernoulli trials and conditioning on exactly $n$ items being selected.
 

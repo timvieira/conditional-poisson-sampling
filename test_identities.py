@@ -700,6 +700,62 @@ def test_sampling_distribution():
     assert p_value > 0.001, f"chi2={chi2:.1f}, df={df}, p={p_value:.6f}"
 
 
+# ---------------------------------------------------------------------------
+# Boundary weights: w_i = 0 (excluded) and w_i = inf (forced inclusion)
+# ---------------------------------------------------------------------------
+
+def test_boundary_zero_weight_pi():
+    """w_i = 0 implies pi_i = 0 (item never selected); pi still sums to n."""
+    w = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    cp = ConditionalPoisson.from_weights(n=2, w=w)
+    assert cp.pi[0] == 0.0, f"pi[0] should be 0 when w[0]=0, got {cp.pi[0]}"
+    assert np.isclose(np.sum(cp.pi), 2), f"pi should sum to n=2, got {np.sum(cp.pi)}"
+
+
+def test_boundary_inf_weight_pi():
+    """w_i = inf implies pi_i = 1 (item always selected); pi still sums to n."""
+    w = np.array([np.inf, 1.0, 2.0, 3.0, 4.0])
+    cp = ConditionalPoisson.from_weights(n=3, w=w)
+    assert cp.pi[0] == 1.0, f"pi[0] should be 1 when w[0]=inf, got {cp.pi[0]}"
+    assert np.isclose(np.sum(cp.pi), 3), f"pi should sum to n=3, got {np.sum(cp.pi)}"
+
+
+def test_boundary_mixed_zero_inf():
+    """Mix of w=0, w=inf, and finite; pi=0 for zeros, pi=1 for infs, sum=n."""
+    w = np.array([np.inf, 0.0, 1.0, 2.0, 3.0, np.inf, 0.0])
+    n = 4
+    cp = ConditionalPoisson.from_weights(n=n, w=w)
+    assert cp.pi[0] == 1.0
+    assert cp.pi[5] == 1.0
+    assert cp.pi[1] == 0.0
+    assert cp.pi[6] == 0.0
+    assert np.isclose(np.sum(cp.pi), n)
+    # Remaining pi should sum to n - #inf = 2
+    finite_mask = np.isfinite(w) & (w > 0)
+    assert np.isclose(np.sum(cp.pi[finite_mask]), n - 2)
+
+
+def test_boundary_all_determined():
+    """n items have w=inf, rest have w=0 — fully determined subset."""
+    w = np.array([np.inf, np.inf, 0.0, 0.0, 0.0])
+    cp = ConditionalPoisson.from_weights(n=2, w=w)
+    assert np.allclose(cp.pi, [1, 1, 0, 0, 0])
+    # Only one possible subset, so log_prob = 0
+    assert np.isclose(cp.log_prob(np.array([0, 1])), 0.0, atol=1e-12)
+
+
+def test_boundary_sampling_respects_zero_inf():
+    """Samples never include w=0 items, always include w=inf items."""
+    w = np.array([np.inf, 0.0, 1.0, 2.0, 3.0])
+    cp = ConditionalPoisson.from_weights(n=3, w=w)
+    rng = np.random.default_rng(123)
+    samples = cp.sample(500, rng=rng)
+    # Item 0 (inf) must appear in every sample
+    assert np.all(np.isin(0, samples.T)), "w=inf item missing from some samples"
+    # Item 1 (zero) must never appear
+    assert not np.any(np.isin(1, samples.T)), "w=0 item appeared in a sample"
+
+
 # ===========================================================================
 # Runner
 # ===========================================================================

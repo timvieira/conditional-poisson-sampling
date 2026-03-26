@@ -6,7 +6,7 @@ Conditional Poisson distribution over fixed-size subsets.
 
     P(S) ∝ prod_{i in S} w_i,   |S| = n
 
-where w_i are positive weights.  Internally parameterised by
+where w_i are non-negative weights (zero and infinity allowed).  Internally parameterised by
 log-weights theta_i = log(w_i).
 
 Everything — forward pass, gradient, Hessian-vector product, and sampling —
@@ -408,7 +408,7 @@ class ConditionalPoisson:
     ------------
     ConditionalPoisson(n, theta)           direct from log-weights theta = log(w)
     ConditionalPoisson.uniform(N, n)       uniform inclusion probs n/N
-    ConditionalPoisson.from_weights(n, w)  from positive weights w_i
+    ConditionalPoisson.from_weights(n, w)  from non-negative weights w_i
     ConditionalPoisson.fit(pi_star, n)     moment-match to target probs
 
     Properties  (all cached; cache invalidated when theta changes)

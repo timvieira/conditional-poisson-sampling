@@ -90,8 +90,8 @@
 - [x] Fold brute-force verification into a collapsible block or just reference the test suite
 - [x] Sampling cost $O(n \log N)$ assumes $n \ll N$; when $n \approx N$ essentially all nodes are visited — note this or clarify
 - [ ] Consider switching from Scott bracket notation to the more standard $[z^k] f(z)$ — less notation to introduce
-- [ ] Link to `conditional_poisson.py` points to repo root, not the file itself
-- [ ] HTML acceptance rate table (Cell 5) is visually inconsistent with the rest of the markdown
-- [ ] DP baseline in timing section (Cell 25) is $O(N^2 n)$ (recomputes from scratch per leave-one-out), not $O(Nn)$ as stated
-- [ ] Color coding (weights blue, π crimson, Z orange) is never explained in the text; invisible to colorblind readers or raw markdown viewers
-- [ ] Several forward references (exponential family, D-tree) introduce concepts long before they're used — consider deferring or adding a brief "we'll return to this" signpost
+- [x] Link to `conditional_poisson.py` points to repo root, not the file itself
+- [x] HTML acceptance rate table (Cell 5) — kept as HTML because Jupyter doesn't render LaTeX in markdown tables
+- [x] DP baseline in timing section (Cell 25) is $O(N^2 n)$ (recomputes from scratch per leave-one-out), not $O(Nn)$ as stated
+- [x] Color coding (weights blue, π crimson, Z orange) is never explained in the text; invisible to colorblind readers or raw markdown viewers
+- [x] Several forward references (exponential family, D-tree) introduce concepts long before they're used — consider deferring or adding a brief "we'll return to this" signpost
