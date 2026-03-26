@@ -85,6 +85,27 @@
 - [ ] Compare Newton-CG fitting to simpler optimizers (e.g., gradient descent, L-BFGS) — the PyTorch version makes this easy since autograd gives gradients for free. Newton-CG requires the hand-coded HVP (D-tree in NumPy, double backward in PyTorch); if a first-order method converges fast enough, it simplifies the implementation and may be competitive for moderate precision.
 - [ ] Promote torch_fft_prototype.py to the primary library implementation — it's faster (O(N log² n) vs O(N log² N)), simpler (no hand-coded downward pass or D-tree), and supports autograd for integration as a neural network layer. The NumPy implementation (conditional_poisson.py) becomes a pedagogical/reference implementation that makes the algorithm transparent without requiring PyTorch — keep it, but frame it as the teaching version. Need to: add sampling to the torch version, match the full ConditionalPoisson API (fit, log_prob, etc.), add tests, decide on the package structure.
 
+## Bugs
+
+- [ ] HT section (Cell 40): orphaned sentence "gives an unbiased estimate: E[μ̂_HT] = μ ✓, provided π_i > 0..." is stranded after the example paragraph — should be right after the estimator formula. Leftover from the restructuring.
+- [ ] HT section (Cell 40): "advantage over Monte Carlo" paragraph is now partially redundant with the new Setup paragraph that already explains i.i.d. repetition
+- [ ] Speedup discussion (Cell 39): `torch_fft_prototype.py` link still points to repo root, not `/blob/main/torch_fft_prototype.py` — missed when fixing links elsewhere
+- [ ] Identities parameterization table (Cell 41): says `\bw \in [0,\infty)^N` (excludes infinity) but intro says `[0, \infty]` (includes infinity) — inconsistent
+- [ ] Fitting section (Cell 27): says "This is convex because log Z is the log-partition function" but the objective L = π*ᵀθ - log Z is actually *concave* (log Z is convex, so L is concave). Sloppy wording.
+- [ ] Jaynes (1957) is cited in Cell 5 but not listed in the References section (Cell 42)
+
+## Confusing
+
+- [ ] Micro-example (Cell 4) uses 1-indexed items ({1,2}, {1,3}...) but worked example code (Cell 12) uses 0-indexed arrays — could trip readers up
+- [ ] Downward pass (Cell 13) Mermaid diagram is N=8 but interleaved code is N=4 — no explicit bridge between them
+- [ ] "## Sampling" heading (Cell 23) in the library API section could be confused with "### Sampling" subsection of the product tree — rename to "## Drawing samples" or similar
+
+## Editorial
+
+- [ ] Cell 5: abbreviation "CPS" used ("CPS spreads probability...") but never introduced — spell out or define
+- [ ] Cell 10: "**The gap.**" sentence is tacked onto a paragraph about categorical vs. Bernoulli tradeoff — would land harder as its own paragraph
+- [ ] Cell 42 (summary): two blank lines between the `(coeffs, log_scale)` paragraph and **References:** — minor formatting
+
 ## Minor
 
 - [x] Fold brute-force verification into a collapsible block or just reference the test suite
