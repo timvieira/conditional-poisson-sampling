@@ -114,6 +114,7 @@
 - [ ] Bold vectors consistently: `\theta` → `\boldsymbol{\theta}`, `\pi` → `\boldsymbol{\pi}`, and any other vectors that are currently unbolded. Scalars (θ_i, π_i) stay unbolded.
 - [ ] Title case all subsection headings (e.g., "### Downward pass (backpropagation)" → "### Downward Pass (Backpropagation)")
 - [ ] Verification checkmark pills: remove padding, make smaller (footnote-sized). Place after punctuation (commas, periods) like a footnote marker, not before.
+- [ ] Reconsider color coding — the colored symbols (weights blue, π crimson, Z orange, z purple) add visual noise without clearly aiding comprehension. They're invisible in raw markdown, inaccessible to colorblind readers, and require a legend. Consider removing them entirely.
 - [ ] Vector concatenation notation `(\boldsymbol{a}, \boldsymbol{b})` used without definition (e.g., in Vandermonde identity). Either define it on first use or switch to `(\boldsymbol{a}; \boldsymbol{b})` (semicolon, standard in numerical linear algebra).
 
 ## Visualization
