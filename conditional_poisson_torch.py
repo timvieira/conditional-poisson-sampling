@@ -13,8 +13,8 @@ Supports an optional `items` parameter: a list of labels for the universe
 elements.  When provided, pi returns a dict, sample returns lists of items,
 and log_prob accepts item-valued subsets.
 
-Boundary weights (w=0, w=∞) are handled by a preprocessing reduction:
-strip forced-out/forced-in items, solve the reduced problem, remap results.
+Weights must be finite and positive.  For forced inclusion/exclusion,
+pre-filter the universe before constructing.
 
 Pure PyTorch internally — no numpy or scipy dependency.
 """
@@ -42,7 +42,7 @@ class ConditionalPoissonTorch:
     Construction
     ------------
     ConditionalPoissonTorch(n, theta)                    direct from log-weights
-    ConditionalPoissonTorch.from_weights(n, w, items=)   from non-negative weights
+    ConditionalPoissonTorch.from_weights(n, w, items=)   from positive weights
     ConditionalPoissonTorch.fit(pi_star, n, items=)      fit to target probs
 
     Properties
@@ -60,80 +60,29 @@ class ConditionalPoissonTorch:
 
     def __init__(self, n: int, theta, *, items=None,
                  dtype=torch.float64, device=None):
-        """Construct from log-weights (interior items only, no boundary)."""
+        """Construct from log-weights theta_i = log(w_i)."""
         self._theta = _to_tensor(theta, dtype).detach().clone().to(device=device)
         self._n = int(n)
-        self._N_interior = len(self._theta)
-
-        if self._n < 0 or self._n > self._N_interior:
-            raise ValueError(f"n={self._n} must be in [0, {self._N_interior}]")
-
+        self._N = len(self._theta)
         self._items = items
-        self._interior_idx = torch.arange(self._N_interior, dtype=torch.long)
-        self._forced_in_idx = torch.empty(0, dtype=torch.long)
-        self._forced_out_idx = torch.empty(0, dtype=torch.long)
-        self._N_full = self._N_interior
         self._sample_tree = None  # lazily built on first sample() call
 
-    def _with_boundary(self, interior_idx, forced_in_idx, forced_out_idx, N_full):
-        """Attach boundary mapping (called by factory methods)."""
-        self._interior_idx = interior_idx
-        self._forced_in_idx = forced_in_idx
-        self._forced_out_idx = forced_out_idx
-        self._N_full = N_full
-        return self
-
-    @property
-    def _has_boundary(self):
-        return len(self._forced_in_idx) > 0 or len(self._forced_out_idx) > 0
-
-    # ── Preprocessing ─────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _preprocess_weights(w, n):
-        """Separate boundary items from interior, validate, return mapping."""
-        w = _to_tensor(w)
-
-        forced_out_idx = torch.where(w == 0)[0]
-        forced_in_idx = torch.where(torch.isinf(w))[0]
-        interior_idx = torch.where(torch.isfinite(w) & (w > 0))[0]
-
-        n_forced = len(forced_in_idx)
-        n_interior = n - n_forced
-
-        if n_interior < 0:
-            raise ValueError(f"More forced-in items ({n_forced}) than n={n}")
-        if n_interior > len(interior_idx):
-            raise ValueError(f"Not enough interior items ({len(interior_idx)}) "
-                             f"for n - forced_in = {n_interior}")
-
-        with torch.no_grad():
-            interior_theta = torch.log(w[interior_idx])
-
-        return interior_idx, forced_in_idx, forced_out_idx, interior_theta, n_interior
+        if self._n < 0 or self._n > self._N:
+            raise ValueError(f"n={self._n} must be in [0, {self._N}]")
+        if items is not None and len(items) != self._N:
+            raise ValueError(f"items has {len(items)} elements but theta has {self._N}")
 
     # ── Constructors ──────────────────────────────────────────────────────────
 
     @classmethod
     def from_weights(cls, n: int, w, *, items=None, **kw) -> "ConditionalPoissonTorch":
-        """Construct from non-negative weights w_i (0 and inf allowed)."""
+        """Construct from positive weights w_i."""
         w = _to_tensor(w, kw.get('dtype', torch.float64))
-        if (w < 0).any():
-            raise ValueError("all weights must be non-negative")
-
-        N_full = len(w)
-        if items is not None and len(items) != N_full:
-            raise ValueError(f"items has {len(items)} elements but w has {N_full}")
-
-        interior_idx, forced_in_idx, forced_out_idx, interior_theta, n_int = \
-            cls._preprocess_weights(w, n)
-
-        if n_int == 0:
-            interior_theta = torch.zeros(0, dtype=w.dtype)
-
-        cp = cls(n_int, interior_theta, items=items, **kw)
-        cp._with_boundary(interior_idx, forced_in_idx, forced_out_idx, N_full)
-        return cp
+        if (w <= 0).any() or not torch.isfinite(w).all():
+            raise ValueError("all weights must be finite and positive")
+        with torch.no_grad():
+            theta = torch.log(w)
+        return cls(n, theta, items=items, **kw)
 
     @classmethod
     def fit(
@@ -154,6 +103,7 @@ class ConditionalPoissonTorch:
         Parameters
         ----------
         pi_star : target inclusion probabilities (tensor, list, or dict)
+                  All values must be in (0, 1) and sum to n.
         n       : subset size
         items   : optional item labels
         tol     : convergence tolerance on max|pi - pi_star|
@@ -167,19 +117,8 @@ class ConditionalPoissonTorch:
 
         pi_star = _to_tensor(pi_star, dtype).to(device=device)
 
-        forced_in = torch.where(pi_star == 1.0)[0]
-        forced_out = torch.where(pi_star == 0.0)[0]
-        interior = torch.where((pi_star > 0) & (pi_star < 1))[0]
-
-        pi_int = pi_star[interior]
-        n_int = n - len(forced_in)
-
-        if n_int == 0:
-            cp = cls(0, torch.zeros(0, dtype=dtype), items=items, dtype=dtype, device=device)
-            cp._with_boundary(interior, forced_in, forced_out, len(pi_star))
-            return cp
-
-        theta = torch.log(pi_int / (1.0 - pi_int)).clone().requires_grad_(True)
+        # Warm start: logit(pi*) is asymptotically exact (Hájek 1964)
+        theta = torch.log(pi_star / (1.0 - pi_star)).clone().requires_grad_(True)
 
         optimizer = torch.optim.LBFGS(
             [theta], lr=1.0, max_iter=20, history_size=20,
@@ -193,8 +132,8 @@ class ConditionalPoissonTorch:
         def closure():
             nit[0] += 1
             optimizer.zero_grad()
-            log_Z = forward_log_Z(theta, n_int)
-            loss = -(pi_int @ theta - log_Z)
+            log_Z = forward_log_Z(theta, n)
+            loss = -(pi_star @ theta - log_Z)
             loss.backward()
             last_grad[0] = theta.grad.abs().max().item()
             return loss
@@ -214,36 +153,29 @@ class ConditionalPoissonTorch:
         with torch.no_grad():
             theta -= theta.mean()
 
-        cp = cls(n_int, theta.detach(), items=items, dtype=dtype, device=device)
-        cp._with_boundary(interior, forced_in, forced_out, len(pi_star))
-        return cp
+        return cls(n, theta.detach(), items=items, dtype=dtype, device=device)
 
     # ── Properties ────────────────────────────────────────────────────────────
 
     @property
     def n(self) -> int:
         """Subset size."""
-        return self._n + len(self._forced_in_idx)
+        return self._n
 
     @property
     def N(self) -> int:
-        """Universe size (including boundary items)."""
-        return self._N_full
+        """Universe size."""
+        return self._N
 
     @property
     def theta(self) -> torch.Tensor:
-        """Log-weights for interior items."""
+        """Log-weights."""
         return self._theta.clone()
 
     @property
     def w(self) -> torch.Tensor:
-        """Weights for all items (including boundary)."""
-        if not self._has_boundary:
-            return torch.exp(self._theta)
-        w_full = torch.zeros(self._N_full, dtype=self._theta.dtype)
-        w_full[self._interior_idx] = torch.exp(self._theta)
-        w_full[self._forced_in_idx] = float('inf')
-        return w_full
+        """Weights."""
+        return torch.exp(self._theta)
 
     @property
     def pi(self):
@@ -251,21 +183,14 @@ class ConditionalPoissonTorch:
 
         Returns dict {item: prob} if items were provided, else (N,) tensor.
         """
-        pi_full = torch.zeros(self._N_full, dtype=self._theta.dtype)
-        pi_full[self._forced_in_idx] = 1.0
-        if self._n > 0 and self._N_interior > 0:
-            pi_full[self._interior_idx if self._has_boundary
-                    else slice(None)] = compute_pi(self._theta, self._n).detach()
-
+        pi_val = compute_pi(self._theta, self._n).detach()
         if self._items is not None:
-            return {item: pi_full[i].item() for i, item in enumerate(self._items)}
-        return pi_full
+            return {item: pi_val[i].item() for i, item in enumerate(self._items)}
+        return pi_val
 
     @property
     def log_normalizer(self) -> float:
         """Log normalizing constant."""
-        if self._n == 0 or self._N_interior == 0:
-            return 0.0
         return forward_log_Z(self._theta, self._n).item()
 
     # ── Log probability ───────────────────────────────────────────────────────
@@ -279,15 +204,14 @@ class ConditionalPoissonTorch:
           - (n,) or (M, n) int tensor/list of indices
           - (N,) or (M, N) bool tensor
 
-        Returns -inf for impossible subsets.
+        Returns log P(S) = sum_{i in S} theta_i - log Z.
         """
-        # Convert item-valued input to indices
         if self._items is not None and not isinstance(S, torch.Tensor):
             if isinstance(S, (list, tuple)) and len(S) > 0:
                 item_to_idx = {item: i for i, item in enumerate(self._items)}
                 if isinstance(S[0], (list, tuple)):
                     S = torch.tensor([[item_to_idx[x] for x in sub] for sub in S])
-                elif not isinstance(S[0], (int,)):
+                elif not isinstance(S[0], int):
                     S = torch.tensor([item_to_idx[x] for x in S])
 
         S = _to_tensor(S, torch.long) if not isinstance(S, torch.Tensor) else S
@@ -295,128 +219,86 @@ class ConditionalPoissonTorch:
         th = self._theta.detach()
         lz = self.log_normalizer
 
-        if not self._has_boundary:
-            if S.dtype == torch.bool:
-                if S.dim() == 2:
-                    return (th @ S.float().T - lz)
-                return float(th[S].sum() - lz)
+        if S.dtype == torch.bool:
             if S.dim() == 2:
-                return torch.stack([th[row].sum() - lz for row in S])
+                return (th @ S.float().T - lz)
             return float(th[S].sum() - lz)
-
-        # Boundary: convert to indicators, validate
-        if S.dtype != torch.bool:
-            idx = S if S.dim() == 2 else S.unsqueeze(0)
-            indicators = torch.zeros(idx.shape[0], self._N_full, dtype=torch.bool)
-            for m in range(idx.shape[0]):
-                indicators[m, idx[m]] = True
-        else:
-            indicators = S if S.dim() == 2 else S.unsqueeze(0)
-
-        results = torch.full((indicators.shape[0],), float('-inf'))
-        for m in range(indicators.shape[0]):
-            ind = indicators[m]
-            if not ind[self._forced_in_idx].all():
-                continue
-            if ind[self._forced_out_idx].any():
-                continue
-            if self._n == 0:
-                results[m] = 0.0
-            else:
-                results[m] = th[ind[self._interior_idx]].sum() - lz
-
-        return float(results[0]) if single else results
+        if S.dim() == 2:
+            return torch.stack([th[row].sum() - lz for row in S])
+        return float(th[S].sum() - lz)
 
     # ── Sampling ──────────────────────────────────────────────────────────────
 
     def _build_sample_tree(self):
         """Build the product tree for sampling (cached on first call).
 
+        Each tree[node][k] = Z(w_T, k) for items in subtree T (up to
+        a per-node scale factor that cancels in the sampling ratios).
         Uses torch FFT for polynomial multiplication with contour scaling.
         """
-        N = self._N_interior
+        N = self._N
         n = self._n
         w = torch.exp(self._theta).detach()
 
         r = _find_r(w, n)
         w_scaled = w * r
 
-        # Pad to next power of 2
         tree_n = 1 << (N - 1).bit_length()
-
-        # tree[i] = polynomial tensor at node i (truncated to degree n)
         tree = [None] * (2 * tree_n)
 
-        # Leaves
         for i in range(N):
             tree[tree_n + i] = torch.tensor([1.0, w_scaled[i].item()],
                                             dtype=self._theta.dtype)
         for i in range(N, tree_n):
             tree[tree_n + i] = torch.ones(1, dtype=self._theta.dtype)
 
-        # Build bottom-up using batched FFT poly mul
         for i in range(tree_n - 1, 0, -1):
-            left = tree[2 * i]
-            right = tree[2 * i + 1]
-            # Use the same FFT mul as forward_log_Z
-            p = _batch_poly_mul(left.unsqueeze(0), right.unsqueeze(0)).squeeze(0)
+            p = _batch_poly_mul(tree[2 * i].unsqueeze(0),
+                                tree[2 * i + 1].unsqueeze(0)).squeeze(0)
             if len(p) > n + 1:
                 p = p[:n + 1]
-            # Renormalize to prevent overflow/underflow
             mx = p.abs().max()
             if mx > 0:
                 p = p / mx
             tree[i] = p.detach()
 
-        self._sample_tree = (tree, tree_n, N)
+        self._sample_tree = (tree, tree_n)
 
-    def _draw_samples(self, size, generator):
-        """Draw samples from the cached product tree via top-down quota splitting."""
-        tree, tree_n, N = self._sample_tree
+    def _draw_one_sample(self, generator):
+        """Draw one sample via top-down quota splitting."""
+        tree, tree_n = self._sample_tree
         n = self._n
+        N = self._N
 
-        if n == 0:
-            return torch.empty(size, 0, dtype=torch.long)
-        if n == N:
-            return torch.arange(N).unsqueeze(0).expand(size, -1)
+        selected = []
+        stack = [(1, n)]
+        while stack:
+            node, k = stack.pop()
+            if k == 0:
+                continue
+            if node >= tree_n:
+                leaf = node - tree_n
+                if leaf < N and k == 1:
+                    selected.append(leaf)
+                continue
+            left = tree[2 * node]
+            right = tree[2 * node + 1]
+            probs = torch.zeros(k + 1, dtype=self._theta.dtype)
+            for j in range(k + 1):
+                rem = k - j
+                if j < len(left) and rem < len(right):
+                    probs[j] = max(left[j].item(), 0.0) * max(right[rem].item(), 0.0)
+            total = probs.sum()
+            if total <= 0:
+                continue
+            probs /= total
+            j = torch.multinomial(probs, 1, generator=generator).item()
+            stack.append((2 * node + 1, k - j))
+            stack.append((2 * node, j))
 
-        samples = torch.empty(size, n, dtype=torch.long)
-        for m in range(size):
-            selected = []
-            stack = [(1, n)]
-            while stack:
-                node, k = stack.pop()
-                if k == 0:
-                    continue
-                if node >= tree_n:
-                    leaf = node - tree_n
-                    if leaf < N and k == 1:
-                        selected.append(leaf)
-                    continue
-                left_poly = tree[2 * node]
-                right_poly = tree[2 * node + 1]
-                probs = torch.zeros(k + 1, dtype=self._theta.dtype)
-                for j in range(k + 1):
-                    rem = k - j
-                    if j < len(left_poly) and rem < len(right_poly):
-                        probs[j] = max(left_poly[j].item(), 0.0) * \
-                                   max(right_poly[rem].item(), 0.0)
-                total = probs.sum()
-                if total <= 0:
-                    continue
-                probs /= total
-                j = torch.multinomial(probs, 1, generator=generator).item()
-                stack.append((2 * node + 1, k - j))
-                stack.append((2 * node, j))
-            samples[m] = torch.sort(torch.tensor(selected, dtype=torch.long))[0]
+        return torch.sort(torch.tensor(selected, dtype=torch.long))[0]
 
-        return samples
-
-    def sample(
-        self,
-        size: int = 1,
-        rng: Optional[int] = None,
-    ):
+    def sample(self, size: int = 1, rng: Optional[int] = None):
         """
         Draw independent samples.
 
@@ -436,23 +318,15 @@ class ConditionalPoissonTorch:
         else:
             generator.seed()
 
-        if self._n == 0 or self._N_interior == 0:
-            forced = torch.sort(self._forced_in_idx)[0]
-            raw = forced.unsqueeze(0).expand(size, -1)
-        else:
-            if self._sample_tree is None:
-                self._build_sample_tree()
-            int_samples = self._draw_samples(size, generator)
+        if self._sample_tree is None:
+            self._build_sample_tree()
 
-            if self._has_boundary:
-                n_total = self._n + len(self._forced_in_idx)
-                raw = torch.empty(size, n_total, dtype=torch.long)
-                n_forced = len(self._forced_in_idx)
-                raw[:, :n_forced] = self._forced_in_idx
-                raw[:, n_forced:] = self._interior_idx[int_samples]
-                raw = torch.sort(raw, dim=1)[0]
-            else:
-                raw = int_samples
+        if self._n == 0:
+            raw = torch.empty(size, 0, dtype=torch.long)
+        elif self._n == self._N:
+            raw = torch.arange(self._N).unsqueeze(0).expand(size, -1)
+        else:
+            raw = torch.stack([self._draw_one_sample(generator) for _ in range(size)])
 
         if self._items is not None:
             return [[self._items[i] for i in row.tolist()] for row in raw]
@@ -462,20 +336,10 @@ class ConditionalPoissonTorch:
 
     def hvp(self, v) -> torch.Tensor:
         """Compute Cov[1_S] v via autograd (double backward)."""
-        v = _to_tensor(v, self._theta.dtype)
-
-        result = torch.zeros(self._N_full, dtype=self._theta.dtype)
-        if self._n > 0 and self._N_interior > 0:
-            v_int = v[self._interior_idx] if self._has_boundary else v
-            hvp_int = compute_hvp(self._theta, self._n, v_int).detach()
-            if self._has_boundary:
-                result[self._interior_idx] = hvp_int
-            else:
-                result = hvp_int
-        return result
+        return compute_hvp(self._theta, self._n, _to_tensor(v, self._theta.dtype)).detach()
 
     # ── Repr ──────────────────────────────────────────────────────────────────
 
     def __repr__(self):
-        return (f"ConditionalPoissonTorch(n={self.n}, N={self._N_full}, "
+        return (f"ConditionalPoissonTorch(n={self._n}, N={self._N}, "
                 f"log_Z={self.log_normalizer:.4f})")
