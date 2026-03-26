@@ -71,10 +71,10 @@
 
 ## Restructuring
 
-- [ ] Restructure the "Identities" section (Cell 27) — it's a grab-bag; promote Vandermonde identity to the tree section (it's *why* the tree works), move parameterization table earlier (clarifies the intro), demote the rest to an appendix
-- [ ] The identities section has redundancy — repeats the $\pi_i$ formula and convexity argument from earlier sections; deduplicate or make the second occurrence explicitly a "recap for reference"
-- [ ] K-DPP connection: decide whether it belongs in the main text or an appendix — it's interesting but tangential to the main narrative
-- [ ] The summary repeats but doesn't synthesize — add a takeaway ("the tree unifies normalizing constant computation, marginal inference, sampling, and parameter fitting into a single data structure")
+- [x] Restructure the "Identities" section — added Vandermonde cross-reference to tree/sampling sections, added parameterization cross-reference from intro, annotated Vandermonde with its role
+- [x] The identities section has redundancy — deduplicated differential identities into brief recap with cross-references to exp family and fitting sections
+- [x] K-DPP connection: collapsed into a `<details>` block (interesting but tangential)
+- [x] The summary repeats but doesn't synthesize — replaced bullet list with a capabilities table showing the mechanical transformation stack, added "no problem-specific derivations" takeaway
 
 ## Implementation
 
