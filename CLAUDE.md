@@ -14,6 +14,7 @@ Code and documentation must use identical notation. Stale or inconsistent notati
 - **Scott brackets**: `\llbracket f \rrbracket(z^k)` for coefficient extraction — not `[z^k]`
 - **Big-O notation**: `\mathcal{O}(\cdot)` in LaTeX — not plain `O(\cdot)`
 - **Em-dashes**: tight, no spaces — `word—word` not `word — word`
+- **Definitional equals**: `\defeq` macro (renders as = with "def" above) for defining equations
 
 When changing notation or API names, update **all** of these in the same commit:
 1. Code (parameter names, property names)
