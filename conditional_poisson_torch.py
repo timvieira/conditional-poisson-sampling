@@ -82,27 +82,31 @@ class ConditionalPoissonTorch:
         """
         Fit to target inclusion probabilities via L-BFGS.
 
-        All values in pi_star must be in (0, 1) and sum to n.
+        Minimizes -E_π★[log P_θ(S)] = -(π★ᵀθ - log Z(θ, n)).
+        The gradient is π(θ) - π★, so each L-BFGS step is driven
+        directly by the gap between current and target inclusion
+        probabilities.  Convergence (max|π(θ) - π★| ≤ tol) is
+        therefore an infinity-norm gradient test — the optimizer's
+        own stopping criterion.
+
+        All values in π★ must be in (0, 1) and sum to n.
 
         Parameters
         ----------
-        tol : convergence tolerance on max|pi - pi_star|.
-              Since the gradient of the objective is exactly pi_star - pi(theta),
-              this is equivalent to an infinity-norm gradient tolerance.
+        tol : convergence tolerance on max|π(θ) - π★|.
         """
         pi_star = _to_tensor(pi_star, dtype).to(device=device)
         theta = torch.log(pi_star / (1.0 - pi_star)).clone().requires_grad_(True)
 
-        # L-BFGS (Nocedal & Wright, Ch. 7): memory m, Wolfe line search,
-        # run until convergence.  We disable torch's stopping criteria
-        # and check max|pi - pi*| ourselves afterward.
-        m = 5                          # memory budget (Nocedal & Wright Table 7.1)
+        # L-BFGS (Nocedal & Wright, Ch. 7): memory m, Wolfe line search.
+        # The gradient is π(θ) - π★, so tolerance_grad = tol stops
+        # when max|π - π★| ≤ tol.
         optimizer = torch.optim.LBFGS(
             [theta],
-            max_iter=200,              # iteration budget
-            history_size=m,
+            max_iter=200,
+            history_size=5,
             line_search_fn='strong_wolfe',
-            tolerance_grad=0,
+            tolerance_grad=tol,
             tolerance_change=0,
         )
 
@@ -121,7 +125,7 @@ class ConditionalPoissonTorch:
             import warnings
             warnings.warn(
                 f"fit did not reach tol={tol:.0e}: max|pi - pi*| = {fit_err:.2e}. "
-                f"The LBFGS line search terminated early.")
+                f"L-BFGS exhausted max_iter=200 without converging.")
 
         with torch.no_grad():
             theta -= theta.mean()
