@@ -115,6 +115,10 @@
 - [ ] Title case all subsection headings (e.g., "### Downward pass (backpropagation)" → "### Downward Pass (Backpropagation)")
 - [ ] Verification checkmark pills: remove padding, make smaller (footnote-sized). Place after punctuation (commas, periods) like a footnote marker, not before.
 
+## Visualization
+
+- [ ] D3 animation of the sampling algorithm: show the binary tree with quotas at each node, animate the top-down walk step by step. At each internal node, display the split equation P_L[j] · P_R[k−j] as a small distribution, sample from it, then propagate the resulting quotas to the children. Highlight the path from root to leaves, show items being selected (quota=1) or excluded (quota=0) at the leaves. Could be an interactive widget embedded in the notebook or a standalone HTML page linked from the blog post.
+
 ## Checklist (standing editorial rules)
 
 Apply before every commit touching the notebook:
