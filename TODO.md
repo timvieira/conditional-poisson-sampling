@@ -96,15 +96,15 @@
 
 ## Confusing
 
-- [ ] Micro-example (Cell 4) uses 1-indexed items ({1,2}, {1,3}...) but worked example code (Cell 12) uses 0-indexed arrays — could trip readers up
-- [ ] Downward pass (Cell 13) Mermaid diagram is N=8 but interleaved code is N=4 — no explicit bridge between them
-- [ ] "## Sampling" heading (Cell 23) in the library API section could be confused with "### Sampling" subsection of the product tree — rename to "## Drawing samples" or similar
+- [x] Micro-example (Cell 4) uses 1-indexed, code uses 0-indexed — added indexing note in code, kept math 1-indexed
+- [x] Downward pass diagram N=8 vs code N=4 — switched worked example to N=8, n=3 to match diagrams
+- [x] "## Sampling" heading confused with "### Sampling" — renamed to "## Drawing samples"
 
 ## Editorial
 
-- [ ] Cell 5: abbreviation "CPS" used ("CPS spreads probability...") but never introduced — spell out or define
-- [ ] Cell 10: "**The gap.**" sentence is tacked onto a paragraph about categorical vs. Bernoulli tradeoff — would land harder as its own paragraph
-- [ ] Cell 42 (summary): two blank lines between the `(coeffs, log_scale)` paragraph and **References:** — minor formatting
+- [x] Cell 5: "CPS" abbreviation never introduced — replaced with "the conditional Poisson distribution"
+- [x] Cell 10: "**The gap.**" split into its own paragraph
+- [x] Cell 42: extra blank line before References removed
 
 ## Minor
 
