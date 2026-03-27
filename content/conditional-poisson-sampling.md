@@ -29,6 +29,8 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 
 </style>
 
+<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 2px solid #dee2e6; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+
 <div id="cps"></div>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
@@ -263,5 +265,7 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
   build();
 })();
 </script>
+
+</div>
 
 {% notebook conditional-poisson-sampling.ipynb cells[5:] %}
