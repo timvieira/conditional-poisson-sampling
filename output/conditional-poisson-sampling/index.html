@@ -3020,45 +3020,12 @@ $Z(\mathbf{{w}},3)$ = coeff of $z^3$ = <b>695.625</b>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="Computing-Inclusion-Probabilities-$%5Cbpip$">Computing Inclusion Probabilities $\bpip$<a class="anchor-link" href="#Computing-Inclusion-Probabilities-$%5Cbpip$">¶</a></h3><p>The product tree computes the product $P_{\text{root}}(\z) = \prod_i (1 + \w_i \z)$.  To get inclusion probabilities, we need the <em>gradient</em> of this product with respect to each leaf.  As noted above, the inclusion probability is the <a href="#Exponential-family-structure">gradient of the log-normalizer</a>:</p>
-<p>$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i} = \frac{\w_i \cdot \Zw{\bw^{(-i)}}{n-1}}{\Zw{\bw}{n}}$$</p>
-<p>The numerator involves $\Zw{\bw^{(-i)}}{n-1}$, which is the $(n{-}1)$-th coefficient of the "leave-one-out" polynomial $P^{(-i)}(\z) = \prod_{j \neq i}(1 + \w_j \z)$.  So computing $\bpip$ reduces to computing all $N$ leave-one-out products—which is exactly the <a href="../gradient-of-a-product/">gradient of a product</a>.</p>
-<p>This is not an analogy: the downward pass <em>is</em> <a href="../evaluating-fx-is-as-fast-as-fx/">backpropagation</a>, applied to the tree-structured polynomial product.  The upward pass is the forward pass; the downward pass propagates adjoints (outside polynomials) from root to leaves using the standard reverse-mode rule for multiplication: the adjoint of a child is the parent's adjoint times the <em>sibling's</em> forward value.  By the <a href="https://doi.org/10.1016/0304-3975(83">Baur-Strassen theorem</a>90110-X), this costs at most a constant factor more than the forward pass—so the downward pass is also $\mathcal{O}(N \log^2 N)$.</p>
-<p>Concretely: at the root, the "outside" polynomial is $1$.  When we descend to a child, its outside is the parent's outside times the sibling's inside polynomial.  The left child of the root gets outside $= P_{5678}$, the right child gets outside $= P_{1234}$.  Continuing down, leaf 1 gets outside $= P_{5678} \cdot P_2 \cdot P_{34} = P^{(-1)}$.  Each leaf ends up with the product of all <em>other</em> leaves' polynomials, without redundant work.</p>
-<p>This is the same divide-and-conquer structure used for <a href="../heaps-for-incremental-computation/">heaps for incremental computation</a>—a balanced binary tree where each node stores an aggregate over its subtree, and updates propagate in $\mathcal{O}(\log N)$—but here the "values" are polynomials and the "aggregation" is polynomial multiplication.</p>
-<div class="jp-Mermaid"><pre class="mermaid">
-graph TB
-    ROOT["$$\text{outside} = 1$$"] --&gt; N1234["$$\text{outside} = P_{5\text{-}8}$$"]
-    ROOT --&gt; N5678["$$\text{outside} = P_{1\text{-}4}$$"]
-    N1234 --&gt; N12["$$\text{outside} = P_{5\text{-}8} \cdot P_{34}$$"]
-    N1234 --&gt; N34["$$\text{outside} = P_{5\text{-}8} \cdot P_{12}$$"]
-    N5678 --&gt; N56["$$\text{outside} = P_{1\text{-}4} \cdot P_{78}$$"]
-    N5678 --&gt; N78["$$\text{outside} = P_{1\text{-}4} \cdot P_{56}$$"]
-    N12 --&gt; L1["$$P^{(-1)} = \text{out}_{12} \cdot P_2$$"]
-    N12 --&gt; L2["$$P^{(-2)} = \text{out}_{12} \cdot P_1$$"]
-    N34 --&gt; L3["$$P^{(-3)} = \text{out}_{34} \cdot P_4$$"]
-    N34 --&gt; L4["$$P^{(-4)} = \text{out}_{34} \cdot P_3$$"]
-    N56 --&gt; L5["$$P^{(-5)} = \text{out}_{56} \cdot P_6$$"]
-    N56 --&gt; L6["$$P^{(-6)} = \text{out}_{56} \cdot P_5$$"]
-    N78 --&gt; L7["$$P^{(-7)} = \text{out}_{78} \cdot P_8$$"]
-    N78 --&gt; L8["$$P^{(-8)} = \text{out}_{78} \cdot P_7$$"]
-
-    style ROOT fill:#4a90d9,color:#fff
-    style N1234 fill:#4a90d9,color:#fff
-    style N5678 fill:#4a90d9,color:#fff
-    style N12 fill:#4a90d9,color:#fff
-    style N34 fill:#4a90d9,color:#fff
-    style N56 fill:#4a90d9,color:#fff
-    style N78 fill:#4a90d9,color:#fff
-    style L1 fill:#e0e0e0,color:#000
-    style L2 fill:#e0e0e0,color:#000
-    style L3 fill:#e0e0e0,color:#000
-    style L4 fill:#e0e0e0,color:#000
-    style L5 fill:#e0e0e0,color:#000
-    style L6 fill:#e0e0e0,color:#000
-    style L7 fill:#e0e0e0,color:#000
-    style L8 fill:#e0e0e0,color:#000
-</pre></div>
+<h3 id="Computing-Inclusion-Probabilities-$%5Cbpip$">Computing Inclusion Probabilities $\bpip$<a class="anchor-link" href="#Computing-Inclusion-Probabilities-$%5Cbpip$">¶</a></h3><p>The inclusion probability is the gradient of the log-normalizer (an <a href="#Exponential-family-structure">exponential family</a> identity):</p>
+<p>$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$</p>
+<p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running backpropagation on the same tree—no new algorithm needed.  By the <a href="https://doi.org/10.1016/0304-3975(83">Baur-Strassen theorem</a>90110-X) (<a href="https://doi.org/10.1016/0304-3975(83">Baur &amp; Strassen, 1983</a>90110-X); see also <a href="../evaluating-fx-is-as-fast-as-fx/">this post</a>), the gradient costs at most a constant factor more than the forward computation.</p>
+<p><strong>Why the tree matters.</strong>  Computing $\pip_i$ requires the "leave-one-out" product $\prod_{j \neq i}(1 + \w_j \z)$—a single item removed from the full product.  A naive approach recomputes this from scratch for each $i$, which is $\mathcal{O}(N)$ per item and $\mathcal{O}(N^2 n)$ total.  This is a classic <a href="../gradient-of-a-product/">gradient-of-a-product</a> problem: the product tree's <a href="../heaps-for-incremental-computation/">balanced binary structure</a> computes all $N$ leave-one-out values simultaneously in $\mathcal{O}(N \log^2 n)$.</p>
+<p>This "accidentally quadratic" trap is common.  For example, the k-DPP marginal formula (<a href="https://arxiv.org/abs/1207.6083">Kulesza &amp; Taskar, 2012</a>) requires all $N$ leave-one-out elementary symmetric polynomials $\Zw{\bw^{(-i)}}{k-1}$.  Their Algorithm 7 computes $\Zw{\bw}{k}$ in $\mathcal{O}(Nk)$ via the Pascal recurrence, but naively rerunning it $N$ times for the leave-one-outs gives $\mathcal{O}(N^2 k)$.  The product tree avoids this.</p>
+<p>In the PyTorch implementation, the gradient comes for free via <code>torch.autograd</code>—no hand-coded tree traversal needed.</p>
 </div>
 </div>
 </div>
@@ -3486,13 +3453,13 @@ $$</p>
 </thead>
 <tbody>
 <tr>
-<td>Forward (upward)</td>
+<td>Forward (build tree)</td>
 <td>$\Z$</td>
 <td>tree-structured polynomial multiply</td>
 <td>$\mathcal{O}(N \log^2 n)$</td>
 </tr>
 <tr>
-<td>Backward (downward)</td>
+<td>Backward (gradient)</td>
 <td>$\bpip = \nabla_{\btheta} \log \Z$</td>
 <td>reverse-mode AD / backprop (<a href="https://doi.org/10.1016/0304-3975(83">Baur &amp; Strassen, 1983</a>90110-X))</td>
 <td>$\mathcal{O}(N \log^2 n)$</td>
@@ -3505,7 +3472,7 @@ $$</p>
 </tr>
 </tbody>
 </table>
-<p>Concretely, where the P-tree computes $P_T(\z) = \prod_{i \in T}(1 + \w_i \z)$, the D-tree computes its directional derivative $D_T(\z) = \sum_{i \in T} v_i \w_i \prod_{j \in T, j \neq i}(1 + \w_j \z)$ using the product rule at each internal node: $D[\text{node}] = D[L] \cdot P[R] + P[L] \cdot D[R]$.<a class="verified" href="test_identities.py#test_dtree_product_rule" target="_blank" title="test_dtree_product_rule">✓</a>  A joint downward pass then delivers both $P^{(-i)}$ and $D^{(-i)}$ at every leaf, giving the full Hessian-vector product in $\mathcal{O}(N \log^2 n)$.</p>
+<p>Concretely, where the P-tree computes $P_T(\z) = \prod_{i \in T}(1 + \w_i \z)$, the D-tree computes its directional derivative $D_T(\z) = \sum_{i \in T} v_i \w_i \prod_{j \in T, j \neq i}(1 + \w_j \z)$ using the product rule at each internal node: $D[\text{node}] = D[L] \cdot P[R] + P[L] \cdot D[R]$.<a class="verified" href="test_identities.py#test_dtree_product_rule" target="_blank" title="test_dtree_product_rule">✓</a>  A joint backward pass then delivers both $P^{(-i)}$ and $D^{(-i)}$ at every leaf, giving the full Hessian-vector product in $\mathcal{O}(N \log^2 n)$.</p>
 <p>In the PyTorch implementation, the HVP comes for free via <code>torch.autograd</code> (double backward)—no hand-coded D-tree needed.</p>
 </details>
 </div>
@@ -4122,7 +4089,7 @@ $$</p>
 </tbody>
 </table>
 <p>There are no problem-specific derivations here—each row follows from a general theorem in automatic differentiation or computer algebra.</p>
-<p>The NumPy implementation (<a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson.py"><code>conditional_poisson.py</code></a>) uses hand-coded upward/downward passes with $\mathcal{O}(N \log^2 n)$ complexity.  The PyTorch implementation (<a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py"><code>torch_fft_prototype.py</code></a>) uses FFT-based polynomial multiplication with <strong>contour radius scaling</strong>—rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stable—achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.  The gradient and HVP come from PyTorch's autograd, not hand-coded passes.</p>
+<p>The NumPy implementation (<a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson.py"><code>conditional_poisson.py</code></a>) uses hand-coded tree traversals with $\mathcal{O}(N \log^2 n)$ complexity.  The PyTorch implementation (<a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py"><code>torch_fft_prototype.py</code></a>) uses FFT-based polynomial multiplication with <strong>contour radius scaling</strong>—rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stable—achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.  The gradient and HVP come from PyTorch's autograd, not hand-coded passes.</p>
 <p>In the NumPy implementation, polynomials use a scaled representation <code>(coeffs, log_scale)</code> with $\max|c_k| = 1$ to prevent floating-point overflow.  The PyTorch implementation uses contour radius scaling instead (see <a href="#The-FFT-Precision-Problem-and-Contour-Scaling">above</a>).</p>
 <p><strong>References:</strong></p>
 <ul>
