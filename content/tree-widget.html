@@ -124,11 +124,8 @@ svg text { font-family: 'EB Garamond', serif; }
       if (N === target) { animating = false; return; }
       var oldN = N;
       if (target > N) {
-        // Add rightmost: give it a share of the total (steal proportionally from others)
-        var newVal = 1 / (N + 1); // new item gets 1/(N+1) of total
-        var scale = (1 - newVal); // others shrink proportionally
-        w = w.map(function(v) { return v * scale; });
-        w.push(newVal);
+        // Add rightmost with weight 0 — user drags it up to give it influence
+        w.push(0);
         N = N + 1;
       } else {
         // Remove rightmost: redistribute its weight proportionally
