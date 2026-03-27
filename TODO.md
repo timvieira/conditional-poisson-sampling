@@ -1,5 +1,19 @@
 # Blog post TODO
 
+## Next Up
+
+- [ ] Fix "Objective." paragraph in Fitting section: the log P(S) equation doesn't obviously connect to the L(θ) objective that follows. Bridge the gap explicitly.
+- [ ] Fix "The gradient is π(θ) − π*" — gradient of what w.r.t. what? Write ∇_θ L(θ) = π(θ) − π*.
+- [ ] Cut all HVP (Hessian-vector product) material: summary table row, PyTorch section mentions, compute_hvp tests/timing, D-tree references.
+- [ ] Cut the "Fitting weights to target inclusion probabilities" bar chart (cell 28) — the max error number already confirms the fit.
+- [ ] Remove NumPy implementation details from the post (numerical stability section, scipy.signal.convolve internals, hand-coded tree traversal discussion). Focus on algorithm/math, point to code for implementation.
+
+- [ ] Weighted Pascal recurrence needs base cases.
+- [ ] Weighted Vandermonde identity: the statement jumps straight to the generating function proof without connecting the combinatorial claim to the generating function setup. Bridge the gap — explain why the identity follows from factoring the generating function before diving into the proof.
+- [ ] Speed comparison against the R packages (UPmaxentropy in `sampling`, BalancedSampling) — show wall-clock times for computing π and drawing samples at various N.
+- [ ] Move the interactive explorer widget — it's currently between `cells[1:3]` and `cells[3:10]` in the .md template (line ~7–284), interrupting the exposition of the distribution before the reader knows what w, π, P(S) mean. Move it later, e.g., after the product tree / basic usage sections.
+- [ ] Move more content out of the Jupyter notebook into the markdown file. The .md file is the master template and allows finer control over layout, widget placement, and prose flow. Migrate prose-heavy cells from the .ipynb into .md, keeping only code cells and their outputs in the notebook.
+
 ## Confusing / Poorly Explained
 
 - [x] Motivate the name "conditional Poisson" — bridge from Poisson sampling (independent inclusion) to conditioning on size
