@@ -2134,7 +2134,7 @@ $$</p>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>The inclusion probability $\pip_i$ is the $P(S)$-weighted column sum of the $i$-th indicator: $\pip_i \defeq \sum_{S : i \in S} P(S)$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$ (the other items "push back" through the size constraint $|S| = n$).  Computing $\bpip$ from $\bw$ exactly is the central computational problem of this post.</p>
+<p>The inclusion probability $\pip_i$ is the $P(S)$-weighted column sum of the $i$-th indicator: $\pip_i \defeq \sum_{S : i \in S} P(S)$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$ (the other items "push back" through the size constraint $|S| = n$).  The computational challenges are: computing $\Zw{\bw}{n}$ and $P(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim P$, and the inverse problem of finding $\bw$ from target $\bpip$.</p>
 </div>
 </div>
 </div>
