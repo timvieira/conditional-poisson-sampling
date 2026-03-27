@@ -2184,15 +2184,7 @@ $$</p>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><strong>Roadmap.</strong> This will describe an implementation that computes inclusion probabilities, draws exact samples, and fits weights to target probabilities—all in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree with FFT-based multiplication and a contour-scaling trick for numerical stability.  The code is available as a <a href="https://github.com/timvieira/conditional-poisson-sampling">Python library</a>.</p>
-<p><strong>Outline:</strong></p>
-<ol>
-<li>A simple rejection sampler—correct but impractical—to motivate the need for better machinery</li>
-<li>The polynomial product tree: computing $\Z$, computing $\bpip$, and drawing samples, with the $N\!=\!4$ example at each step</li>
-<li>Library API and demos</li>
-<li>Fitting weights to target probabilities, numerical stability, and a fast PyTorch/FFT implementation</li>
-<li>Application to Horvitz-Thompson estimation, and a reference section of identities</li>
-</ol>
+<p>This post covers an efficient algorithm for the conditional Poisson distribution: computing the normalizing constant $\Zw{\bw}{n}$, inclusion probabilities $\bpip$, exact samples, and fitting weights to target probabilities—all in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree.  The code is available as a <a href="https://github.com/timvieira/conditional-poisson-sampling">Python library</a>.</p>
 </div>
 </div>
 </div>
