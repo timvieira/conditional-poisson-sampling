@@ -127,12 +127,12 @@ body {
     ctrl.append('input').attr('type','number').attr('min',2).attr('max',8).attr('value',N)
       .style('width','44px').style('font-family','inherit').style('font-size','inherit')
       .style('border','1px solid #ccc').style('border-radius','3px').style('padding','2px 4px')
-      .on('change input',function(){var v=+this.value;if(isNaN(v))return;if(v<2||v>8){d3.select('#cps-status').text('N must be between 2 and 8').style('color','#c00');return;}v=Math.round(v);if(v===N)return;N=v;n=Math.min(n,N);while(w.length<N)w.push(0.5+Math.random());w=w.slice(0,N);normW();build();});
+      .on('change input',function(){var v=+this.value;if(isNaN(v))return;if(v<2||v>8){d3.select('#cps-status').text('the distribution requires 2 \u2264 N \u2264 8').style('color','#c00');return;}v=Math.round(v);if(v===N)return;N=v;n=Math.min(n,N);while(w.length<N)w.push(0.5+Math.random());w=w.slice(0,N);normW();build();});
     ctrl.append('span').html('&ensp;$n$ = ');
     ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n)
       .style('width','44px').style('font-family','inherit').style('font-size','inherit')
       .style('border','1px solid #ccc').style('border-radius','3px').style('padding','2px 4px')
-      .on('change input',function(){var v=+this.value;if(isNaN(v))return;if(v<0||v>N){d3.select('#cps-status').text('n must be between 0 and '+N).style('color','#c00');return;}v=Math.round(v);if(v===n)return;n=v;build();});
+      .on('change input',function(){var v=+this.value;if(isNaN(v))return;if(v<0||v>N){d3.select('#cps-status').text('the distribution requires 0 \u2264 n \u2264 N='+N).style('color','#c00');return;}v=Math.round(v);if(v===n)return;n=v;build();});
 
     // === WEIGHTS TABLE (with bars) ===
     var wt = root.append('table');
@@ -149,15 +149,20 @@ body {
         var td = wb.append('td').attr('class','bar-td');
         var b = makeBar(td, w[idx], getMaxW(), CW, true, function(frac){
           var target = Math.max(0, Math.min(0.99, frac));
-          // Don't allow setting to zero if it would leave fewer than n nonzero items
-          if(target === 0) {
-            var nonzero = 0;
-            for(var k=0;k<N;k++) if(k!==idx && w[k]>1e-10) nonzero++;
-            if(nonzero < n) {
-              d3.select('#cps-status').text('need at least ' + n + ' nonzero weights when n=' + n).style('color','#c00');
-              return;
-            }
+          var EPS = 0.005;
+          // Count how many items would remain with meaningful weight
+          var wouldBeNonzero = 0;
+          for(var k=0;k<N;k++) {
+            if(k===idx) { if(target>EPS) wouldBeNonzero++; }
+            else { if(w[k]>EPS) wouldBeNonzero++; }
           }
+          if(wouldBeNonzero < n) {
+            d3.select('#cps-status')
+              .text('the distribution requires at least n='+n+' items with positive weight')
+              .style('color','#c00');
+            return;
+          }
+          d3.select('#cps-status').text('');
           // Scale the *others* to keep sum = 1
           var others = 0;
           for(var k=0;k<N;k++) if(k!==idx) others+=w[k];
@@ -168,11 +173,10 @@ body {
               if(k===idx) w[k]=target;
               else w[k]*=scale;
             }
-          } else if(target === 0) {
-            w[idx] = 0;
+          } else {
+            w[idx] = target;
           }
           normW();
-          d3.select('#cps-status').text('');
           pi = getPi(w);
           update();
         });
