@@ -206,12 +206,14 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
         var tr = tbody.append('tr');
         tr.append('td').attr('class','rl').style('color','#333').style('font-style','normal').style('text-align','right').text('{'+r.s.map(function(j){return j+1;}).join(', ')+'}');
         r.ind.forEach(function(v){tr.append('td').attr('class','ic'+(v?'':' zero')).text(v);});
-        var pc = tr.append('td').attr('class','pc').style('position','relative').style('text-align','left');
-        pc.append('div').attr('class','prob-bar')
-          .style('position','absolute').style('top','2px').style('bottom','2px').style('left','0')
-          .style('background',CP).style('opacity','0.12').style('border-radius','2px')
-          .style('pointer-events','none');
-        pc.append('span').style('position','relative');
+        var pc = tr.append('td').attr('class','pc').style('text-align','left').style('padding','1px 2px');
+        var barWrap = pc.append('div').style('display','flex').style('align-items','center').style('gap','3px');
+        barWrap.append('div').attr('class','prob-bar')
+          .style('height','10px').style('border-radius','2px')
+          .style('background',CP).style('opacity','0.7')
+          .style('min-width','1px');
+        barWrap.append('span').attr('class','prob-val')
+          .style('font-size','0.8em').style('color',CP).style('white-space','nowrap');
         probCells.push(pc);
       });
     } else {
@@ -268,8 +270,8 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
       var maxP=Math.max.apply(null,tdata.map(function(r){return r.p;}));
       tdata.forEach(function(r,i){
         if(!probCells[i])return;
-        probCells[i].select('span').text(r.p.toFixed(3));
-        probCells[i].select('.prob-bar').style('width',(r.p/maxP*100)+'%');
+        probCells[i].select('.prob-val').text(r.p.toFixed(3));
+        probCells[i].select('.prob-bar').style('width', Math.max(1, r.p/maxP*60)+'px');
       });
     }
   }
