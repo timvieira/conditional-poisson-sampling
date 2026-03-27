@@ -187,21 +187,18 @@ svg text { font-family: 'EB Garamond', serif; }
       }
     }
 
-    // Draw edges first
+    // Draw edges as bezier curves
     for (var li = 1; li < levels.length; li++) {
       levels[li].forEach(function(nd) {
-        if (nd.left) {
-          svg.append('line')
-            .attr('x1', nd.x).attr('y1', nd.y + nodeH)
-            .attr('x2', nd.left.x).attr('y2', nd.left.y)
-            .attr('stroke', '#ddd').attr('stroke-width', 1);
-        }
-        if (nd.right) {
-          svg.append('line')
-            .attr('x1', nd.x).attr('y1', nd.y + nodeH)
-            .attr('x2', nd.right.x).attr('y2', nd.right.y)
-            .attr('stroke', '#ddd').attr('stroke-width', 1);
-        }
+        [nd.left, nd.right].forEach(function(child) {
+          if (!child || child.pad) return;
+          var x1 = nd.x, y1 = nd.y + nodeH;
+          var x2 = child.x, y2 = child.y;
+          var my = (y1 + y2) / 2;
+          svg.append('path')
+            .attr('d', 'M'+x1+','+y1+' C'+x1+','+my+' '+x2+','+my+' '+x2+','+y2)
+            .attr('fill', 'none').attr('stroke', '#ddd').attr('stroke-width', 1.2);
+        });
       });
     }
 
@@ -220,25 +217,27 @@ svg text { font-family: 'EB Garamond', serif; }
         g.append('rect').attr('width', boxW).attr('height', nodeH)
           .attr('fill', '#fff').attr('stroke', '#ddd').attr('rx', 3);
 
-        // Coefficient cells
+        // Coefficient cells — store direct references for fast updates
+        nd._cellRects = [];
+        nd._cellTexts = [];
         var maxC = Math.max.apply(null, coeffs.map(function(c){return Math.abs(c);}));
         if (maxC === 0) maxC = 1;
         for (var k = 0; k < nCoeffs; k++) {
           var intensity = Math.min(1, Math.abs(coeffs[k]) / maxC);
-          // Color by contribution of items in this subtree
-          var r = 91, gg = 155, b = 213; // #5b9bd5
-          g.append('rect')
+          var r = 91, gg = 155, b = 213;
+          var cr = g.append('rect')
             .attr('x', 1 + k * cellW).attr('y', 1)
             .attr('width', cellW - 1).attr('height', nodeH - 2)
             .attr('fill', 'rgba(' + r + ',' + gg + ',' + b + ',' + (0.1 + 0.8 * intensity) + ')')
             .attr('rx', 1);
-          // Show value for small trees
+          nd._cellRects.push(cr);
           if (N <= 5) {
-            g.append('text')
+            var ct = g.append('text')
               .attr('x', 1 + k * cellW + cellW/2).attr('y', nodeH/2 + 4)
               .attr('text-anchor', 'middle')
               .style('font-size', '8px').style('fill', intensity > 0.5 ? '#fff' : '#666')
               .text(coeffs[k] < 0.001 && coeffs[k] > 0 ? '' : coeffs[k].toFixed(coeffs[k] >= 10 ? 0 : coeffs[k] >= 1 ? 1 : 2));
+            nd._cellTexts.push(ct);
           }
         }
 
@@ -288,31 +287,22 @@ svg text { font-family: 'EB Garamond', serif; }
       var newTree = buildTree(w, n);
       var newLevels = newTree.levels;
 
-      // Update node visuals
+      // Update node visuals using stored references (no DOM queries)
       for (var li = 0; li < newLevels.length; li++) {
         for (var ni = 0; ni < newLevels[li].length; ni++) {
           var nd = levels[li][ni];
           var newNd = newLevels[li][ni];
-          if (!nd || !nd._group || nd.pad) continue;
+          if (!nd || !nd._cellRects || nd.pad) continue;
           nd.poly = newNd.poly;
           var coeffs = nd.poly;
           var nCoeffs = nd._nCoeffs;
           var maxC = Math.max.apply(null, coeffs.map(function(c){return Math.abs(c);}));
           if (maxC === 0) maxC = 1;
-          var rects = nd._group.selectAll('rect').nodes();
-          // Skip background rect (index 0) and highlight rect (last if root)
           for (var k = 0; k < nCoeffs; k++) {
             var intensity = Math.min(1, Math.abs(coeffs[k]) / maxC);
-            var r = 91, gg = 155, b = 213;
-            d3.select(rects[k + 1])
-              .attr('fill', 'rgba(' + r + ',' + gg + ',' + b + ',' + (0.1 + 0.8 * intensity) + ')');
-          }
-          // Update text
-          if (N <= 5) {
-            var texts = nd._group.selectAll('text').nodes();
-            for (var k = 0; k < Math.min(texts.length, nCoeffs); k++) {
-              var intensity = Math.min(1, Math.abs(coeffs[k]) / maxC);
-              d3.select(texts[k])
+            nd._cellRects[k].attr('fill', 'rgba(91,155,213,' + (0.1 + 0.8 * intensity) + ')');
+            if (nd._cellTexts && nd._cellTexts[k]) {
+              nd._cellTexts[k]
                 .style('fill', intensity > 0.5 ? '#fff' : '#666')
                 .text(coeffs[k] < 0.001 && coeffs[k] > 0 ? '' : coeffs[k].toFixed(coeffs[k] >= 10 ? 0 : coeffs[k] >= 1 ? 1 : 2));
             }
