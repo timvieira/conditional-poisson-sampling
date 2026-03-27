@@ -191,7 +191,7 @@ Apply before every commit touching the notebook:
 - [x] Several forward references (exponential family, D-tree) introduce concepts long before they're used — consider deferring or adding a brief "we'll return to this" signpost
 
 
-- [ ] Mermaid diagrams aren't rendering now that they moved out of the notebook into the .md file. The build/compilation script needs to handle mermaid code blocks (either pre-render to SVG or include mermaid.js in the template).
+- [x] Mermaid diagrams aren't rendering now that they moved out of the notebook into the .md file. Fixed: added _protect_mermaid/_restore_mermaid to build.py to convert ```mermaid blocks into <div class="mermaid"> elements.
 
 ## Misc
 
@@ -207,3 +207,8 @@ Apply before every commit touching the notebook:
   value (with probability one).  The inclusion probabilities under Poisson
   sampling are \pi_=p_i, but they become more complicated when we condition.
   [Explain that part better.]
+
+
+## MIsc
+
+[ ] "Why the tree matters." there are other non quadratic solutions that don't involve the tree.  So - it's linear forward + backprop that matters not the tree 
