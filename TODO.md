@@ -154,7 +154,7 @@ Apply before every commit touching the notebook:
 - [x] All subsection titles use Title Case
 - [x] Consolidated notation box: added collapsible table after the intro defining all symbols (w, θ, p, π, Z, n, N, S, z, Scott brackets). Uses `<details class="derivation">` for blog styling.
 - [ ] Clean up w/p/θ parameterization confusion. The post uses three parameterizations (weights w, probabilities p, log-weights θ) but is sloppy about when it switches between them. Some formulas use w, others use θ, without always being clear which parameterization is in play. The identities section has a parameterizations table, but the rest of the post doesn't consistently signal which one it's using. Consider: pick one primary parameterization (probably w) and be explicit every time θ or p appears about the relationship. Or add a small "notation reminder" near each section that switches.
-- [ ] "is asymptotically exact" (Cell 26, optimizer paragraph) is vague—what is being taken to the limit? Presumably N→∞ with the Hájek (1964) result, but this needs to be stated explicitly. What does "exact" mean here—the warm start converges to the true θ*, or the inclusion probabilities match π*? Clarify or replace with a precise statement.
+- [x] "is asymptotically exact" → replaced with "has initialization error O(1/N) per item (Hájek 1964, Theorem 5.2)" with the regularity condition stated.
 - [x] Verification pills appear after punctuation, not before
 - [x] Color coding removed; legend removed
 - [ ] Every mathematical claim has a ✓ pill linking to its test
