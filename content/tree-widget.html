@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet">
+<script>MathJax={tex:{inlineMath:[['$','$']]}}</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<style>
+body {
+  font-family: 'EB Garamond', "PT Serif", Georgia, serif;
+  color: #333; font-size: 16pt;
+  max-width: 800px; margin: 2em auto; padding: 0 1em;
+}
+#tree-widget { position: relative; }
+#tree-controls {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 10px; font-size: 0.9em;
+}
+#tree-controls input[type=number] {
+  width: 44px; padding: 2px 4px;
+  font-family: inherit; font-size: inherit;
+  border: 1px solid #ccc; border-radius: 3px;
+}
+.slider-row {
+  display: flex; align-items: flex-end; gap: 4px;
+  margin-bottom: 8px;
+}
+.slider-col {
+  display: flex; flex-direction: column; align-items: center;
+}
+.slider-col .slabel { font-size: 0.7em; color: #5b9bd5; margin-top: 2px; }
+.slider-track {
+  width: 28px; height: 70px; position: relative;
+  background: #f8f8f8; border: 1px solid #eee; border-radius: 2px;
+  cursor: ns-resize; user-select: none; touch-action: none;
+}
+.slider-fill {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: #5b9bd5; opacity: 0.7; border-radius: 0 0 2px 2px;
+  pointer-events: none;
+}
+.slider-val {
+  position: absolute; width: 100%; text-align: center;
+  font-size: 9px; color: #5b9bd5; pointer-events: none;
+  font-family: 'EB Garamond', serif;
+}
+svg text { font-family: 'EB Garamond', serif; }
+</style>
+</head>
+<body>
+<div id="tree-widget"></div>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+(function() {
+  var N = 4, n = 2;
+  var w = [0.2, 0.35, 0.15, 0.3];
+  function normW() { var s=w.reduce(function(a,b){return a+b;},0); w=w.map(function(v){return v/s;}); }
+  normW();
+
+  var CW = '#5b9bd5';
+  var root = d3.select('#tree-widget');
+
+  function polyMul(a, b) {
+    var out = new Array(a.length + b.length - 1).fill(0);
+    for (var i = 0; i < a.length; i++)
+      for (var j = 0; j < b.length; j++)
+        out[i+j] += a[i] * b[j];
+    return out;
+  }
+
+  // Build the tree: returns array of nodes
+  // Each node: {left, right, poly, items (which leaf indices), depth, x, y}
+  function buildTree(w, n) {
+    var leaves = w.map(function(wi, i) {
+      return { poly: [1, wi], items: [i], leaf: true };
+    });
+    // Pad to power of 2
+    var size = 1;
+    while (size < leaves.length) size *= 2;
+    while (leaves.length < size) {
+      leaves.push({ poly: [1], items: [], leaf: true, pad: true });
+    }
+    // Build bottom-up
+    var level = leaves;
+    var allLevels = [level];
+    while (level.length > 1) {
+      var next = [];
+      for (var i = 0; i < level.length; i += 2) {
+        var l = level[i], r = level[i+1];
+        var p = polyMul(l.poly, r.poly);
+        // Truncate to degree n
+        if (p.length > n + 1) p = p.slice(0, n + 1);
+        next.push({ left: l, right: r, poly: p, items: l.items.concat(r.items), leaf: false });
+      }
+      level = next;
+      allLevels.push(level);
+    }
+    return { root: level[0], levels: allLevels };
+  }
+
+  function build() {
+    root.selectAll('*').remove();
+
+    // Controls
+    var ctrl = root.append('div').attr('id', 'tree-controls');
+    ctrl.append('span').html('$N$ = ');
+    ctrl.append('input').attr('type','number').attr('min',2).attr('max',8).attr('value',N)
+      .on('change input', function() {
+        var v = Math.max(2, Math.min(8, Math.round(+this.value)));
+        if (v === N) return;
+        N = v; n = Math.min(n, N);
+        while (w.length < N) w.push(0.2);
+        w = w.slice(0, N);
+        normW();
+        build();
+      });
+    ctrl.append('span').html('&ensp;$n$ = ');
+    ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n)
+      .on('change input', function() {
+        var v = Math.max(0, Math.min(N, Math.round(+this.value)));
+        if (v === n) return;
+        n = v; build();
+      });
+
+    // Weight sliders
+    var sliderH = 70;
+    var srow = root.append('div').attr('class', 'slider-row');
+    var sliderFills = [], sliderLabels = [];
+    for (var i = 0; i < N; i++) {
+      (function(idx) {
+        var col = srow.append('div').attr('class', 'slider-col');
+        var track = col.append('div').attr('class', 'slider-track');
+        var fill = track.append('div').attr('class', 'slider-fill')
+          .style('height', (w[idx]*100) + '%');
+        sliderFills.push(fill);
+        var lab = track.append('div').attr('class', 'slider-val')
+          .style('bottom', (w[idx]*sliderH + 2) + 'px')
+          .text(w[idx].toFixed(2));
+        sliderLabels.push(lab);
+        track.call(d3.drag().on('drag', function(event) {
+          var rect = this.getBoundingClientRect();
+          var frac = 1 - (event.y - rect.top) / sliderH;
+          var target = Math.max(0.01, Math.min(0.99, frac));
+          var others = 0;
+          for (var k=0;k<N;k++) if(k!==idx) others+=w[k];
+          var remain = 1 - target;
+          if (others > 1e-10 && remain > 0) {
+            var scale = remain / others;
+            for (var k=0;k<N;k++) {
+              if (k===idx) w[k]=target;
+              else w[k] = Math.max(0.001, w[k]*scale);
+            }
+          }
+          normW();
+          updateTree();
+        }));
+        col.append('div').attr('class', 'slabel').html('$w_' + (idx+1) + '$');
+      })(i);
+    }
+
+    // Build tree data
+    var tree = buildTree(w, n);
+    var levels = tree.levels;
+    var depth = levels.length;
+
+    // Layout
+    var nodeW = 60, nodeH = 28, cellW = 14, cellH = 16;
+    var hGap = 12, vGap = 50;
+    var svgW = Math.max(400, levels[0].length * (nodeW + hGap));
+    var svgH = depth * (nodeH + vGap) + 20;
+
+    var svg = root.append('svg').attr('width', svgW).attr('height', svgH)
+      .style('display', 'block').style('margin', '8px auto');
+
+    // Assign positions bottom-up
+    // Leaves at bottom
+    for (var li = 0; li < levels.length; li++) {
+      var lev = levels[li];
+      var y = (depth - 1 - li) * (nodeH + vGap) + 10;
+      var totalW = lev.length * (nodeW + hGap) - hGap;
+      var startX = (svgW - totalW) / 2;
+      for (var ni = 0; ni < lev.length; ni++) {
+        var nd = lev[ni];
+        nd.x = startX + ni * (nodeW + hGap) + nodeW / 2;
+        nd.y = y;
+      }
+    }
+
+    // Draw edges first
+    for (var li = 1; li < levels.length; li++) {
+      levels[li].forEach(function(nd) {
+        if (nd.left) {
+          svg.append('line')
+            .attr('x1', nd.x).attr('y1', nd.y + nodeH)
+            .attr('x2', nd.left.x).attr('y2', nd.left.y)
+            .attr('stroke', '#ddd').attr('stroke-width', 1);
+        }
+        if (nd.right) {
+          svg.append('line')
+            .attr('x1', nd.x).attr('y1', nd.y + nodeH)
+            .attr('x2', nd.right.x).attr('y2', nd.right.y)
+            .attr('stroke', '#ddd').attr('stroke-width', 1);
+        }
+      });
+    }
+
+    // Draw nodes with polynomial arrays
+    var allNodeGroups = [];
+    for (var li = 0; li < levels.length; li++) {
+      levels[li].forEach(function(nd) {
+        if (nd.pad) return;
+        var coeffs = nd.poly;
+        var nCoeffs = Math.min(coeffs.length, n + 1);
+        var boxW = nCoeffs * cellW + 2;
+        var g = svg.append('g')
+          .attr('transform', 'translate(' + (nd.x - boxW/2) + ',' + nd.y + ')');
+
+        // Background
+        g.append('rect').attr('width', boxW).attr('height', nodeH)
+          .attr('fill', '#fff').attr('stroke', '#ddd').attr('rx', 3);
+
+        // Coefficient cells
+        var maxC = Math.max.apply(null, coeffs.map(function(c){return Math.abs(c);}));
+        if (maxC === 0) maxC = 1;
+        for (var k = 0; k < nCoeffs; k++) {
+          var intensity = Math.min(1, Math.abs(coeffs[k]) / maxC);
+          // Color by contribution of items in this subtree
+          var r = 91, gg = 155, b = 213; // #5b9bd5
+          g.append('rect')
+            .attr('x', 1 + k * cellW).attr('y', 1)
+            .attr('width', cellW - 1).attr('height', nodeH - 2)
+            .attr('fill', 'rgba(' + r + ',' + gg + ',' + b + ',' + (0.1 + 0.8 * intensity) + ')')
+            .attr('rx', 1);
+          // Show value for small trees
+          if (N <= 5) {
+            g.append('text')
+              .attr('x', 1 + k * cellW + cellW/2).attr('y', nodeH/2 + 4)
+              .attr('text-anchor', 'middle')
+              .style('font-size', '8px').style('fill', intensity > 0.5 ? '#fff' : '#666')
+              .text(coeffs[k] < 0.001 && coeffs[k] > 0 ? '' : coeffs[k].toFixed(coeffs[k] >= 10 ? 0 : coeffs[k] >= 1 ? 1 : 2));
+          }
+        }
+
+        // Highlight n-th coefficient at root
+        if (li === levels.length - 1 && n < nCoeffs) {
+          g.append('rect')
+            .attr('x', 1 + n * cellW).attr('y', 0)
+            .attr('width', cellW - 1).attr('height', nodeH)
+            .attr('fill', 'none').attr('stroke', '#c0504d').attr('stroke-width', 2).attr('rx', 1);
+        }
+
+        nd._group = g;
+        nd._nCoeffs = nCoeffs;
+        allNodeGroups.push(nd);
+      });
+    }
+
+    // Leaf labels
+    levels[0].forEach(function(nd, i) {
+      if (nd.pad) return;
+      svg.append('text')
+        .attr('x', nd.x).attr('y', nd.y - 6)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '10px').style('fill', '#999')
+        .text('item ' + (i+1));
+    });
+
+    // Root label
+    var rootNd = levels[levels.length - 1][0];
+    svg.append('text')
+      .attr('x', rootNd.x).attr('y', rootNd.y + nodeH + 16)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '11px').style('fill', '#c0504d')
+      .text('↑ coefficient ' + n + ' = Z');
+
+    // Status
+    var status = root.append('div').style('font-size', '0.75em').style('color', '#999');
+
+    // Update without rebuilding layout
+    function updateTree() {
+      // Update sliders
+      for (var i = 0; i < N; i++) {
+        sliderFills[i].style('height', (w[i]*100) + '%');
+        sliderLabels[i].style('bottom', (w[i]*sliderH + 2) + 'px').text(w[i].toFixed(2));
+      }
+      // Rebuild tree data
+      var newTree = buildTree(w, n);
+      var newLevels = newTree.levels;
+
+      // Update node visuals
+      for (var li = 0; li < newLevels.length; li++) {
+        for (var ni = 0; ni < newLevels[li].length; ni++) {
+          var nd = levels[li][ni];
+          var newNd = newLevels[li][ni];
+          if (!nd || !nd._group || nd.pad) continue;
+          nd.poly = newNd.poly;
+          var coeffs = nd.poly;
+          var nCoeffs = nd._nCoeffs;
+          var maxC = Math.max.apply(null, coeffs.map(function(c){return Math.abs(c);}));
+          if (maxC === 0) maxC = 1;
+          var rects = nd._group.selectAll('rect').nodes();
+          // Skip background rect (index 0) and highlight rect (last if root)
+          for (var k = 0; k < nCoeffs; k++) {
+            var intensity = Math.min(1, Math.abs(coeffs[k]) / maxC);
+            var r = 91, gg = 155, b = 213;
+            d3.select(rects[k + 1])
+              .attr('fill', 'rgba(' + r + ',' + gg + ',' + b + ',' + (0.1 + 0.8 * intensity) + ')');
+          }
+          // Update text
+          if (N <= 5) {
+            var texts = nd._group.selectAll('text').nodes();
+            for (var k = 0; k < Math.min(texts.length, nCoeffs); k++) {
+              var intensity = Math.min(1, Math.abs(coeffs[k]) / maxC);
+              d3.select(texts[k])
+                .style('fill', intensity > 0.5 ? '#fff' : '#666')
+                .text(coeffs[k] < 0.001 && coeffs[k] > 0 ? '' : coeffs[k].toFixed(coeffs[k] >= 10 ? 0 : coeffs[k] >= 1 ? 1 : 2));
+            }
+          }
+        }
+      }
+
+      // Update Z label
+      var Z = newTree.root.poly[Math.min(n, newTree.root.poly.length - 1)];
+      status.text('Z = ' + (Z !== undefined ? Z.toFixed(4) : '—'));
+    }
+
+    updateTree();
+    if (window.MathJax && MathJax.typesetPromise) {
+      MathJax.typesetClear();
+      MathJax.typesetPromise();
+    }
+  }
+
+  build();
+})();
+</script>
+</body>
+</html>
