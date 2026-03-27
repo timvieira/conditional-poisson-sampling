@@ -6,18 +6,10 @@
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet">
 <script>
 MathJax = {
-  tex: {inlineMath: [['$','$']]},
-  startup: {
-    ready: function() {
-      MathJax.startup.defaultReady();
-      // Re-typeset after MathJax is fully loaded
-      var tw = document.getElementById('tw');
-      if (tw) MathJax.typesetPromise([tw]);
-    }
-  }
+  tex: {inlineMath: [['$','$']]}
 };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <style>
 body {
   font-family: 'EB Garamond', "PT Serif", Georgia, serif;
