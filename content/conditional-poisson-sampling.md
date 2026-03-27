@@ -6,29 +6,29 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 {% notebook conditional-poisson-sampling.ipynb cells[1:5] %}
 
 <style>
-#cps table { border-collapse: collapse; width: 100%; margin: 0.2em 0; table-layout: fixed; }
-#cps th, #cps td { padding: 5px 8px; font-family: inherit; font-size: inherit; }
-#cps th { border-bottom: 2px solid #333; font-weight: normal; }
-#cps .rl { text-align: left; width: 100px; }
+#cps table { border-collapse: collapse; width: 100%; margin: 0; table-layout: fixed; }
+#cps th, #cps td { padding: 3px 6px; font-family: inherit; font-size: 0.88em; }
+#cps th { border-bottom: 1px solid #ccc; font-weight: normal; color: #666; }
+#cps .rl { text-align: left; width: 80px; color: #999; font-size: 0.8em; }
 #cps .ic { text-align: center; }
 #cps .pc { text-align: right; }
-#cps .zero { color: #bbb; }
+#cps .zero { color: #ccc; }
 #cps .bar-td {
-  vertical-align: bottom; text-align: center; padding: 4px 2px;
+  vertical-align: bottom; text-align: center; padding: 2px 1px;
   cursor: ns-resize; user-select: none; -webkit-user-select: none;
-  touch-action: none;  /* prevent scroll on touch drag */
+  touch-action: none;
 }
 #cps .bar-td.readonly { cursor: default; }
 #cps .bar-td svg { display: block; margin: 0 auto; }
 @media (max-width: 600px) {
   body { font-size: 14pt; padding: 0 0.5em; }
-  #cps .rl { font-size: 0.8em; }
-  #cps th, #cps td { padding: 3px 4px; }
+  #cps .rl { width: 60px; font-size: 0.75em; }
+  #cps th, #cps td { padding: 2px 3px; }
 }
 
 </style>
 
-<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 2px solid #dee2e6; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
 **Interactive explorer.** Drag the weight bars to see how changing $w_i$ affects the subset probabilities $P(S)$ and inclusion probabilities $\pi_i$. Drag the $\pi_i$ bars to solve the inverse problem: find weights that produce given inclusion probabilities. Use the $N$ and $n$ controls to change the problem size.
 
@@ -39,11 +39,11 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
   var N=5, n=3, w=[0.124,0.265,0.066,0.372,0.174], pi=[];
   function normW(){var s=w.reduce(function(a,b){return a+b;},0);w=w.map(function(v){return v/s;});}
   normW();
-  var CW='#2196F3', CP='#E91E63';
+  var CW='#5b9bd5', CP='#c0504d';
   // Responsive bar sizing
   var mobile = window.innerWidth < 600;
-  var barH = mobile ? 90 : 120;
-  var bw = mobile ? 28 : 36;
+  var barH = mobile ? 70 : 90;
+  var bw = mobile ? 22 : 28;
 
   function subs(N,n){var r=[];(function go(s,c){if(c.length===n){r.push(c.slice());return;}if(s>=N)return;c.push(s);go(s+1,c);c.pop();go(s+1,c);})(0,[]);return r;}
   function getPi(w){
@@ -90,13 +90,13 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
   function makeBar(td, val, maxVal, color, draggable, onDrag) {
     var svg = td.append('svg').attr('width',bw).attr('height',barH);
     svg.append('rect').attr('x',0).attr('y',0).attr('width',bw).attr('height',barH)
-      .attr('fill','#f4f4f4').attr('stroke','#e0e0e0').attr('rx',3);
+      .attr('fill','#f8f8f8').attr('stroke','#eee').attr('rx',2);
     var frac = Math.min(val/maxVal, 1);
     var fill = svg.append('rect').attr('x',1).attr('width',bw-2).attr('rx',2)
       .attr('y',barH-frac*barH).attr('height',frac*barH)
       .attr('fill',color).attr('opacity',0.7).style('pointer-events','none');
     var label = svg.append('text').attr('x',bw/2).attr('y',barH-frac*barH-4)
-      .attr('text-anchor','middle').style('font-size','14px').style('fill',color).style('font-family',"'EB Garamond', serif")
+      .attr('text-anchor','middle').style('font-size','11px').style('fill',color).style('font-family',"'EB Garamond', serif")
       .style('pointer-events','none').text(val === 0 ? '0' : val < 0.01 ? '\u22480' : val.toFixed(3));
     if (draggable) {
       svg.append('rect').attr('width',bw).attr('height',barH)
@@ -131,9 +131,9 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
       .on('change input',function(){var v=+this.value;if(isNaN(v))return;if(v<0||v>N){d3.select('#cps-status').text('the distribution requires 0 \u2264 n \u2264 N='+N).style('color','#c00');return;}v=Math.round(v);if(v===n)return;n=v;build();});
 
     // Shared column widths for all three tables
-    var colLabelW = '120px';
-    var colItemW = Math.floor(Math.min(80, (520 - 120 - 80) / N)) + 'px';
-    var colPSW = '80px';
+    var colLabelW = '90px';
+    var colItemW = Math.floor(Math.min(60, (440 - 90 - 65) / N)) + 'px';
+    var colPSW = '65px';
     function addCols(table) {
       var cg = table.append('colgroup');
       cg.append('col').style('width', colLabelW);
@@ -226,7 +226,7 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
     // to n, changing one π_i will cause the others to adjust.
     var pt = root.append('table');
     addCols(pt);
-    var ph = pt.append('thead').append('tr').style('border-top','2px solid #333');
+    var ph = pt.append('thead').append('tr').style('border-top','1px solid #ccc');
     ph.append('th').attr('class','rl').style('font-weight','bold').html('inclusion prob.');
     for(var i=0;i<N;i++) ph.append('th').attr('class','ic').style('color',CP).style('font-weight','bold').html('$\\pi_'+(i+1)+'$');
     ph.append('th').attr('class','pc');
