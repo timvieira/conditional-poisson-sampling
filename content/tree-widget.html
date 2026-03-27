@@ -239,32 +239,19 @@ svg text { font-family: 'EB Garamond', serif; }
       .attr('markerWidth',5).attr('markerHeight',7).attr('orient','0')
       .append('path').attr('d','M0,0 L6,0 L3,8 Z').attr('fill','#ccc');
 
-    levels[0].forEach(function(nd) {
-      if (nd.pad) return;
-      // From bottom of slider (inputZoneBot) to top of leaf node (nd.y)
-      svg.append('line')
-        .attr('x1', nd.x).attr('y1', inputZoneBot)
-        .attr('x2', nd.x).attr('y2', nd.y)
-        .attr('stroke', '#ccc').attr('stroke-width', 1)
-        .attr('marker-end', 'url(#arrowDown)');
-    });
+    // Connector lines drawn after nodes (need _barXs), see below
 
     // Separator 2: circuit → output
     svg.append('line').attr('x1', 10).attr('x2', svgW - 10)
       .attr('y1', sep2Y).attr('y2', sep2Y)
       .attr('stroke', '#e0e0e0').attr('stroke-width', 1).attr('stroke-dasharray', '4,4');
 
-    // Arrow from root bottom to output zone
-    var rootNdForArrow = levels[levels.length - 1][0];
+    // Arrow from root's n-th bar bottom to output zone (drawn after nodes so _barXs exists)
     arrowDef.append('marker').attr('id','arrowDownRed').attr('viewBox','0 0 6 8')
       .attr('refX',3).attr('refY',8)
       .attr('markerWidth',6).attr('markerHeight',8).attr('orient','0')
       .append('path').attr('d','M0,0 L6,0 L3,8 Z').attr('fill', CR);
-    svg.append('line')
-      .attr('x1', rootNdForArrow.x).attr('y1', rootBot)
-      .attr('x2', rootNdForArrow.x).attr('y2', outputY)
-      .attr('stroke', CR).attr('stroke-width', 1.5)
-      .attr('marker-end', 'url(#arrowDownRed)');
+    // (actual line drawn after nodes, see below)
 
     // --- Draw edges ---
     for (var li = 1; li < levels.length; li++) {
@@ -355,6 +342,28 @@ svg text { font-family: 'EB Garamond', serif; }
       });
     }
 
+    // --- Root → output arrow (from n-th bar center) ---
+    var rootNdFinal = levels[levels.length - 1][0];
+    if (rootNdFinal._barXs && n < rootNdFinal._barXs.length) {
+      var rootCx = rootNdFinal._barXs[n] + bW/2;
+      svg.append('line')
+        .attr('x1', rootCx).attr('y1', rootBot)
+        .attr('x2', rootCx).attr('y2', outputY)
+        .attr('stroke', CR).attr('stroke-width', 1.5)
+        .attr('marker-end', 'url(#arrowDownRed)');
+    }
+
+    // --- Connector arrows from slider bottom to leaf w_i bar top ---
+    levels[0].forEach(function(nd) {
+      if (nd.pad || !nd._barXs) return;
+      var cx = nd._barXs[1] + bW/2; // center of the w_i bar
+      svg.append('line')
+        .attr('x1', cx).attr('y1', inputZoneBot)
+        .attr('x2', cx).attr('y2', nd.y)
+        .attr('stroke', '#ccc').attr('stroke-width', 1)
+        .attr('marker-end', 'url(#arrowDown)');
+    });
+
     // --- Sliders above leaves, aligned to the w_i bar (index 1) ---
     levels[0].forEach(function(nd, idx) {
       if (nd.pad) return;
@@ -413,9 +422,10 @@ svg text { font-family: 'EB Garamond', serif; }
       })(idx);
     });
 
-    // Z label in the output zone (below separator 2)
+    // Z label in output zone, centered on the n-th bar
     var rootNd = levels[levels.length - 1][0];
-    zLabelDiv = addMathLabel(svgWrap, rootNd.x, outputY, '', {anchor:'middle', color: CR, fontSize: '14px'});
+    var zLabelX = (rootNd._barXs && n < rootNd._barXs.length) ? rootNd._barXs[n] + bW/2 : rootNd.x;
+    zLabelDiv = addMathLabel(svgWrap, zLabelX, outputY, '', {anchor:'middle', color: CR, fontSize: '14px'});
 
     root.datum({ levels: levels, tree: tree, globalMax: globalMax });
     updateTree();
