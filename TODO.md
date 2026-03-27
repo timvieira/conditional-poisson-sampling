@@ -175,7 +175,7 @@ Apply before every commit touching the notebook:
 - [x] Color coding removed; legend removed
 - [ ] Every mathematical claim has a ✓ pill linking to its test
 - [ ] Code and math use consistent notation (per CLAUDE.md)
-- [ ] No undefined abbreviations (spell out on first use)
+- [x] No undefined abbreviations (spell out on first use)
 - [ ] Citations verified against the actual publication
 - [x] Every hardcoded number verified: static example tables (the source of past bugs) replaced by the widget. Remaining code cells contain only input values (w_ex, plot params) and computed outputs. No stale values found.
 
@@ -189,3 +189,19 @@ Apply before every commit touching the notebook:
 - [x] DP baseline in timing section (Cell 25) is $O(N^2 n)$ (recomputes from scratch per leave-one-out), not $O(Nn)$ as stated
 - [x] Color coding (weights blue, π crimson, Z orange) is never explained in the text; invisible to colorblind readers or raw markdown viewers
 - [x] Several forward references (exponential family, D-tree) introduce concepts long before they're used — consider deferring or adding a brief "we'll return to this" signpost
+
+
+## Misc
+
+- [x] If we are going to bother explaining the name conditional Poisson, we should say
+
+  Poisson sampling is named after mathematician Siméon Denis Poisson.  It has
+  nothing to do with fish or fishing.
+
+  In Poisson sampling, each unit i is included in the sample independently with some probability p_i
+
+  Here the sample size is n = \sum 1[i∈S] is random.  The *conditional* Poisson
+  distribution is simple a Poisson distribution conditioned to have n be a fixed
+  value (with probability one).  The inclusion probabilities under Poisson
+  sampling are \pi_=p_i, but they become more complicated when we condition.
+  [Explain that part better.]
