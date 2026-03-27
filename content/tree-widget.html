@@ -4,7 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet">
-<script>MathJax={tex:{inlineMath:[['$','$']]}}</script>
+<script>
+MathJax = {
+  tex: {inlineMath: [['$','$']]},
+  startup: {
+    ready: function() {
+      MathJax.startup.defaultReady();
+      // Re-typeset after MathJax is fully loaded
+      var tw = document.getElementById('tw');
+      if (tw) MathJax.typesetPromise([tw]);
+    }
+  }
+};
+</script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
 <style>
 body {
