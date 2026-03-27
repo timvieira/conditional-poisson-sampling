@@ -1059,13 +1059,13 @@ This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function)
 
 **Gradient.**  $\nabla_{\btheta} L(\btheta) = \bpip^* - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpip^*$ exactly, so the gradient is zero.  Each evaluation of $L$ and $\nabla L$ costs $\mathcal{O}(N \log^2 n)$ (one pass through the product tree + backpropagation).
 
-**Optimizer.**  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The warm start $\theta_i \defeq \log(\bpip^*_i / (1 - \bpip^*_i))$ has initialization error $\mathcal{O}(1/N)$ per item ([Hájek, 1964, Theorem 5.2](https://doi.org/10.1214/aoms/1177700375)), so the optimizer starts close to the solution.
+**Optimizer.**  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The warm start $\theta_i^{(0)} = \log(\bpip^*_i / (1 - \bpip^*_i))$ has initialization error $\mathcal{O}(1/N)$ per item ([Hájek, 1964, Theorem 5.2](https://doi.org/10.1214/aoms/1177700375)), so the optimizer starts close to the solution.
 
 
 <details class="derivation">
 <summary><b>Warm start: why logit(π*) is a good initialization</b> (click to expand)</summary>
 
-The optimizer is initialized at $\theta_i \defeq \log(\pip^*_i / (1 - \pip^*_i))$, i.e., the odds of the target inclusion probabilities.  This is the exact solution in the *unconditional* Poisson case: if we flip independent coins with $p_i = \pip^*_i$, the odds are $\w_i \defeq p_i/(1-p_i)$ and the expected sample size is $\sum \pip^*_i = n$.  Conditioning on the sample size being exactly $n$ perturbs the inclusion probabilities, but the perturbation is small.
+The optimizer is initialized at $\theta_i^{(0)} = \log(\pip^*_i / (1 - \pip^*_i))$, i.e., the log-odds of the target inclusion probabilities.  This is the exact solution in the *unconditional* Poisson case: if we flip independent coins with $p_i = \pip^*_i$, the odds are $\w_i \defeq p_i/(1-p_i)$ and the expected sample size is $\sum \pip^*_i = n$.  Conditioning on the sample size being exactly $n$ perturbs the inclusion probabilities, but the perturbation is small.
 
 Hájek (1964, Theorem 5.2) showed that under standard regularity conditions, the conditional Poisson inclusion probabilities satisfy
 
