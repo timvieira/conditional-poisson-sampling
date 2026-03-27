@@ -135,35 +135,29 @@ body {
       .style('border','1px solid #ccc').style('border-radius','3px').style('padding','2px 4px')
       .on('change input',function(){var v=+this.value;if(isNaN(v))return;if(v<0||v>N){d3.select('#cps-status').text('the distribution requires 0 \u2264 n \u2264 N='+N).style('color','#c00');return;}v=Math.round(v);if(v===n)return;n=v;build();});
 
-    // Shared column widths for all three tables
-    var colLabelW = 'auto';
-    var colItemW = (bw + 8) + 'px';
-    var colPSW = '55px';
-    function addCols(table) {
-      var cg = table.append('colgroup');
-      cg.append('col').style('width', colLabelW);
-      for (var j=0;j<N;j++) cg.append('col').style('width', colItemW);
-      cg.append('col').style('width', colPSW);
-    }
+    // === ONE TABLE for everything ===
+    var tbl = root.append('table');
+    var cg = tbl.append('colgroup');
+    cg.append('col').style('width', 'auto');
+    for (var j=0;j<N;j++) cg.append('col').style('width', (bw+8)+'px');
+    cg.append('col').style('width', '55px');
+    var tbody = tbl.append('tbody');
 
-    // === WEIGHTS TABLE (with bars) ===
-    var wt = root.append('table');
-    addCols(wt);
-    // Header
-    var wh = wt.append('thead').append('tr');
-    wh.append('th').attr('class','rl').text('weights');
-    for(var i=0;i<N;i++) wh.append('th').attr('class','ic').style('color',CW).html('$w_'+(i+1)+'$');
-    wh.append('th').attr('class','pc');
-    // Bar row
-    var wb = wt.append('tbody').append('tr');
-    wb.append('td').attr('class','rl').style('font-size','0.75em').style('color','#999').html('drag to adjust<br>(normalized: $\\sum w_i = 1$)');
+    // --- Weights header ---
+    var wh = tbody.append('tr');
+    wh.append('td').attr('class','rl').text('weights');
+    for(var i=0;i<N;i++) wh.append('td').attr('class','ic').style('color',CW).html('$w_'+(i+1)+'$');
+    wh.append('td').attr('class','pc');
+
+    // --- Weight bars ---
+    var wb = tbody.append('tr');
+    wb.append('td').attr('class','rl').style('font-size','0.7em').style('color','#999').html('drag to adjust<br>($\\sum w_i = 1$)');
     for(var i=0;i<N;i++){
       (function(idx){
         var td = wb.append('td').attr('class','bar-td');
         var b = makeBar(td, w[idx], getMaxW(), CW, true, function(frac){
           var target = Math.max(0, Math.min(0.99, frac));
           var EPS = 0.005;
-          // Count how many items would remain with meaningful weight
           var wouldBeNonzero = 0;
           for(var k=0;k<N;k++) {
             if(k===idx) { if(target>EPS) wouldBeNonzero++; }
@@ -176,7 +170,6 @@ body {
             return;
           }
           d3.select('#cps-status').text('');
-          // Scale the *others* to keep sum = 1
           var others = 0;
           for(var k=0;k<N;k++) if(k!==idx) others+=w[k];
           var remain = 1 - target;
@@ -198,21 +191,23 @@ body {
     }
     wb.append('td').attr('class','pc');
 
-    // === SUBSETS TABLE ===
+    // --- Spacer ---
+    tbody.append('tr').append('td').attr('colspan',N+2).style('height','6px');
+
+    // --- Subsets header ---
     var allS = subs(N,n);
     probCells = [];
     if (allS.length <= 70) {
       var tdata = getTable(w);
-      var st = root.append('table');
-      addCols(st);
-      var sh = st.append('thead').append('tr');
-      sh.append('th').attr('class','rl').html('Subset $S$');
-      for(var j=0;j<N;j++) sh.append('th').attr('class','ic').text(j+1);
-      sh.append('th').attr('class','pc').html('$P(S)$');
-      var sb = st.append('tbody');
+      var sh = tbody.append('tr');
+      sh.append('td').attr('class','rl').html('Subset $S$');
+      for(var j=0;j<N;j++) sh.append('td').attr('class','ic').text(j+1);
+      sh.append('td').attr('class','pc').html('$P(S)$');
+
+      // --- Subset rows ---
       tdata.forEach(function(r){
-        var tr = sb.append('tr');
-        tr.append('td').attr('class','rl').text('{'+r.s.map(function(j){return j+1;}).join(', ')+'}');
+        var tr = tbody.append('tr');
+        tr.append('td').attr('class','rl').style('color','#333').style('font-style','normal').text('{'+r.s.map(function(j){return j+1;}).join(', ')+'}');
         r.ind.forEach(function(v){tr.append('td').attr('class','ic'+(v?'':' zero')).text(v);});
         var pc = tr.append('td').attr('class','pc').style('position','relative');
         pc.append('div').attr('class','prob-bar')
@@ -223,21 +218,21 @@ body {
         probCells.push(pc);
       });
     } else {
-      root.append('div').style('color','#999').style('font-size','0.85em').text('('+allS.length+' subsets\u2014table hidden)');
+      tbody.append('tr').append('td').attr('colspan',N+2).style('color','#999').style('font-size','0.85em').text('('+allS.length+' subsets\u2014table hidden)');
     }
 
-    // === INCLUSION PROBABILITIES TABLE (with bars, draggable → fits w) ===
-    // Note: dragging π_i sets a target and solves for w. Because π must sum
-    // to n, changing one π_i will cause the others to adjust.
-    var pt = root.append('table');
-    addCols(pt);
-    var ph = pt.append('thead').append('tr');
-    ph.append('th').attr('class','rl').style('font-weight','bold').html('inclusion prob.');
-    for(var i=0;i<N;i++) ph.append('th').attr('class','ic').style('color',CP).style('font-weight','bold').html('$\\pi_'+(i+1)+'$');
-    ph.append('th').attr('class','pc');
-    // Bar row
-    var pb = pt.append('tbody').append('tr');
-    pb.append('td').attr('class','rl').style('font-size','0.75em').style('color','#999').html('drag to set target<br>(others adjust since $\\sum \\pi_i = n$)');
+    // --- Spacer ---
+    tbody.append('tr').append('td').attr('colspan',N+2).style('height','6px');
+
+    // --- Pi header ---
+    var ph = tbody.append('tr');
+    ph.append('td').attr('class','rl').style('font-weight','bold').html('inclusion prob.');
+    for(var i=0;i<N;i++) ph.append('td').attr('class','ic').style('color',CP).style('font-weight','bold').html('$\\pi_'+(i+1)+'$');
+    ph.append('td').attr('class','pc');
+
+    // --- Pi bars ---
+    var pb = tbody.append('tr');
+    pb.append('td').attr('class','rl').style('font-size','0.7em').style('color','#999').html('drag to set target<br>($\\sum \\pi_i = n$)');
     for(var i=0;i<N;i++){
       (function(idx){
         var td = pb.append('td').attr('class','bar-td');
