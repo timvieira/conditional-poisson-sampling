@@ -153,7 +153,7 @@ Apply before every commit touching the notebook:
 - [x] All vector quantities use `\boldsymbol` in LaTeX
 - [x] All subsection titles use Title Case
 - [x] Consolidated notation box: added collapsible table after the intro defining all symbols (w, θ, p, π, Z, n, N, S, z, Scott brackets). Uses `<details class="derivation">` for blog styling.
-- [x] Clean up w/p/θ parameterization: audited all uses. Every p_i and θ_i now has \defeq at point of use. Notation box defines all three. θ appears only in fitting/exp-family sections where it belongs. w is the primary parameterization throughout.
+- [ ] Clean up w/p/θ parameterization confusion. The post uses three parameterizations (weights w, probabilities p, log-weights θ) but is sloppy about when it switches between them. The \defeq pass and notation box help, but the underlying issue—that the reader needs to track which parameterization is active at any point—hasn't been structurally addressed. Needs a careful read-through with fresh eyes.
 - [x] "is asymptotically exact" → replaced with "has initialization error O(1/N) per item (Hájek 1964, Theorem 5.2)" with the regularity condition stated.
 - [x] Verification pills appear after punctuation, not before
 - [x] Color coding removed; legend removed
