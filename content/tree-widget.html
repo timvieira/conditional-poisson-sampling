@@ -81,7 +81,23 @@ svg text { font-family: 'EB Garamond', serif; }
 
   var sliderFills = [], sliderLabels = [];
   var nodeRefs = [];
-  var statusEl;
+
+  // Helper: embed MathJax-rendered HTML inside SVG via foreignObject
+  function svgMath(parent, x, y, html, opts) {
+    opts = opts || {};
+    var w = opts.width || 80, h = opts.height || 20;
+    var fo = parent.append('foreignObject')
+      .attr('x', x - (opts.anchor === 'middle' ? w/2 : opts.anchor === 'end' ? w : 0))
+      .attr('y', y - h/2)
+      .attr('width', w).attr('height', h);
+    var div = fo.append('xhtml:div')
+      .style('font-size', opts.fontSize || '10px')
+      .style('color', opts.color || '#999')
+      .style('text-align', opts.anchor === 'middle' ? 'center' : opts.anchor === 'end' ? 'right' : 'left')
+      .style('line-height', h + 'px')
+      .html(html);
+    return fo;
+  }
 
   function build() {
     root.selectAll('*').remove();
@@ -206,11 +222,10 @@ svg text { font-family: 'EB Garamond', serif; }
               .attr('fill', 'none').attr('stroke', CR).attr('stroke-width', 1.5).attr('rx', 1);
           }
           for (var k = 0; k < nCoeffs; k++) {
-            g.append('text')
-              .attr('x', k * cW + cW/2).attr('y', histH + 10)
-              .attr('text-anchor', 'middle')
-              .style('font-size', '7px').style('fill', k === n ? CR : '#bbb')
-              .text(k);
+            var labelX = nd.x - boxW/2 + k * cW + cW/2;
+            svgMath(svg, labelX, nd.y + histH + 8,
+              k === n ? '$\\mathbf{' + k + '}$' : '$' + k + '$',
+              {anchor:'middle', color: k === n ? CR : '#bbb', fontSize:'8px', width:20, height:14});
           }
         }
 
@@ -254,12 +269,8 @@ svg text { font-family: 'EB Garamond', serif; }
           .text(w[idx].toFixed(2));
         sliderLabels.push(sl);
 
-        // Item label above slider
-        svg.append('text')
-          .attr('x', barX + cW/2).attr('y', topPad + labelH - 4)
-          .attr('text-anchor', 'middle')
-          .style('font-size', '9px').style('fill', '#999')
-          .text('w' + (idx+1));
+        // Item label above slider (MathJax)
+        svgMath(svg, barX + cW/2, topPad + 4, '$w_' + (idx+1) + '$', {anchor:'middle', color:CW, fontSize:'11px', width:30, height:18});
 
         // Drag target (wider for touch)
         svg.append('rect')
@@ -286,13 +297,14 @@ svg text { font-family: 'EB Garamond', serif; }
       })(idx);
     });
 
-    // Z label beside root (updated dynamically)
+    // Z label beside root (updated dynamically via foreignObject)
     var rootNd = levels[levels.length - 1][0];
     var rootBoxW = Math.min(rootNd.poly.length, n+1) * cW;
-    var zLabel = svg.append('text')
-      .attr('x', rootNd.x + rootBoxW/2 + 8).attr('y', rootNd.y + histH/2 + 4)
-      .attr('text-anchor', 'start')
-      .style('font-size', '11px').style('fill', CR);
+    var zLabelFO = svg.append('foreignObject')
+      .attr('x', rootNd.x + rootBoxW/2 + 6).attr('y', rootNd.y + histH/2 - 10)
+      .attr('width', 120).attr('height', 22);
+    var zLabelDiv = zLabelFO.append('xhtml:div')
+      .style('font-size', '11px').style('color', CR).style('line-height', '22px');
 
     root.datum({ levels: levels, tree: tree, globalMax: globalMax });
     updateTree();
@@ -352,7 +364,8 @@ svg text { font-family: 'EB Garamond', serif; }
     }
 
     var Z = newTree.root.poly[Math.min(n, newTree.root.poly.length - 1)];
-    zLabel.text('← Z = ' + (Z !== undefined ? Z.toFixed(4) : '—'));
+    zLabelDiv.html('$\\leftarrow Z = ' + (Z !== undefined ? Z.toFixed(4) : '\\text{—}') + '$');
+    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([zLabelDiv.node()]);
   }
 
   build();

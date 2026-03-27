@@ -17,6 +17,7 @@ Code and documentation must use identical notation. Stale or inconsistent notati
 - **Definitional equals**: `\defeq` macro (renders as = with "def" above) for defining equations
 - **Headings**: Title Case (capitalize all words except articles/conjunctions/prepositions: a, an, the, and, but, or, in, on, at, to, for, of)
 - **Notation discipline**: define every symbol before first use, ideally in a consolidated notation box. Never introduce a symbol implicitly or switch parameterizations (w↔θ↔p) without flagging it. Readers should be able to trust that the same symbol means the same thing throughout.
+- **Typesetting**: use MathJax for all mathematical labels and symbols, including in interactive widgets. For SVG, use `<foreignObject>` to embed MathJax-rendered HTML. Never use plain text for math symbols.
 
 When changing notation or API names, update **all** of these in the same commit:
 1. Code (parameter names, property names)
