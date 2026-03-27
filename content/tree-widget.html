@@ -354,15 +354,33 @@ svg text { font-family: 'EB Garamond', serif; }
     if (rootNdFinal._barXs && n < rootNdFinal._barXs.length) {
       var rootCx = rootNdFinal._barXs[n] + bW/2;
       zLabelX = rootCx;
-      // Straight line from red bar bottom to Z label
+      // Bezier curve from red bar to Z label, with manual arrowhead
       var x1 = rootCx, y1 = rootBot;
       var x2 = rootNdFinal.x, y2 = outputY;
       zLabelX = x2;
-      svg.append('line')
-        .attr('x1', x1).attr('y1', y1)
-        .attr('x2', x2).attr('y2', y2)
-        .attr('stroke', CR).attr('stroke-width', 1.5)
-        .attr('marker-end', 'url(#arrowDownRed)');
+      // Control points: leave downward, arrive downward
+      var cp1x = x1, cp1y = y1 + (y2-y1)*0.5;
+      var cp2x = x2, cp2y = y1 + (y2-y1)*0.5;
+      // Shorten the path so arrowhead doesn't overshoot
+      var tipGap = 6;
+      var y2s = y2 - tipGap;
+      svg.append('path')
+        .attr('d', 'M'+x1+','+y1+' C'+cp1x+','+cp1y+' '+cp2x+','+cp2y+' '+x2+','+y2s)
+        .attr('fill', 'none').attr('stroke', CR).attr('stroke-width', 1.5);
+      // Manual arrowhead: triangle at endpoint, oriented along tangent from cp2 to endpoint
+      var dx = x2 - cp2x, dy = y2s - cp2y;
+      var len = Math.sqrt(dx*dx + dy*dy);
+      if (len > 0) { dx /= len; dy /= len; }
+      var ax = 5; // arrowhead half-width
+      var al = 8; // arrowhead length
+      // Tip at (x2, y2), base perpendicular to tangent
+      var bx = x2 - dx*al, by = y2 - dy*al;
+      var px = -dy, py = dx; // perpendicular
+      svg.append('path')
+        .attr('d', 'M'+x2+','+y2+
+          ' L'+(bx+px*ax)+','+(by+py*ax)+
+          ' L'+(bx-px*ax)+','+(by-py*ax)+' Z')
+        .attr('fill', CR);
     }
 
     // --- Connector arrows from slider bottom to leaf w_i bar top ---
