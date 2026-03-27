@@ -115,12 +115,12 @@ body {
     ctrl.append('input').attr('type','number').attr('min',2).attr('max',8).attr('value',N)
       .style('width','44px').style('font-family','inherit').style('font-size','inherit')
       .style('border','1px solid #ccc').style('border-radius','3px').style('padding','2px 4px')
-      .on('change input',function(){var v=Math.max(2,Math.min(8,+this.value));if(v===N)return;N=v;n=Math.min(n,N-1);while(w.length<N)w.push(0.5+Math.random());w=w.slice(0,N);normW();build();});
+      .on('change input',function(){var v=Math.max(2,Math.min(8,+this.value));if(v===N)return;N=v;n=Math.min(n,N);while(w.length<N)w.push(0.5+Math.random());w=w.slice(0,N);normW();build();});
     ctrl.append('span').html('&ensp;$n$ = ');
-    ctrl.append('input').attr('type','number').attr('min',1).attr('max',N-1).attr('value',n)
+    ctrl.append('input').attr('type','number').attr('min',1).attr('max',N).attr('value',n)
       .style('width','44px').style('font-family','inherit').style('font-size','inherit')
       .style('border','1px solid #ccc').style('border-radius','3px').style('padding','2px 4px')
-      .on('change input',function(){var v=Math.max(1,Math.min(N-1,+this.value));if(v===n)return;n=v;build();});
+      .on('change input',function(){var v=Math.max(1,Math.min(N,+this.value));if(v===n)return;n=v;build();});
 
     // === WEIGHTS TABLE (with bars) ===
     var wt = root.append('table');
