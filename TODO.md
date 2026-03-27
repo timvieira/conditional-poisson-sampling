@@ -191,6 +191,8 @@ Apply before every commit touching the notebook:
 - [x] Several forward references (exponential family, D-tree) introduce concepts long before they're used — consider deferring or adding a brief "we'll return to this" signpost
 
 
+- [ ] Mermaid diagrams aren't rendering now that they moved out of the notebook into the .md file. The build/compilation script needs to handle mermaid code blocks (either pre-render to SVG or include mermaid.js in the template).
+
 ## Misc
 
 - [x] If we are going to bother explaining the name conditional Poisson, we should say
