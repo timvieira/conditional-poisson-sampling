@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet">
 <script>MathJax={tex:{inlineMath:[['$','$']]}};
 </script>
@@ -22,9 +23,16 @@ body {
 #cps .bar-td {
   vertical-align: bottom; text-align: center; padding: 4px 2px;
   cursor: ns-resize; user-select: none; -webkit-user-select: none;
+  touch-action: none;  /* prevent scroll on touch drag */
 }
 #cps .bar-td.readonly { cursor: default; }
 #cps .bar-td svg { display: block; margin: 0 auto; }
+@media (max-width: 600px) {
+  body { font-size: 14pt; padding: 0 0.5em; }
+  #cps .rl { width: 60px; font-size: 0.8em; }
+  #cps table { table-layout: auto; }
+  #cps th, #cps td { padding: 3px 4px; }
+}
 </style>
 </head>
 <body>
@@ -36,7 +44,10 @@ body {
   function normW(){var s=w.reduce(function(a,b){return a+b;},0);w=w.map(function(v){return v/s;});}
   normW();
   var CW='#2196F3', CP='#E91E63';
-  var barH=120, bw=32;
+  // Responsive bar sizing
+  var mobile = window.innerWidth < 600;
+  var barH = mobile ? 90 : 120;
+  var bw = mobile ? 28 : 36;
 
   function subs(N,n){var r=[];(function go(s,c){if(c.length===n){r.push(c.slice());return;}if(s>=N)return;c.push(s);go(s+1,c);c.pop();go(s+1,c);})(0,[]);return r;}
   function getPi(w){var S=subs(N,n),pr=S.map(function(s){return s.reduce(function(a,i){return a*w[i];},1);}),Z=pr.reduce(function(a,b){return a+b;},0),p=Array(N).fill(0);S.forEach(function(s,j){s.forEach(function(i){p[i]+=pr[j]/Z;});});return p;}
@@ -82,6 +93,7 @@ body {
     if (draggable) {
       svg.append('rect').attr('width',bw).attr('height',barH)
         .attr('fill','transparent').attr('cursor','ns-resize')
+        .style('touch-action','none')
         .call(d3.drag().on('drag',function(event){
           var frac = (barH - event.y) / barH;
           onDrag(Math.max(0, Math.min(1, frac)));
