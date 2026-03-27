@@ -39,7 +39,7 @@ svg text { font-family: 'EB Garamond', serif; }
   function normW() { var s=w.reduce(function(a,b){return a+b;},0); w=w.map(function(v){return v/s;}); }
   normW();
 
-  var CW = '#5b9bd5', CR = '#c0504d';
+  var CW = '#5b9bd5', CR = '#c0504d', CI = '#d4a24e'; // blue, red, input gold
   var root = d3.select('#tw');
 
   function polyMul(a, b) {
@@ -180,9 +180,23 @@ svg text { font-family: 'EB Garamond', serif; }
 
     var labelH = 16;
     var topPad = 10;
-    var leafY = topPad + labelH + sliderH + 4;
+    var sepGap = 20;       // space around separator lines
+    var arrowLen = 14;     // connector arrows between zones
     var nodeH = bH + nodePad;
-    var svgH = leafY + depth * (nodeH + vGap) + 30;
+
+    // Zone 1: inputs (labels + sliders)
+    var inputZoneTop = topPad;
+    var inputZoneBot = topPad + labelH + sliderH + 4;
+    // Separator 1
+    var sep1Y = inputZoneBot + sepGap/2;
+    // Zone 2: circuit (tree nodes)
+    var leafY = sep1Y + sepGap/2 + arrowLen;
+    var rootBot = leafY + (depth - 1) * (nodeH + vGap) + nodeH;
+    // Separator 2
+    var sep2Y = rootBot + sepGap/2;
+    // Zone 3: output (Z label)
+    var outputY = sep2Y + sepGap/2 + arrowLen;
+    var svgH = outputY + 30;
 
     var svgWrap = root.append('div')
       .style('position', 'relative').style('width', svgW + 'px')
@@ -210,6 +224,43 @@ svg text { font-family: 'EB Garamond', serif; }
         nd.y = leafY + li * (nodeH + vGap);
       });
     }
+
+    // --- Zone separators and connectors ---
+    // Separator 1: inputs → circuit
+    svg.append('line').attr('x1', 10).attr('x2', svgW - 10)
+      .attr('y1', sep1Y).attr('y2', sep1Y)
+      .attr('stroke', '#e0e0e0').attr('stroke-width', 1).attr('stroke-dasharray', '4,4');
+
+    // Small arrows from sliders to leaf nodes
+    var arrowDef = svg.append('defs');
+    arrowDef.append('marker').attr('id','downarrow').attr('viewBox','0 0 6 10').attr('refX',3).attr('refY',10)
+      .attr('markerWidth',5).attr('markerHeight',8).attr('orient','auto')
+      .append('path').attr('d','M0,0 L3,10 L6,0').attr('fill','#ccc');
+
+    levels[0].forEach(function(nd) {
+      if (nd.pad) return;
+      svg.append('line')
+        .attr('x1', nd.x).attr('y1', sep1Y + 2)
+        .attr('x2', nd.x).attr('y2', nd.y - 2)
+        .attr('stroke', '#ccc').attr('stroke-width', 1)
+        .attr('marker-end', 'url(#downarrow)');
+    });
+
+    // Separator 2: circuit → output
+    svg.append('line').attr('x1', 10).attr('x2', svgW - 10)
+      .attr('y1', sep2Y).attr('y2', sep2Y)
+      .attr('stroke', '#e0e0e0').attr('stroke-width', 1).attr('stroke-dasharray', '4,4');
+
+    // Arrow from root to output zone
+    var rootNdForArrow = levels[levels.length - 1][0];
+    arrowDef.append('marker').attr('id','downarrow2').attr('viewBox','0 0 6 10').attr('refX',3).attr('refY',10)
+      .attr('markerWidth',5).attr('markerHeight',8).attr('orient','auto')
+      .append('path').attr('d','M0,0 L3,10 L6,0').attr('fill', CR);
+    svg.append('line')
+      .attr('x1', rootNdForArrow.x).attr('y1', sep2Y + 2)
+      .attr('x2', rootNdForArrow.x).attr('y2', outputY - 2)
+      .attr('stroke', CR).attr('stroke-width', 1.5)
+      .attr('marker-end', 'url(#downarrow2)');
 
     // --- Draw edges ---
     for (var li = 1; li < levels.length; li++) {
@@ -319,19 +370,19 @@ svg text { font-family: 'EB Garamond', serif; }
         var sf = svg.append('rect')
           .attr('x', barX + 2).attr('width', bW - 4).attr('rx', 1)
           .attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH)
-          .attr('fill', CW).attr('opacity', 0.8).style('pointer-events', 'none');
+          .attr('fill', CI).attr('opacity', 0.8).style('pointer-events', 'none');
         sliderFills.push(sf);
 
         // Label
         var sl = svg.append('text')
           .attr('x', barX + bW/2).attr('y', sliderTop + sliderH - frac * sliderH - 2)
           .attr('text-anchor', 'middle')
-          .style('font-size', '9px').style('fill', CW).style('pointer-events', 'none')
+          .style('font-size', '9px').style('fill', CI).style('pointer-events', 'none')
           .text(w[idx].toFixed(2));
         sliderLabels.push(sl);
 
         // Item label above slider (MathJax)
-        addMathLabel(svgWrap, barX + bW/2, topPad, '$w_{' + (idx+1) + '}$', {anchor:'middle', color:CW, fontSize:'11px'});
+        addMathLabel(svgWrap, barX + bW/2, topPad, '$w_{' + (idx+1) + '}$', {anchor:'middle', color:CI, fontSize:'11px'});
 
         // Drag target (wider for touch)
         svg.append('rect')
@@ -358,24 +409,9 @@ svg text { font-family: 'EB Garamond', serif; }
       })(idx);
     });
 
-    // Z annotation: SVG arrow + HTML label beside root
+    // Z label in the output zone (below separator 2)
     var rootNd = levels[levels.length - 1][0];
-    var rootBoxW = nodeBoxW(rootNd);
-    var arrowX = rootNd.x + rootBoxW/2 + 4;
-    var arrowY = rootNd.y + nodeH/2;
-    // Arrow marker
-    var defs = svg.append('defs');
-    defs.append('marker').attr('id','zarrow').attr('viewBox','0 0 10 6').attr('refX',0).attr('refY',3)
-      .attr('markerWidth',8).attr('markerHeight',5).attr('orient','auto')
-      .append('path').attr('d','M10,0 L0,3 L10,6 Z').attr('fill',CR);
-    // Arrow line pointing left at the highlighted bar
-    svg.append('line')
-      .attr('x1', arrowX + 40).attr('y1', arrowY)
-      .attr('x2', arrowX + 2).attr('y2', arrowY)
-      .attr('stroke', CR).attr('stroke-width', 1.5)
-      .attr('marker-end', 'url(#zarrow)');
-    // Label to the right of arrow
-    zLabelDiv = addMathLabel(svgWrap, arrowX + 44, arrowY - 9, '', {color: CR, fontSize: '12px'});
+    zLabelDiv = addMathLabel(svgWrap, rootNd.x, outputY, '', {anchor:'middle', color: CR, fontSize: '14px'});
 
     root.datum({ levels: levels, tree: tree, globalMax: globalMax });
     updateTree();
