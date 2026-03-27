@@ -233,11 +233,11 @@ svg text { font-family: 'EB Garamond', serif; }
 
     // Arrow markers
     var arrowDef = svg.append('defs');
-    // Arrowhead that follows the line direction
+    // Arrowhead pointing along line direction (right-pointing triangle, orient=auto rotates it)
     arrowDef.append('marker').attr('id','arrowDown').attr('viewBox','0 0 10 10')
-      .attr('refX',5).attr('refY',10)
+      .attr('refX',10).attr('refY',5)
       .attr('markerWidth',7).attr('markerHeight',7).attr('orient','auto')
-      .append('path').attr('d','M0,0 L10,0 L5,10 Z').attr('fill','#ccc');
+      .append('path').attr('d','M0,0 L10,5 L0,10 Z').attr('fill','#ccc');
 
     // Connector lines drawn after nodes (need _barXs), see below
 
@@ -247,11 +247,10 @@ svg text { font-family: 'EB Garamond', serif; }
       .attr('stroke', '#e0e0e0').attr('stroke-width', 1).attr('stroke-dasharray', '4,4');
 
     // Arrow from root's n-th bar bottom to output zone (drawn after nodes so _barXs exists)
-    // Red arrow that follows the curve tangent
     arrowDef.append('marker').attr('id','arrowDownRed').attr('viewBox','0 0 10 10')
-      .attr('refX',5).attr('refY',10)
+      .attr('refX',10).attr('refY',5)
       .attr('markerWidth',8).attr('markerHeight',8).attr('orient','auto')
-      .append('path').attr('d','M0,0 L10,0 L5,10 Z').attr('fill', CR);
+      .append('path').attr('d','M0,0 L10,5 L0,10 Z').attr('fill', CR);
     // (actual line drawn after nodes, see below)
 
     // --- Draw edges ---
