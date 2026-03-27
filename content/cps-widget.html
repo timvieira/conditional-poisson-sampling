@@ -153,7 +153,8 @@ body {
           var nontrivial = w.filter(function(v){return v > 0.005;}).length;
           if(nontrivial < n){
             d3.select('#cps-status').text('need at least n=' + n + ' items with nonzero weight').style('color','#c00');
-            return;
+          } else {
+            d3.select('#cps-status').text('');
           }
           pi = getPi(w);
           update();
