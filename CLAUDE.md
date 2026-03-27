@@ -15,7 +15,7 @@ Code and documentation must use identical notation. Stale or inconsistent notati
 - **Big-O notation**: `\mathcal{O}(\cdot)` in LaTeX — not plain `O(\cdot)`
 - **Em-dashes**: tight, no spaces — `word—word` not `word — word`
 - **Definitional equals**: `\defeq` macro (renders as = with "def" above) for defining equations
-- **Headings**: sentence case (capitalize first word and proper nouns only), not Title Case
+- **Headings**: Title Case (capitalize all words except articles/conjunctions/prepositions: a, an, the, and, but, or, in, on, at, to, for, of)
 - **Notation discipline**: define every symbol before first use, ideally in a consolidated notation box. Never introduce a symbol implicitly or switch parameterizations (w↔θ↔p) without flagging it. Readers should be able to trust that the same symbol means the same thing throughout.
 
 When changing notation or API names, update **all** of these in the same commit:
