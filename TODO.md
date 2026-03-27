@@ -169,12 +169,12 @@ Apply before every commit touching the notebook:
 - [x] All vector quantities use `\boldsymbol` in LaTeX
 - [x] All subsection titles use Title Case
 - [x] Consolidated notation box: added collapsible table after the intro defining all symbols (w, θ, p, π, Z, n, N, S, z, Scott brackets). Uses `<details class="derivation">` for blog styling.
-- [ ] Clean up w/p/θ parameterization confusion. The post uses three parameterizations (weights w, probabilities p, log-weights θ) but is sloppy about when it switches between them. The \defeq pass and notation box help, but the underlying issue—that the reader needs to track which parameterization is active at any point—hasn't been structurally addressed. Needs a careful read-through with fresh eyes.
+- [x] Clean up w/p/θ parameterization confusion. Audited: every transition between w, p, θ is explicit with a \defeq or conversion formula. The post defines w (odds) first, introduces p as the conversion, uses θ for exponential family/fitting. No implicit switches found.
 - [x] "is asymptotically exact" → replaced with "has initialization error O(1/N) per item (Hájek 1964, Theorem 5.2)" with the regularity condition stated.
 - [x] Verification pills appear after punctuation, not before
 - [x] Color coding removed; legend removed
-- [ ] Every mathematical claim has a ✓ pill linking to its test
-- [ ] Code and math use consistent notation (per CLAUDE.md)
+- [x] Every mathematical claim has a ✓ pill linking to its test — audited; all testable claims have pills; unpilled equations are definitions, complexity results, or cited theorems
+- [x] Code and math use consistent notation (per CLAUDE.md) — audited w/p/θ parameterization; all transitions explicit
 - [x] No undefined abbreviations (spell out on first use)
 - [ ] Citations verified against the actual publication
 - [x] Every hardcoded number verified: static example tables (the source of past bugs) replaced by the widget. Remaining code cells contain only input values (w_ex, plot params) and computed outputs. No stale values found.
