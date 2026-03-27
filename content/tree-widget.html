@@ -193,7 +193,7 @@ svg text { font-family: 'EB Garamond', serif; }
     var leafY = sep1Y + sepGap/2 + arrowLen;
     var rootBot = leafY + (depth - 1) * (nodeH + vGap) + nodeH;
     // Separator 2
-    var sep2Y = rootBot + sepGap/2;
+    var sep2Y = rootBot + sepGap;
     // Zone 3: output (Z label)
     var outputY = sep2Y + sepGap/2 + arrowLen;
     var svgH = outputY + 18;
@@ -355,18 +355,18 @@ svg text { font-family: 'EB Garamond', serif; }
       var rootCx = rootNdFinal._barXs[n] + bW/2;
       zLabelX = rootCx;
       // Bezier curve from red bar to Z label, with manual arrowhead
-      var x1 = rootCx, y1 = rootBot + 4;
+      var x1 = rootCx, y1 = rootBot + 8;
       var x2 = rootNdFinal.x, y2 = outputY;
       zLabelX = x2;
       // Control points: leave downward, arrive downward
-      var cp1x = x1, cp1y = y1 + (y2-y1)*0.5;
-      var cp2x = x2, cp2y = y1 + (y2-y1)*0.5;
+      var cp1x = x1, cp1y = y1 + (y2-y1)*0.7;
+      var cp2x = x2, cp2y = y1 + (y2-y1)*0.3;
       // Shorten the path so arrowhead doesn't overshoot
       var tipGap = 6;
       var y2s = y2 - tipGap;
       svg.append('path')
         .attr('d', 'M'+x1+','+y1+' C'+cp1x+','+cp1y+' '+cp2x+','+cp2y+' '+x2+','+y2s)
-        .attr('fill', 'none').attr('stroke', CR).attr('stroke-width', 1.5);
+        .attr('fill', 'none').attr('stroke', '#d4a0a0').attr('stroke-width', 1.2);
       // Manual arrowhead: triangle at endpoint, oriented along tangent from cp2 to endpoint
       var dx = x2 - cp2x, dy = y2s - cp2y;
       var len = Math.sqrt(dx*dx + dy*dy);
@@ -380,7 +380,7 @@ svg text { font-family: 'EB Garamond', serif; }
         .attr('d', 'M'+x2+','+y2+
           ' L'+(bx+px*ax)+','+(by+py*ax)+
           ' L'+(bx-px*ax)+','+(by-py*ax)+' Z')
-        .attr('fill', CR);
+        .attr('fill', '#d4a0a0');
     }
 
     // --- Connector arrows from slider bottom to leaf w_i bar top ---
