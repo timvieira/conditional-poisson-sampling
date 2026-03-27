@@ -6,8 +6,7 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 {% notebook conditional-poisson-sampling.ipynb cells[1:5] %}
 
 <style>
-#cps { max-width: 500px; }
-#cps table { border-collapse: collapse; width: 100%; margin: 0; table-layout: fixed; }
+#cps table { border-collapse: collapse; width: auto; margin: 0; }
 #cps th, #cps td { padding: 1px 2px; font-family: inherit; font-size: 0.85em; line-height: 1.3; }
 #cps th { border: none; font-weight: normal; color: #666; }
 #cps td { border: none; }
