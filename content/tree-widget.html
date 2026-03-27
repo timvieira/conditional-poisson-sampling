@@ -220,12 +220,16 @@ svg text { font-family: 'EB Garamond', serif; }
     var outputY = sep2Y + sepGap/2 + arrowLen;
     var svgH = outputY + 18;
 
-    var svgWrap = root.append('div')
+    var svgScroll = root.append('div')
+      .style('overflow-x', 'auto')
+      .style('overflow-y', 'visible')
+      .style('transition', 'height ' + dur + 'ms ease')
+      .style('height', svgH + 'px');
+    var svgWrap = svgScroll.append('div')
       .style('position', 'relative')
       .style('width', svgW + 'px')
       .style('height', svgH + 'px')
-      .style('transition', 'width ' + dur + 'ms ease, height ' + dur + 'ms ease')
-      .style('overflow', 'visible');
+      .style('min-width', svgW + 'px');
     var svg = svgWrap.append('svg').attr('width', svgW).attr('height', svgH)
       .style('display', 'block').style('user-select', 'none').style('overflow', 'visible');
 
