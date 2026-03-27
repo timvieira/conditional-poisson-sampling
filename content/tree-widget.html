@@ -84,10 +84,10 @@ svg text { font-family: 'EB Garamond', serif; }
 
   // Each histogram bar width
   var cW = 12;
-  var histH = 24;
+  var histH = 30;
   var sliderH = 50;
-  var vGap = 28;
-  var hGap = 14;
+  var vGap = 24;
+  var hGap = 16;
 
   var sliderFills = [], sliderLabels = [];
   var nodeRefs = [];
@@ -228,23 +228,34 @@ svg text { font-family: 'EB Garamond', serif; }
         var g = svg.append('g')
           .attr('transform', 'translate(' + gx + ',' + nd.y + ')');
 
-        // Subtle group background
+        // Group box
         g.append('rect').attr('width', boxW).attr('height', histH)
-          .attr('fill', '#fafafa').attr('stroke', '#e8e8e8').attr('rx', 3).attr('stroke-width', 0.5);
+          .attr('fill', '#fff').attr('stroke', '#ddd').attr('rx', 4);
 
         var cRects = [], cTexts = [];
         for (var k = 0; k < nCoeffs; k++) {
           var bx = nodePad/2 + k * cW;
           var barFrac = Math.min(1, Math.abs(coeffs[k]) / globalMax);
-          var barPx = Math.max(0.5, barFrac * (histH - 2));
+          var barPx = Math.max(0.5, barFrac * (histH - 4));
           var isHighlight = (li === levels.length - 1 && k === n);
-          // Just the fill bar, no track
+          // Track background (same style as sliders)
+          g.append('rect')
+            .attr('x', bx).attr('y', 2)
+            .attr('width', cW).attr('height', histH - 4)
+            .attr('fill', '#f8f8f8').attr('rx', 1);
+          // Fill bar
           var cr = g.append('rect')
-            .attr('x', bx + 1).attr('y', histH - 1 - barPx)
+            .attr('x', bx + 1).attr('y', histH - 2 - barPx)
             .attr('width', cW - 2).attr('height', barPx)
             .attr('fill', isHighlight ? CR : CW).attr('opacity', 0.75).attr('rx', 1);
           cRects.push(cr);
-          cTexts.push(null); // no text labels inside the tree—too cluttered
+          // Numeric value above bar
+          var ct = g.append('text')
+            .attr('x', bx + cW/2).attr('y', histH - 2 - barPx - 1)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '6px').style('fill', isHighlight ? CR : '#aaa')
+            .text(fmtCoeff(coeffs[k]));
+          cTexts.push(ct);
         }
 
         // At root: add index labels below
@@ -390,7 +401,10 @@ svg text { font-family: 'EB Garamond', serif; }
         for (var k = 0; k < nCoeffs; k++) {
           var barFrac = Math.min(1, Math.abs(coeffs[k]) / gMax);
           var barPx = Math.max(1, barFrac * (histH - 4));
-          ref.cellRects[k].attr('y', histH - 1 - barPx).attr('height', barPx);
+          ref.cellRects[k].attr('y', histH - 2 - barPx).attr('height', barPx);
+          if (ref.cellTexts[k]) {
+            ref.cellTexts[k].attr('y', histH - 2 - barPx - 1).text(fmtCoeff(coeffs[k]));
+          }
         }
       }
     }
