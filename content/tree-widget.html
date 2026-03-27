@@ -112,7 +112,21 @@ svg text { font-family: 'EB Garamond', serif; }
     return div;
   }
 
+  var dur = 400; // animation duration ms
+
   function build() {
+    // Fade out old content, then rebuild
+    var oldChildren = root.selectAll(':scope > *');
+    if (oldChildren.size() > 0) {
+      oldChildren.transition().duration(dur/2).style('opacity', 0)
+        .on('end', function() { d3.select(this).remove(); })
+        .end().then(buildInner).catch(buildInner);
+    } else {
+      buildInner();
+    }
+  }
+
+  function buildInner() {
     root.selectAll('*').remove();
     sliderFills = []; sliderLabels = [];
     nodeRefs = [];
@@ -344,14 +358,32 @@ svg text { font-family: 'EB Garamond', serif; }
       })(idx);
     });
 
-    // Z label beside root (HTML overlay)
+    // Z annotation: SVG arrow + HTML label beside root
     var rootNd = levels[levels.length - 1][0];
     var rootBoxW = nodeBoxW(rootNd);
-    zLabelDiv = addMathLabel(svgWrap, rootNd.x + rootBoxW/2 + 8, rootNd.y + nodeH/2 - 8, '', {color: CR, fontSize: '12px'});
+    var arrowX = rootNd.x + rootBoxW/2 + 4;
+    var arrowY = rootNd.y + nodeH/2;
+    // Arrow marker
+    var defs = svg.append('defs');
+    defs.append('marker').attr('id','zarrow').attr('viewBox','0 0 10 6').attr('refX',0).attr('refY',3)
+      .attr('markerWidth',8).attr('markerHeight',5).attr('orient','auto')
+      .append('path').attr('d','M10,0 L0,3 L10,6 Z').attr('fill',CR);
+    // Arrow line pointing left at the highlighted bar
+    svg.append('line')
+      .attr('x1', arrowX + 40).attr('y1', arrowY)
+      .attr('x2', arrowX + 2).attr('y2', arrowY)
+      .attr('stroke', CR).attr('stroke-width', 1.5)
+      .attr('marker-end', 'url(#zarrow)');
+    // Label to the right of arrow
+    zLabelDiv = addMathLabel(svgWrap, arrowX + 44, arrowY - 9, '', {color: CR, fontSize: '12px'});
 
     root.datum({ levels: levels, tree: tree, globalMax: globalMax });
     updateTree();
-    // MathJax: typeset the entire widget container after rebuild
+
+    // Fade in new content
+    svgWrap.style('opacity', 0).transition().duration(dur).style('opacity', 1);
+
+    // MathJax: typeset after fade starts
     setTimeout(function() {
       if (window.MathJax && MathJax.typesetPromise) {
         var tw = document.getElementById('tw');
@@ -416,7 +448,7 @@ svg text { font-family: 'EB Garamond', serif; }
 
     var Z = newTree.root.poly[Math.min(n, newTree.root.poly.length - 1)];
     var zNode = zLabelDiv.node();
-    zNode.innerHTML = '$\\leftarrow Z = ' + (Z !== undefined ? Z.toFixed(4) : '\\text{—}') + '$';
+    zNode.innerHTML = '$Z = ' + (Z !== undefined ? Z.toFixed(4) : '\\text{—}') + '$';
     if (window.MathJax && MathJax.typesetPromise) {
       MathJax.typesetClear([zNode]);
       MathJax.typesetPromise([zNode]);
