@@ -31,6 +31,8 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 2px solid #dee2e6; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
+**Interactive explorer.** Drag the weight bars to see how changing $w_i$ affects the subset probabilities $P(S)$ and inclusion probabilities $\pi_i$. Drag the $\pi_i$ bars to solve the inverse problem: find weights that produce given inclusion probabilities. Use the $N$ and $n$ controls to change the problem size.
+
 <div id="cps"></div>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
