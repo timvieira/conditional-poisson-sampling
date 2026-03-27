@@ -197,16 +197,16 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
     if (allS.length <= 70) {
       var tdata = getTable(w);
       var sh = tbody.append('tr');
-      sh.append('td').attr('class','rl').html('Subset $S$');
+      sh.append('td').attr('class','rl').style('text-align','right').html('Subset $S$');
       for(var j=0;j<N;j++) sh.append('td').attr('class','ic').text(j+1);
-      sh.append('td').attr('class','pc').html('$P(S)$');
+      sh.append('td').attr('class','pc').style('text-align','left').html('$P(S)$');
 
       // --- Subset rows ---
       tdata.forEach(function(r){
         var tr = tbody.append('tr');
-        tr.append('td').attr('class','rl').style('color','#333').style('font-style','normal').text('{'+r.s.map(function(j){return j+1;}).join(', ')+'}');
+        tr.append('td').attr('class','rl').style('color','#333').style('font-style','normal').style('text-align','right').text('{'+r.s.map(function(j){return j+1;}).join(', ')+'}');
         r.ind.forEach(function(v){tr.append('td').attr('class','ic'+(v?'':' zero')).text(v);});
-        var pc = tr.append('td').attr('class','pc').style('position','relative');
+        var pc = tr.append('td').attr('class','pc').style('position','relative').style('text-align','left');
         pc.append('div').attr('class','prob-bar')
           .style('position','absolute').style('top','2px').style('bottom','2px').style('left','0')
           .style('background',CP).style('opacity','0.12').style('border-radius','2px')
