@@ -29,8 +29,7 @@ body {
 #cps .bar-td svg { display: block; margin: 0 auto; }
 @media (max-width: 600px) {
   body { font-size: 14pt; padding: 0 0.5em; }
-  #cps .rl { width: 60px; font-size: 0.8em; }
-  #cps table { table-layout: auto; }
+  #cps .rl { font-size: 0.8em; }
   #cps th, #cps td { padding: 3px 4px; }
 }
 </style>
@@ -134,8 +133,20 @@ body {
       .style('border','1px solid #ccc').style('border-radius','3px').style('padding','2px 4px')
       .on('change input',function(){var v=+this.value;if(isNaN(v))return;if(v<0||v>N){d3.select('#cps-status').text('the distribution requires 0 \u2264 n \u2264 N='+N).style('color','#c00');return;}v=Math.round(v);if(v===n)return;n=v;build();});
 
+    // Shared column widths for all three tables
+    var colLabelW = '120px';
+    var colItemW = Math.floor(Math.min(80, (520 - 120 - 80) / N)) + 'px';
+    var colPSW = '80px';
+    function addCols(table) {
+      var cg = table.append('colgroup');
+      cg.append('col').style('width', colLabelW);
+      for (var j=0;j<N;j++) cg.append('col').style('width', colItemW);
+      cg.append('col').style('width', colPSW);
+    }
+
     // === WEIGHTS TABLE (with bars) ===
     var wt = root.append('table');
+    addCols(wt);
     // Header
     var wh = wt.append('thead').append('tr');
     wh.append('th').attr('class','rl').text('weights');
@@ -191,6 +202,7 @@ body {
     if (allS.length <= 70) {
       var tdata = getTable(w);
       var st = root.append('table');
+      addCols(st);
       var sh = st.append('thead').append('tr');
       sh.append('th').attr('class','rl').html('Subset $S$');
       for(var j=0;j<N;j++) sh.append('th').attr('class','ic').text(j+1);
@@ -216,6 +228,7 @@ body {
     // Note: dragging π_i sets a target and solves for w. Because π must sum
     // to n, changing one π_i will cause the others to adjust.
     var pt = root.append('table');
+    addCols(pt);
     var ph = pt.append('thead').append('tr').style('border-top','2px solid #333');
     ph.append('th').attr('class','rl').style('font-weight','bold').html('inclusion prob.');
     for(var i=0;i<N;i++) ph.append('th').attr('class','ic').style('color',CP).style('font-weight','bold').html('$\\pi_'+(i+1)+'$');
