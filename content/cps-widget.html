@@ -50,8 +50,20 @@ body {
   var bw = mobile ? 28 : 36;
 
   function subs(N,n){var r=[];(function go(s,c){if(c.length===n){r.push(c.slice());return;}if(s>=N)return;c.push(s);go(s+1,c);c.pop();go(s+1,c);})(0,[]);return r;}
-  function getPi(w){var S=subs(N,n),pr=S.map(function(s){return s.reduce(function(a,i){return a*w[i];},1);}),Z=pr.reduce(function(a,b){return a+b;},0),p=Array(N).fill(0);S.forEach(function(s,j){s.forEach(function(i){p[i]+=pr[j]/Z;});});return p;}
-  function getTable(w){var S=subs(N,n),pr=S.map(function(s){return s.reduce(function(a,i){return a*w[i];},1);}),Z=pr.reduce(function(a,b){return a+b;},0);return S.map(function(s,j){return{s:s,ind:Array.from({length:N},function(_,i){return s.indexOf(i)>=0?1:0;}),p:pr[j]/Z};});}
+  function getPi(w){
+    var S=subs(N,n);
+    var pr=S.map(function(s){return s.reduce(function(a,i){return a*w[i];},1);});
+    var Z=pr.reduce(function(a,b){return a+b;},0);
+    var p=Array(N).fill(0);
+    if(Z>0) S.forEach(function(s,j){s.forEach(function(i){p[i]+=pr[j]/Z;});});
+    return p;
+  }
+  function getTable(w){
+    var S=subs(N,n);
+    var pr=S.map(function(s){return s.reduce(function(a,i){return a*w[i];},1);});
+    var Z=pr.reduce(function(a,b){return a+b;},0);
+    return S.map(function(s,j){return{s:s,ind:Array.from({length:N},function(_,i){return s.indexOf(i)>=0?1:0;}),p:Z>0?pr[j]/Z:0};});
+  }
   // Warm-start from current w, center θ to stabilize scale
   function fit(ps){
     var th=w.map(function(wi){return Math.log(Math.max(1e-10,wi));});
@@ -89,7 +101,7 @@ body {
       .attr('fill',color).attr('opacity',0.7).style('pointer-events','none');
     var label = svg.append('text').attr('x',bw/2).attr('y',barH-frac*barH-4)
       .attr('text-anchor','middle').style('font-size','14px').style('fill',color).style('font-family',"'EB Garamond', serif")
-      .style('pointer-events','none').text(val < 0.001 ? val.toExponential(0) : val.toFixed(3));
+      .style('pointer-events','none').text(val === 0 ? '0' : val < 0.01 ? '\u22480' : val.toFixed(3));
     if (draggable) {
       svg.append('rect').attr('width',bw).attr('height',barH)
         .attr('fill','transparent').attr('cursor','ns-resize')
@@ -136,7 +148,7 @@ body {
       (function(idx){
         var td = wb.append('td').attr('class','bar-td');
         var b = makeBar(td, w[idx], getMaxW(), CW, true, function(frac){
-          var target = Math.max(1e-10, Math.min(0.99, frac));
+          var target = Math.max(0, Math.min(0.99, frac));
           // Scale the *others* to keep sum = 1
           var others = 0;
           for(var k=0;k<N;k++) if(k!==idx) others+=w[k];
@@ -230,10 +242,10 @@ body {
     for(var i=0;i<N;i++){
       var wFrac=Math.min(w[i]/maxW,1);
       wFills[i].attr('y',barH-wFrac*barH).attr('height',wFrac*barH);
-      wLabels[i].attr('y',barH-wFrac*barH-4).text(w[i] < 0.001 ? w[i].toExponential(0) : w[i].toFixed(3));
+      wLabels[i].attr('y',barH-wFrac*barH-4).text(w[i] === 0 ? '0' : w[i] < 0.01 ? '\u22480' : w[i].toFixed(3));
       var pFrac=pi[i];
       pFills[i].attr('y',barH-pFrac*barH).attr('height',pFrac*barH);
-      pLabels[i].attr('y',barH-pFrac*barH-4).text(pi[i].toFixed(3));
+      pLabels[i].attr('y',barH-pFrac*barH-4).text(pi[i] === 0 ? '0' : pi[i] < 0.01 ? '\u22480' : pi[i].toFixed(3));
     }
     if(probCells.length>0){
       var tdata=getTable(w);
