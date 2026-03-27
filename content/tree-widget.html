@@ -95,21 +95,27 @@ svg text { font-family: 'EB Garamond', serif; }
   var sliderFills = [], sliderLabels = [];
   var nodeRefs = [];
 
-  // Helper: embed MathJax-rendered HTML inside SVG via foreignObject
-  function svgMath(parent, x, y, html, opts) {
+  // Place MathJax labels as absolutely-positioned HTML divs over the SVG
+  // svgContainer must be position:relative
+  var mathLabels = [];
+  function addMathLabel(container, x, y, html, opts) {
     opts = opts || {};
-    var w = opts.width || 80, h = opts.height || 20;
-    var fo = parent.append('foreignObject')
-      .attr('x', x - (opts.anchor === 'middle' ? w/2 : opts.anchor === 'end' ? w : 0))
-      .attr('y', y - h/2)
-      .attr('width', w).attr('height', h);
-    var div = fo.append('xhtml:div')
+    var div = container.append('div')
+      .style('position', 'absolute')
+      .style('left', x + 'px')
+      .style('top', y + 'px')
       .style('font-size', opts.fontSize || '10px')
       .style('color', opts.color || '#999')
-      .style('text-align', opts.anchor === 'middle' ? 'center' : opts.anchor === 'end' ? 'right' : 'left')
-      .style('line-height', h + 'px')
-      .html(html);
-    return fo;
+      .style('pointer-events', 'none')
+      .style('white-space', 'nowrap');
+    if (opts.anchor === 'middle') {
+      div.style('transform', 'translateX(-50%)');
+    } else if (opts.anchor === 'end') {
+      div.style('transform', 'translateX(-100%)');
+    }
+    div.html(html);
+    mathLabels.push(div);
+    return div;
   }
 
   function build() {
@@ -120,9 +126,9 @@ svg text { font-family: 'EB Garamond', serif; }
     // Controls
     var ctrl = root.append('div').attr('id', 'tw-controls');
     ctrl.append('span').html('$N$ = ');
-    ctrl.append('input').attr('type','number').attr('min',2).attr('max',8).attr('value',N)
+    ctrl.append('input').attr('type','number').attr('min',2).attr('value',N)
       .on('change input', function() {
-        var v = Math.max(2, Math.min(8, Math.round(+this.value)));
+        var v = Math.max(2, Math.round(+this.value));
         if (v === N) return;
         N = v; n = Math.min(n, N);
         while (w.length < N) w.push(0.2);
@@ -169,8 +175,11 @@ svg text { font-family: 'EB Garamond', serif; }
     var leafY = topPad + labelH + sliderH + 4;
     var svgH = leafY + depth * (bH + vGap) + 30;
 
-    var svg = root.append('svg').attr('width', svgW).attr('height', svgH)
-      .style('display', 'block').style('margin', '0 auto').style('user-select', 'none');
+    var svgWrap = root.append('div')
+      .style('position', 'relative').style('width', svgW + 'px')
+      .style('margin', '0 auto');
+    var svg = svgWrap.append('svg').attr('width', svgW).attr('height', svgH)
+      .style('display', 'block').style('user-select', 'none');
 
     // Assign x: leaves evenly spaced, internal nodes at midpoint of children
     // First spread leaves
@@ -265,9 +274,9 @@ svg text { font-family: 'EB Garamond', serif; }
         if (li === levels.length - 1) {
           for (var k = 0; k < nCoeffs; k++) {
             var labelX = gx + nodePad/2 + k * (bW + bGap) + bW/2;
-            svgMath(svg, labelX, nd.y + bH + 8,
+            addMathLabel(svgWrap, labelX, nd.y + bH + 4,
               k === n ? '$\\mathbf{' + k + '}$' : '$' + k + '$',
-              {anchor:'middle', color: k === n ? CR : '#bbb', fontSize:'9px', width:24, height:16});
+              {anchor:'middle', color: k === n ? CR : '#bbb', fontSize:'9px'});
           }
         }
 
@@ -312,7 +321,7 @@ svg text { font-family: 'EB Garamond', serif; }
         sliderLabels.push(sl);
 
         // Item label above slider (MathJax)
-        svgMath(svg, barX + bW/2, topPad + 4, '$w_' + (idx+1) + '$', {anchor:'middle', color:CW, fontSize:'11px', width:30, height:18});
+        addMathLabel(svgWrap, barX + bW/2, topPad, '$w_{' + (idx+1) + '}$', {anchor:'middle', color:CW, fontSize:'11px'});
 
         // Drag target (wider for touch)
         svg.append('rect')
@@ -339,23 +348,18 @@ svg text { font-family: 'EB Garamond', serif; }
       })(idx);
     });
 
-    // Z label beside root
+    // Z label beside root (HTML overlay)
     var rootNd = levels[levels.length - 1][0];
     var rootBoxW = nodeBoxW(rootNd);
-    var zLabelFO = svg.append('foreignObject')
-      .attr('x', rootNd.x + rootBoxW/2 + 6).attr('y', rootNd.y + bH/2 - 10)
-      .attr('width', 140).attr('height', 22);
-    var zLabelDiv = zLabelFO.append('xhtml:div')
-      .style('font-size', '12px').style('color', CR).style('line-height', '22px');
+    var zLabelDiv = addMathLabel(svgWrap, rootNd.x + rootBoxW/2 + 8, rootNd.y + bH/2 - 8, '', {color: CR, fontSize: '12px'});
 
     root.datum({ levels: levels, tree: tree, globalMax: globalMax });
     updateTree();
-    // MathJax: must clear then re-typeset the entire widget container
-    // so new foreignObject elements get processed
+    // MathJax: typeset all the HTML overlay labels
     if (window.MathJax && MathJax.typesetPromise) {
-      var container = document.getElementById('tw');
-      MathJax.typesetClear([container]);
-      MathJax.typesetPromise([container]);
+      var els = mathLabels.map(function(d) { return d.node(); });
+      MathJax.typesetClear(els);
+      MathJax.typesetPromise(els);
     }
   }
 
@@ -413,8 +417,12 @@ svg text { font-family: 'EB Garamond', serif; }
     }
 
     var Z = newTree.root.poly[Math.min(n, newTree.root.poly.length - 1)];
-    zLabelDiv.html('$\\leftarrow Z = ' + (Z !== undefined ? Z.toFixed(4) : '\\text{—}') + '$');
-    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([zLabelDiv.node()]);
+    var zNode = zLabelDiv.node();
+    zNode.innerHTML = '$\\leftarrow Z = ' + (Z !== undefined ? Z.toFixed(4) : '\\text{—}') + '$';
+    if (window.MathJax && MathJax.typesetPromise) {
+      MathJax.typesetClear([zNode]);
+      MathJax.typesetPromise([zNode]);
+    }
   }
 
   build();
