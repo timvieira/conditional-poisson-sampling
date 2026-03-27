@@ -355,11 +355,12 @@ svg text { font-family: 'EB Garamond', serif; }
       var rootCx = rootNdFinal._barXs[n] + bW/2;
       zLabelX = rootCx;
       // Bezier curve from red bar bottom to Z label
+      // cp1 horizontal from start, cp2 vertical into endpoint → arrowhead points down
       var x1 = rootCx, y1 = rootBot;
-      var x2 = rootNdFinal.x, y2 = outputY; // aim at node center for the label
+      var x2 = rootNdFinal.x, y2 = outputY;
       zLabelX = x2;
-      var cp1x = x1, cp1y = y1 + (y2-y1)*0.4;
-      var cp2x = x2, cp2y = y1 + (y2-y1)*0.6;
+      var cp1x = x1 + (x2-x1)*0.5, cp1y = y1;
+      var cp2x = x2, cp2y = y2 - (y2-y1)*0.3;
       svg.append('path')
         .attr('d', 'M'+x1+','+y1+' C'+cp1x+','+cp1y+' '+cp2x+','+cp2y+' '+x2+','+y2)
         .attr('fill', 'none').attr('stroke', CR).attr('stroke-width', 1.5)
