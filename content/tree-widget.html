@@ -282,7 +282,8 @@ svg text { font-family: 'EB Garamond', serif; }
           var x1 = child.x, y1 = child.y + bH + nodePad;
           var x2 = nd.x, y2 = nd.y;
           var my = (y1 + y2) / 2;
-          var edgeNew = lastAction === 'add' && nd.items && nd.items.indexOf(N-1) >= 0;
+          // Only tag edge if the child is the new leaf
+          var edgeNew = lastAction === 'add' && child.leaf && child.items && child.items.indexOf(N-1) >= 0;
           svg.append('path')
             .attr('d', 'M'+x1+','+y1+' C'+x1+','+my+' '+x2+','+my+' '+x2+','+y2)
             .attr('fill', 'none').attr('stroke', '#ddd').attr('stroke-width', 1.2)
@@ -309,7 +310,8 @@ svg text { font-family: 'EB Garamond', serif; }
         var nCoeffs = Math.min(coeffs.length, n + 1);
         var boxW = nCoeffs * (bW + bGap) - bGap + nodePad;
         var gx = nd.x - boxW/2;
-        var isNew = lastAction === 'add' && nd.items && nd.items.indexOf(N-1) >= 0;
+        // Only the leaf itself is "new" — ancestors already existed
+        var isNew = lastAction === 'add' && nd.leaf && nd.items && nd.items.indexOf(N-1) >= 0;
         var g = svg.append('g')
           .attr('transform', 'translate(' + gx + ',' + nd.y + ')')
           .classed('new-node', isNew);
@@ -412,7 +414,7 @@ svg text { font-family: 'EB Garamond', serif; }
     levels[0].forEach(function(nd, idx) {
       if (nd.pad || !nd._barXs) return;
       var cx = nd._barXs[1] + bW/2;
-      var isNew = lastAction === 'add' && nd.items && nd.items.indexOf(N-1) >= 0;
+      var isNew = lastAction === 'add' && nd.items && nd.items.indexOf(N-1) >= 0 && nd.leaf;
       svg.append('line')
         .attr('x1', cx).attr('y1', inputZoneBot)
         .attr('x2', cx).attr('y2', nd.y)
