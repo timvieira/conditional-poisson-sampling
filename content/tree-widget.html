@@ -128,13 +128,31 @@ svg text { font-family: 'EB Garamond', serif; }
     var depth = levels.length;
 
     // Layout: leaves at top, root at bottom
-    // Leaf node width = 2 bars (coeffs [1, w_i])
-    // Internal node width = nCoeffs bars
-    var leafSpacing = 2 * cW + hGap + 12;
-    var leafCount = levels[0].length;
-    var svgW = Math.max(300, leafCount * leafSpacing + 40);
+    // Compute each node's box width
+    var nodePad = 8; // padding inside group box
+    function nodeBoxW(nd) {
+      if (nd.pad) return 0;
+      var nc = Math.min(nd.poly.length, n + 1);
+      return nc * (cW + 2) + nodePad;
+    }
 
-    // Vertical: item labels + sliders + leaf nodes + internal levels
+    // Compute min spacing for each level (widest node + gap)
+    var levelSpacings = levels.map(function(lev) {
+      var maxW = 0;
+      lev.forEach(function(nd) { var bw = nodeBoxW(nd); if (bw > maxW) maxW = bw; });
+      return maxW + hGap + 4;
+    });
+    // Leaf spacing must also fit sliders
+    levelSpacings[0] = Math.max(levelSpacings[0], cW + hGap + 20);
+
+    // Find the widest level to set SVG width
+    var maxLevelW = 0;
+    for (var li = 0; li < levels.length; li++) {
+      var lw = levels[li].length * levelSpacings[li];
+      if (lw > maxLevelW) maxLevelW = lw;
+    }
+    var svgW = Math.max(300, maxLevelW + 40);
+
     var labelH = 16;
     var topPad = 10;
     var leafY = topPad + labelH + sliderH + 4;
@@ -143,15 +161,25 @@ svg text { font-family: 'EB Garamond', serif; }
     var svg = root.append('svg').attr('width', svgW).attr('height', svgH)
       .style('display', 'block').style('margin', '0 auto').style('user-select', 'none');
 
-    // Assign x positions based on leaf spacing
-    for (var li = 0; li < levels.length; li++) {
-      var lev = levels[li];
-      var totalW = lev.length * leafSpacing;
-      var startX = (svgW - totalW) / 2;
-      for (var ni = 0; ni < lev.length; ni++) {
-        lev[ni].x = startX + ni * leafSpacing + leafSpacing / 2;
-        lev[ni].y = leafY + li * (histH + vGap);
-      }
+    // Assign x: leaves evenly spaced, internal nodes at midpoint of children
+    // First spread leaves
+    var leafCount = levels[0].length;
+    var leafSpacing = Math.max(levelSpacings[0], (svgW - 40) / leafCount);
+    var leafStartX = (svgW - leafCount * leafSpacing) / 2;
+    for (var ni = 0; ni < leafCount; ni++) {
+      levels[0][ni].x = leafStartX + ni * leafSpacing + leafSpacing / 2;
+      levels[0][ni].y = leafY;
+    }
+    // Internal levels: x = midpoint of children
+    for (var li = 1; li < levels.length; li++) {
+      levels[li].forEach(function(nd) {
+        if (nd.left && nd.right) {
+          nd.x = (nd.left.x + nd.right.x) / 2;
+        } else if (nd.left) {
+          nd.x = nd.left.x;
+        }
+        nd.y = leafY + li * (histH + vGap);
+      });
     }
 
     // --- Draw edges ---
@@ -211,12 +239,14 @@ svg text { font-family: 'EB Garamond', serif; }
             .attr('width', cW - 2).attr('height', barPx)
             .attr('fill', isHighlight ? CR : CW).attr('opacity', 0.7).attr('rx', 1);
           cRects.push(cr);
-          // Value label above bar
+          // Value label inside bar (bottom) or just above if bar is tiny
           if (N <= 6) {
+            var labelY = barPx > 12 ? histH - 3 : histH - barPx - 2;
+            var labelColor = barPx > 12 ? '#fff' : (isHighlight ? CR : '#999');
             var ct = g.append('text')
-              .attr('x', bx + cW/2).attr('y', histH - barPx - 2)
+              .attr('x', bx + cW/2).attr('y', labelY)
               .attr('text-anchor', 'middle')
-              .style('font-size', '7px').style('fill', isHighlight ? CR : '#999')
+              .style('font-size', '7px').style('fill', labelColor)
               .text(fmtCoeff(coeffs[k]));
             cTexts.push(ct);
           }
@@ -367,7 +397,10 @@ svg text { font-family: 'EB Garamond', serif; }
           var barPx = Math.max(1, barFrac * (histH - 4));
           ref.cellRects[k].attr('y', histH - barPx).attr('height', barPx);
           if (ref.cellTexts[k]) {
-            ref.cellTexts[k].attr('y', histH - barPx - 2).text(fmtCoeff(coeffs[k]));
+            var labelY = barPx > 12 ? histH - 3 : histH - barPx - 2;
+            ref.cellTexts[k].attr('y', labelY)
+              .style('fill', barPx > 12 ? '#fff' : '#999')
+              .text(fmtCoeff(coeffs[k]));
           }
         }
       }
