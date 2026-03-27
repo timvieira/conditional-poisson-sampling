@@ -7,7 +7,7 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 
 <style>
 #cps table { border-collapse: collapse; width: 100%; margin: 0; table-layout: fixed; }
-#cps th, #cps td { padding: 3px 6px; font-family: inherit; font-size: 0.88em; }
+#cps th, #cps td { padding: 1px 4px; font-family: inherit; font-size: 0.85em; line-height: 1.3; }
 #cps th { border-bottom: 1px solid #ccc; font-weight: normal; color: #666; }
 #cps .rl { text-align: left; width: 80px; color: #999; font-size: 0.8em; }
 #cps .ic { text-align: center; }
@@ -23,7 +23,7 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 @media (max-width: 600px) {
   body { font-size: 14pt; padding: 0 0.5em; }
   #cps .rl { width: 60px; font-size: 0.75em; }
-  #cps th, #cps td { padding: 2px 3px; }
+  #cps th, #cps td { padding: 1px 2px; }
 }
 
 </style>
