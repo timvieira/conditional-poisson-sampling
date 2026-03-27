@@ -3,7 +3,7 @@ date: 2026-03-25
 comments: true
 tags: notebook, sampling, algorithms, sampling-without-replacement
 
-{% notebook conditional-poisson-sampling.ipynb cells[1:5] %}
+{% notebook conditional-poisson-sampling.ipynb cells[1:4] %}
 
 <style>
 #cps table { border-collapse: collapse; width: auto; margin: 0; }
@@ -280,4 +280,4 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 
 </div>
 
-{% notebook conditional-poisson-sampling.ipynb cells[5:] %}
+{% notebook conditional-poisson-sampling.ipynb cells[4:] %}
