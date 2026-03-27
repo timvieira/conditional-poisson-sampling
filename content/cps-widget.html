@@ -149,6 +149,15 @@ body {
         var td = wb.append('td').attr('class','bar-td');
         var b = makeBar(td, w[idx], getMaxW(), CW, true, function(frac){
           var target = Math.max(0, Math.min(0.99, frac));
+          // Don't allow setting to zero if it would leave fewer than n nonzero items
+          if(target === 0) {
+            var nonzero = 0;
+            for(var k=0;k<N;k++) if(k!==idx && w[k]>1e-10) nonzero++;
+            if(nonzero < n) {
+              d3.select('#cps-status').text('need at least ' + n + ' nonzero weights when n=' + n).style('color','#c00');
+              return;
+            }
+          }
           // Scale the *others* to keep sum = 1
           var others = 0;
           for(var k=0;k<N;k++) if(k!==idx) others+=w[k];
@@ -159,15 +168,11 @@ body {
               if(k===idx) w[k]=target;
               else w[k]*=scale;
             }
+          } else if(target === 0) {
+            w[idx] = 0;
           }
           normW();
-          // Check: need at least n items with meaningful weight
-          var nontrivial = w.filter(function(v){return v > 0.005;}).length;
-          if(nontrivial < n){
-            d3.select('#cps-status').text('need at least n=' + n + ' items with nonzero weight').style('color','#c00');
-          } else {
-            d3.select('#cps-status').text('');
-          }
+          d3.select('#cps-status').text('');
           pi = getPi(w);
           update();
         });
