@@ -3733,10 +3733,16 @@ $$</p>
 <p>$$\Zw{\w_1, \ldots, \w_m}{k} = \Zw{\w_1, \ldots, \w_{m-1}}{k} + \w_m \cdot \Zw{\w_1, \ldots, \w_{m-1}}{k-1}$$</p>
 <p>This is a weighted generalization of Pascal's identity $\binom{m}{k} = \binom{m-1}{k} + \binom{m-1}{k-1}$.  Include item $m$ (second term) or exclude it (first term).<a class="verified" href="test_identities.py#test_weighted_pascal_recurrence" target="_blank" title="test_weighted_pascal_recurrence">✓</a></p>
 <p>Running this DP forward gives $\Z$; running backpropagation on it gives $\bpip$—all in $\mathcal{O}(Nn)$.  This is simpler than the product tree for moderate $N$, and illustrates the same principle: the gradient comes for free via AD.</p>
-<p><strong>Vandermonde's identity (weighted).</strong> This is the identity that makes both the <a href="#The-polynomial-product-tree">product tree</a> and <a href="#Drawing-Exact-Samples">sampling</a> correct.  For disjoint groups $A, B$,</p>
-<p>where $(\ba;\, \bb)$ denotes the concatenation of weight vectors $\ba$ and $\bb$:</p>
+<p><strong>Proposition (Weighted Vandermonde identity).</strong> For disjoint groups $A, B$ with weight vectors $\ba$ and $\bb$:</p>
 <p>$$\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$$</p>
-<p><a class="verified" href="test_identities.py#test_weighted_vandermonde" target="_blank" title="test_weighted_vandermonde">✓</a> This is why polynomial multiplication computes $\Z$: the coefficients of $P_A(\z) \cdot P_B(\z)$ are exactly the convolution of the two groups' elementary symmetric polynomials.  It is the identity that makes the product tree correct, and it is the set-level Vandermonde identity $\binom{A \cup B}{k} = \bigcup_{j=0}^{k} \binom{A}{j} \uplus \binom{B}{k-j}$.</p>
+<p>This is a weighted generalization of <a href="https://en.wikipedia.org/wiki/Vandermonde%27s_identity">Vandermonde's identity</a> $\binom{a+b}{k} = \sum_{j=0}^{k} \binom{a}{j}\binom{b}{k-j}$.<a class="verified" href="test_identities.py#test_weighted_vandermonde" target="_blank" title="test_weighted_vandermonde">✓</a></p>
+<details class="derivation">
+<summary>Proof</summary>
+<p>Factor the generating function over $A \cup B$:</p>
+<p>$$\prod_{i \in A \cup B}(1 + \w_i \z) = \prod_{i \in A}(1 + \w_i \z) \;\cdot\; \prod_{i \in B}(1 + \w_i \z)$$</p>
+<p>The left side is $\sum_k \Zw{(\ba;\,\bb)}{k}\, \z^k$.  The right side is a product of two polynomials, so its $k$-th coefficient is the convolution $\sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$.  Equating coefficients of $\z^k$ gives the result.</p>
+</details>
+<p>This is why polynomial multiplication computes $\Z$: the product tree exploits this identity at every node.  It is also what makes the sampling algorithm correct—splitting a quota of $k$ items between two subtrees according to $\Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$ produces the exact conditional distribution.</p>
 <p><strong>Newton's identities.</strong> The elementary symmetric polynomials can be computed from <strong>power sums</strong> $g_k \defeq \sum_i \w_i^k$ (see <a href="https://doi.org/10.1017/CBO9780511609589">Stanley (1999)</a>, Chapter 7):</p>
 <p>$$\Zw{\bw}{k} = \sum_{i=1}^{k} \frac{(-1)^{i-1}}{k}\, \Zw{\bw}{k-i} \cdot g_i$$</p>
 <p><a class="verified" href="test_identities.py#test_newtons_identities" target="_blank" title="test_newtons_identities">✓</a> This is an $\mathcal{O}(Nn)$ algorithm that only needs the power sums, not the individual weights—useful when the universe is implicitly defined (e.g., paths in a weighted finite-state automaton, where $g_k$ can be computed via matrix methods).</p>
