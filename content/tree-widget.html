@@ -70,12 +70,18 @@ svg text { font-family: 'EB Garamond', serif; }
     return { root: level[0], levels: allLevels };
   }
 
-  // Refs for fast updates
-  var sliderFills = [], sliderLabels = [];
-  var nodeRefs = []; // [{cellRects:[], cellTexts:[], nCoeffs}]
-  var statusEl;
+  // Each histogram bar width
+  var cW = 14;
+  // Histogram max height (for internal nodes)
+  var histH = 36;
+  // Slider height (for leaves)
+  var sliderH = 60;
+  var vGap = 32;
+  var hGap = 10;
 
-  var cellW = 16, nodeH = 26, barW = 28, barH = 60;
+  var sliderFills = [], sliderLabels = [];
+  var nodeRefs = [];
+  var statusEl;
 
   function build() {
     root.selectAll('*').remove();
@@ -101,43 +107,44 @@ svg text { font-family: 'EB Garamond', serif; }
         n = v; build();
       });
 
-    // Build tree
     var tree = buildTree(w, n);
-    var levels = tree.levels; // levels[0] = leaves, levels[last] = root
+    var levels = tree.levels;
     var depth = levels.length;
 
-    // Layout: leaves at BOTTOM, root at TOP
-    var hGap = 8;
-    var vGap = 40;
+    // Layout: leaves at top, root at bottom
+    // Leaf node width = 2 bars (coeffs [1, w_i])
+    // Internal node width = nCoeffs bars
+    var leafSpacing = 2 * cW + hGap + 12;
     var leafCount = levels[0].length;
-    var nodeW = function(nd) { return Math.min(nd.poly.length, n+1) * cellW + 2; };
-    var svgW = Math.max(350, leafCount * (barW + hGap + 8));
-    var sliderSpace = barH + 30; // space for sliders above leaves
-    var svgH = depth * (nodeH + vGap) + sliderSpace + 10;
+    var svgW = Math.max(300, leafCount * leafSpacing + 40);
+
+    // Vertical: item labels + sliders + leaf nodes + internal levels
+    var labelH = 16;
+    var topPad = 10;
+    var leafY = topPad + labelH + sliderH + 4;
+    var svgH = leafY + depth * (histH + vGap) + 30;
 
     var svg = root.append('svg').attr('width', svgW).attr('height', svgH)
       .style('display', 'block').style('margin', '0 auto').style('user-select', 'none');
 
-    // Assign positions: leaves at TOP, root at BOTTOM
+    // Assign x positions based on leaf spacing
     for (var li = 0; li < levels.length; li++) {
       var lev = levels[li];
-      var y = sliderSpace + li * (nodeH + vGap);
-      var totalW = lev.length * (barW + hGap + 8);
+      var totalW = lev.length * leafSpacing;
       var startX = (svgW - totalW) / 2;
       for (var ni = 0; ni < lev.length; ni++) {
-        var nd = lev[ni];
-        nd.x = startX + ni * (barW + hGap + 8) + (barW + hGap + 8) / 2;
-        nd.y = y;
+        lev[ni].x = startX + ni * leafSpacing + leafSpacing / 2;
+        lev[ni].y = leafY + li * (histH + vGap);
       }
     }
 
-    // Draw bezier edges (parent below children)
+    // --- Draw edges ---
     for (var li = 1; li < levels.length; li++) {
       levels[li].forEach(function(nd) {
         [nd.left, nd.right].forEach(function(child) {
           if (!child || child.pad) return;
-          var x1 = child.x, y1 = child.y + nodeH; // child bottom
-          var x2 = nd.x, y2 = nd.y;                // parent top
+          var x1 = child.x, y1 = child.y + histH;
+          var x2 = nd.x, y2 = nd.y;
           var my = (y1 + y2) / 2;
           svg.append('path')
             .attr('d', 'M'+x1+','+y1+' C'+x1+','+my+' '+x2+','+my+' '+x2+','+y2)
@@ -146,102 +153,122 @@ svg text { font-family: 'EB Garamond', serif; }
       });
     }
 
-    // Draw nodes (all levels)
+    // --- Draw histograms for all nodes ---
+    // Find global max coefficient for consistent scaling
+    var globalMax = 0;
+    (function walk(nd) {
+      if (!nd || nd.pad) return;
+      nd.poly.forEach(function(c) { if (Math.abs(c) > globalMax) globalMax = Math.abs(c); });
+      if (nd.left) walk(nd.left);
+      if (nd.right) walk(nd.right);
+    })(tree.root);
+    if (globalMax === 0) globalMax = 1;
+
     for (var li = 0; li < levels.length; li++) {
-      levels[li].forEach(function(nd, ni) {
+      levels[li].forEach(function(nd) {
         if (nd.pad) { nodeRefs.push(null); return; }
         var coeffs = nd.poly;
         var nCoeffs = Math.min(coeffs.length, n + 1);
-        var boxW = nCoeffs * cellW + 2;
+        var boxW = nCoeffs * cW;
         var g = svg.append('g')
           .attr('transform', 'translate(' + (nd.x - boxW/2) + ',' + nd.y + ')');
-        g.append('rect').attr('width', boxW).attr('height', nodeH)
-          .attr('fill', '#fff').attr('stroke', '#e8e8e8').attr('rx', 3);
 
-        var maxC = Math.max.apply(null, coeffs.map(function(c){return Math.abs(c);}));
-        if (maxC === 0) maxC = 1;
+        // Baseline
+        g.append('line').attr('x1', 0).attr('x2', boxW)
+          .attr('y1', histH).attr('y2', histH)
+          .attr('stroke', '#e0e0e0').attr('stroke-width', 0.5);
+
         var cRects = [], cTexts = [];
         for (var k = 0; k < nCoeffs; k++) {
-          var intensity = Math.min(1, Math.abs(coeffs[k]) / maxC);
+          var barH = Math.max(1, (Math.abs(coeffs[k]) / globalMax) * histH);
           var cr = g.append('rect')
-            .attr('x', 1 + k * cellW).attr('y', 1)
-            .attr('width', cellW - 1).attr('height', nodeH - 2)
-            .attr('fill', 'rgba(91,155,213,' + (0.1 + 0.8 * intensity) + ')')
-            .attr('rx', 1);
+            .attr('x', k * cW + 1).attr('y', histH - barH)
+            .attr('width', cW - 2).attr('height', barH)
+            .attr('fill', CW).attr('opacity', 0.7).attr('rx', 1);
           cRects.push(cr);
           if (N <= 6) {
             var ct = g.append('text')
-              .attr('x', 1 + k * cellW + cellW/2).attr('y', nodeH/2 + 4)
+              .attr('x', k * cW + cW/2).attr('y', histH - barH - 2)
               .attr('text-anchor', 'middle')
-              .style('font-size', '8px').style('fill', intensity > 0.5 ? '#fff' : '#888')
+              .style('font-size', '7px').style('fill', '#999')
               .text(fmtCoeff(coeffs[k]));
             cTexts.push(ct);
           }
         }
+
         // Highlight n-th coefficient at root
         if (li === levels.length - 1 && n < nCoeffs) {
+          var hBarH = Math.max(1, (Math.abs(coeffs[n]) / globalMax) * histH);
           g.append('rect')
-            .attr('x', 1 + n * cellW).attr('y', 0)
-            .attr('width', cellW - 1).attr('height', nodeH)
-            .attr('fill', 'none').attr('stroke', CR).attr('stroke-width', 2).attr('rx', 1);
+            .attr('x', n * cW).attr('y', histH - hBarH - 1)
+            .attr('width', cW).attr('height', hBarH + 2)
+            .attr('fill', 'none').attr('stroke', CR).attr('stroke-width', 1.5).attr('rx', 1);
         }
-        nodeRefs.push({ cellRects: cRects, cellTexts: cTexts, nCoeffs: nCoeffs, level: li, idx: ni });
+
+        // Store x position of each coefficient bar for slider alignment
+        nd._barXs = [];
+        for (var k = 0; k < nCoeffs; k++) {
+          nd._barXs.push(nd.x - boxW/2 + k * cW);
+        }
+
+        nodeRefs.push({ cellRects: cRects, cellTexts: cTexts, nCoeffs: nCoeffs });
       });
     }
 
-    // Root label — beside the root node
-    var rootNd = levels[levels.length - 1][0];
-    var rootBoxW = Math.min(rootNd.poly.length, n+1) * cellW + 2;
-    svg.append('text')
-      .attr('x', rootNd.x + rootBoxW/2 + 8).attr('y', rootNd.y + nodeH/2 + 4)
-      .attr('text-anchor', 'start')
-      .style('font-size', '11px').style('fill', CR)
-      .text('← Z');
-
-    // Sliders above leaves (aligned)
-    var sliderY = 18; // room for item labels above
+    // --- Sliders above leaves, aligned to the w_i bar (index 1) ---
     levels[0].forEach(function(nd, idx) {
       if (nd.pad) return;
       (function(idx) {
-        var x = nd.x - barW / 2;
-        // Track
-        svg.append('rect').attr('x', x).attr('y', sliderY)
-          .attr('width', barW).attr('height', barH)
-          .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 2);
+        // The w_i bar is at index 1 in the leaf histogram [1, w_i]
+        var barX = nd._barXs[1]; // left edge of the w_i coefficient bar
+        var sliderTop = topPad + labelH;
+
+        // Track (same width as one histogram bar)
+        svg.append('rect')
+          .attr('x', barX + 1).attr('y', sliderTop)
+          .attr('width', cW - 2).attr('height', sliderH)
+          .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
+
         // Fill
         var frac = Math.min(w[idx], 1);
-        var sf = svg.append('rect').attr('x', x+1).attr('width', barW-2).attr('rx', 2)
-          .attr('y', sliderY + barH - frac*barH).attr('height', frac*barH)
-          .attr('fill', CW).attr('opacity', 0.7).style('pointer-events', 'none');
+        var sf = svg.append('rect')
+          .attr('x', barX + 2).attr('width', cW - 4).attr('rx', 1)
+          .attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH)
+          .attr('fill', CW).attr('opacity', 0.8).style('pointer-events', 'none');
         sliderFills.push(sf);
+
         // Label
-        var sl = svg.append('text').attr('x', nd.x).attr('y', sliderY + barH - frac*barH - 3)
+        var sl = svg.append('text')
+          .attr('x', barX + cW/2).attr('y', sliderTop + sliderH - frac * sliderH - 2)
           .attr('text-anchor', 'middle')
-          .style('font-size', '10px').style('fill', CW)
-          .style('pointer-events', 'none')
+          .style('font-size', '9px').style('fill', CW).style('pointer-events', 'none')
           .text(w[idx].toFixed(2));
         sliderLabels.push(sl);
+
         // Item label above slider
-        svg.append('text').attr('x', nd.x).attr('y', sliderY - 4)
+        svg.append('text')
+          .attr('x', barX + cW/2).attr('y', topPad + labelH - 4)
           .attr('text-anchor', 'middle')
-          .style('font-size', '10px').style('fill', '#999')
-          .text('item ' + (idx+1));
-        // Drag target
-        svg.append('rect').attr('x', x-4).attr('y', sliderY-2)
-          .attr('width', barW+8).attr('height', barH+4)
+          .style('font-size', '9px').style('fill', '#999')
+          .text('w' + (idx+1));
+
+        // Drag target (wider for touch)
+        svg.append('rect')
+          .attr('x', barX - 4).attr('y', sliderTop - 2)
+          .attr('width', cW + 8).attr('height', sliderH + 4)
           .attr('fill', 'transparent').attr('cursor', 'ns-resize')
           .style('touch-action', 'none')
           .call(d3.drag().on('drag', function(event) {
-            var frac = (sliderY + barH - event.y) / barH;
+            var frac = (sliderTop + sliderH - event.y) / sliderH;
             var target = Math.max(0.01, Math.min(0.99, frac));
             var others = 0;
-            for (var k=0;k<N;k++) if(k!==idx) others+=w[k];
+            for (var k = 0; k < N; k++) if (k !== idx) others += w[k];
             var remain = 1 - target;
             if (others > 1e-10 && remain > 0) {
               var scale = remain / others;
-              for (var k=0;k<N;k++) {
-                if (k===idx) w[k]=target;
-                else w[k] = Math.max(0.001, w[k]*scale);
+              for (var k = 0; k < N; k++) {
+                if (k === idx) w[k] = target;
+                else w[k] = Math.max(0.001, w[k] * scale);
               }
             }
             normW();
@@ -250,21 +277,25 @@ svg text { font-family: 'EB Garamond', serif; }
       })(idx);
     });
 
+    // Z label beside root
+    var rootNd = levels[levels.length - 1][0];
+    var rootBoxW = Math.min(rootNd.poly.length, n+1) * cW;
+    svg.append('text')
+      .attr('x', rootNd.x + rootBoxW/2 + 8).attr('y', rootNd.y + histH/2 + 4)
+      .attr('text-anchor', 'start')
+      .style('font-size', '11px').style('fill', CR)
+      .text('← Z');
+
     statusEl = root.append('div').attr('id', 'tw-status');
 
-    // Store levels for updateTree
-    root.datum({ levels: levels, tree: tree });
-
+    root.datum({ levels: levels, tree: tree, globalMax: globalMax });
     updateTree();
-    if (window.MathJax && MathJax.typesetPromise) {
-      MathJax.typesetClear();
-      MathJax.typesetPromise();
-    }
+    if (window.MathJax && MathJax.typesetPromise) { MathJax.typesetClear(); MathJax.typesetPromise(); }
   }
 
   function fmtCoeff(v) {
     if (v === 0) return '0';
-    if (v < 0.01 && v > 0) return '';
+    if (v < 0.005 && v > 0) return '';
     if (v >= 10) return v.toFixed(0);
     if (v >= 1) return v.toFixed(1);
     return v.toFixed(2);
@@ -273,28 +304,30 @@ svg text { font-family: 'EB Garamond', serif; }
   function updateTree() {
     var data = root.datum();
     var levels = data.levels;
+    var sliderTop = 10 + 16; // topPad + labelH
 
     // Update sliders
     for (var i = 0; i < N; i++) {
       var frac = Math.min(w[i], 1);
-      sliderFills[i].attr('y', parseFloat(sliderFills[i].attr('y')) + parseFloat(sliderFills[i].attr('height')) - frac * barH)
-        .attr('height', frac * barH);
-      // Simpler: just recompute from barH
-      var sliderY = parseFloat(sliderFills[i].attr('y')) + parseFloat(sliderFills[i].attr('height')) - frac * barH;
-    }
-    // Actually, easier to just set directly
-    var sliderY = 18;
-    for (var i = 0; i < N; i++) {
-      var frac = Math.min(w[i], 1);
-      sliderFills[i].attr('y', sliderY + barH - frac*barH).attr('height', frac*barH);
-      sliderLabels[i].attr('y', sliderY + barH - frac*barH - 3).text(w[i].toFixed(2));
+      sliderFills[i].attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH);
+      sliderLabels[i].attr('y', sliderTop + sliderH - frac * sliderH - 2).text(w[i].toFixed(2));
     }
 
     // Rebuild tree data
     var newTree = buildTree(w, n);
     var newLevels = newTree.levels;
 
-    // Update node visuals
+    // Recompute global max
+    var gMax = 0;
+    (function walk(nd) {
+      if (!nd || nd.pad) return;
+      nd.poly.forEach(function(c) { if (Math.abs(c) > gMax) gMax = Math.abs(c); });
+      if (nd.left) walk(nd.left);
+      if (nd.right) walk(nd.right);
+    })(newTree.root);
+    if (gMax === 0) gMax = 1;
+
+    // Update histograms
     var ri = 0;
     for (var li = 0; li < newLevels.length; li++) {
       for (var ni = 0; ni < newLevels[li].length; ni++) {
@@ -302,15 +335,11 @@ svg text { font-family: 'EB Garamond', serif; }
         if (!ref) continue;
         var coeffs = newLevels[li][ni].poly;
         var nCoeffs = ref.nCoeffs;
-        var maxC = Math.max.apply(null, coeffs.map(function(c){return Math.abs(c);}));
-        if (maxC === 0) maxC = 1;
         for (var k = 0; k < nCoeffs; k++) {
-          var intensity = Math.min(1, Math.abs(coeffs[k]) / maxC);
-          ref.cellRects[k].attr('fill', 'rgba(91,155,213,' + (0.1 + 0.8 * intensity) + ')');
+          var barH = Math.max(1, (Math.abs(coeffs[k]) / gMax) * histH);
+          ref.cellRects[k].attr('y', histH - barH).attr('height', barH);
           if (ref.cellTexts[k]) {
-            ref.cellTexts[k]
-              .style('fill', intensity > 0.5 ? '#fff' : '#888')
-              .text(fmtCoeff(coeffs[k]));
+            ref.cellTexts[k].attr('y', histH - barH - 2).text(fmtCoeff(coeffs[k]));
           }
         }
       }
