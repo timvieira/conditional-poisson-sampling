@@ -292,32 +292,32 @@ svg text { font-family: 'EB Garamond', serif; }
         // Track (same width as one histogram bar)
         svg.append('rect')
           .attr('x', barX + 1).attr('y', sliderTop)
-          .attr('width', cW - 2).attr('height', sliderH)
+          .attr('width', bW - 2).attr('height', sliderH)
           .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
 
         // Fill
         var frac = Math.min(w[idx], 1);
         var sf = svg.append('rect')
-          .attr('x', barX + 2).attr('width', cW - 4).attr('rx', 1)
+          .attr('x', barX + 2).attr('width', bW - 4).attr('rx', 1)
           .attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH)
           .attr('fill', CW).attr('opacity', 0.8).style('pointer-events', 'none');
         sliderFills.push(sf);
 
         // Label
         var sl = svg.append('text')
-          .attr('x', barX + cW/2).attr('y', sliderTop + sliderH - frac * sliderH - 2)
+          .attr('x', barX + bW/2).attr('y', sliderTop + sliderH - frac * sliderH - 2)
           .attr('text-anchor', 'middle')
           .style('font-size', '9px').style('fill', CW).style('pointer-events', 'none')
           .text(w[idx].toFixed(2));
         sliderLabels.push(sl);
 
         // Item label above slider (MathJax)
-        svgMath(svg, barX + cW/2, topPad + 4, '$w_' + (idx+1) + '$', {anchor:'middle', color:CW, fontSize:'11px', width:30, height:18});
+        svgMath(svg, barX + bW/2, topPad + 4, '$w_' + (idx+1) + '$', {anchor:'middle', color:CW, fontSize:'11px', width:30, height:18});
 
         // Drag target (wider for touch)
         svg.append('rect')
           .attr('x', barX - 4).attr('y', sliderTop - 2)
-          .attr('width', cW + 8).attr('height', sliderH + 4)
+          .attr('width', bW + 8).attr('height', sliderH + 4)
           .attr('fill', 'transparent').attr('cursor', 'ns-resize')
           .style('touch-action', 'none')
           .call(d3.drag().on('drag', function(event) {
