@@ -114,6 +114,7 @@ svg text { font-family: 'EB Garamond', serif; }
 
   var dur = 400;
   var animating = false;
+  var lastAction = null; // 'add' or 'remove' or null
 
   function changeN(target) {
     if (animating || target === N) return;
@@ -122,25 +123,22 @@ svg text { font-family: 'EB Garamond', serif; }
 
     function step() {
       if (N === target) { animating = false; return; }
-      var oldN = N;
       if (target > N) {
-        // Add rightmost with weight 0 — user drags it up to give it influence
         w.push(0);
         N = N + 1;
+        lastAction = 'add';
       } else {
-        // Remove rightmost: redistribute its weight proportionally
         var removed = w.pop();
         N = N - 1;
         var s = w.reduce(function(a,b){return a+b;}, 0);
         if (s > 0) w = w.map(function(v) { return v / s; });
+        lastAction = 'remove';
       }
       n = Math.min(n, N);
       normW();
-      // Rebuild with animation
       buildInner();
-      // Schedule next step
       if (N !== target) {
-        setTimeout(step, dur * 0.7);
+        setTimeout(step, dur);
       } else {
         animating = false;
       }
@@ -149,15 +147,7 @@ svg text { font-family: 'EB Garamond', serif; }
   }
 
   function build() {
-    // Fade out old content, then rebuild
-    var oldChildren = root.selectAll(':scope > *');
-    if (oldChildren.size() > 0) {
-      oldChildren.transition().duration(dur/2).style('opacity', 0)
-        .on('end', function() { d3.select(this).remove(); })
-        .end().then(buildInner).catch(buildInner);
-    } else {
-      buildInner();
-    }
+    buildInner();
   }
 
   function buildInner() {
@@ -490,8 +480,31 @@ svg text { font-family: 'EB Garamond', serif; }
     root.datum({ levels: levels, tree: tree, globalMax: globalMax });
     updateTree();
 
-    // Fade in new content
-    svgWrap.style('opacity', 0).transition().duration(dur * 0.6).style('opacity', 1);
+    // Animate new node sprouting in
+    if (lastAction === 'add') {
+      // Find all SVG elements near the rightmost leaf x and fade them in
+      var rightX = levels[0][N-1] ? levels[0][N-1].x : 0;
+      svg.selectAll('rect, line, path, text').each(function() {
+        var el = d3.select(this);
+        var x = parseFloat(el.attr('x') || el.attr('x1') || '0');
+        var transform = el.attr('transform') || '';
+        // Check if element belongs to the rightmost column
+        var parentTransform = '';
+        try { parentTransform = el.node().parentNode.getAttribute('transform') || ''; } catch(e) {}
+        var tx = 0;
+        var m = parentTransform.match(/translate\(([^,]+)/);
+        if (m) tx = parseFloat(m[1]);
+        if (tx + x > rightX - 40) {
+          el.style('opacity', 0).transition().duration(dur).style('opacity', null);
+        }
+      });
+      // Also fade in the rightmost math label
+      if (mathLabels.length > 0) {
+        var last = mathLabels[mathLabels.length - 1];
+        last.style('opacity', 0).transition().duration(dur).style('opacity', 1);
+      }
+    }
+    lastAction = null;
 
     // MathJax: typeset after fade starts
     setTimeout(function() {
