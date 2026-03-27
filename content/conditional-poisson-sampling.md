@@ -283,6 +283,7 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 {% notebook conditional-poisson-sampling.ipynb cells[4:12] %}
 
 <style>
+#content { overflow: visible !important; }
 svg text { font-family: 'EB Garamond', serif; }
 #tw-controls {
   display: flex; align-items: center; gap: 12px;
@@ -468,7 +469,8 @@ svg text { font-family: 'EB Garamond', serif; }
       var lw = levels[li].length * levelSpacings[li];
       if (lw > maxLevelW) maxLevelW = lw;
     }
-    var svgW = Math.max(300, leafCount * leafSpacing + 60);
+    var leafCount = levels[0].length;
+    var svgW = Math.max(300, leafCount * levelSpacings[0] + 60);
 
     var labelH = 16;
     var topPad = 10;
@@ -490,6 +492,7 @@ svg text { font-family: 'EB Garamond', serif; }
     var outputY = sep2Y + sepGap/2 + arrowLen;
     var svgH = outputY + 18;
 
+    root.style('width', svgW + 'px');
     var svgWrap = root.append('div')
       .style('position', 'relative')
       .style('width', svgW + 'px')
@@ -499,7 +502,6 @@ svg text { font-family: 'EB Garamond', serif; }
       .style('display', 'block').style('user-select', 'none');
 
     // Assign x: leaves left-aligned, so adding on the right doesn't shift the left
-    var leafCount = levels[0].length;
     var leafSpacing = levelSpacings[0];
     var leafStartX = 20;
     for (var ni = 0; ni < leafCount; ni++) {
