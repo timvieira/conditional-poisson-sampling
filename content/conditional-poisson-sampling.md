@@ -282,7 +282,39 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 
 </div>
 
-{% notebook conditional-poisson-sampling.ipynb cells[3:10] %}
+The inclusion probability $\pip_i$ is the $P(S)$-weighted column sum of the $i$\textsuperscript{th} indicator: $\pip_i \defeq \sum_{S} P(S)\, \mathbf{1}[i \in S]$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$ (the other items "push back" through the size constraint $|S| = n$).  The computational challenges are: computing $\Zw{\bw}{n}$ and $P(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim P$, and the inverse problem of finding $\bw$ from target $\bpip$.
+
+
+The name comes from *Poisson sampling*: flip $N$ independent coins where coin $i$ lands heads with probability $p_i \defeq \w_i/(1+\w_i)$, then condition on exactly $n$ heads.  The weight $\w_i$ is the *odds* of the $i$\textsuperscript{th} coin: $\w_i = p_i / (1 - p_i)$.<a href="test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a>  (The [identities section](#Parameterizations) compares the odds and probability parameterizations.)
+
+**Why is this distribution special?** Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, the conditional Poisson distribution is the unique **maximum-entropy** one.<a href="test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>  It makes the fewest assumptions beyond the marginals ([Jaynes, 1957](https://doi.org/10.1103/PhysRev.106.620); [Chen, Dempster & Liu, 1994](https://academic.oup.com/biomet/article-abstract/81/3/457/256956))—the same sense in which the Gaussian is max-entropy for given mean and variance.
+
+
+This post covers an efficient algorithm for the conditional Poisson distribution: computing the normalizing constant $\Zw{\bw}{n}$, inclusion probabilities $\bpip$, exact samples, and fitting weights to target probabilities—all in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree.  The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).
+
+
+**As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python** (or any language outside of R's survey-sampling packages).  Existing R implementations—`UPmaxentropy` in the [sampling](https://cran.r-project.org/web/packages/sampling/) package and the [BalancedSampling](https://cran.r-project.org/web/packages/BalancedSampling/) package—use either rejection sampling or $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I'm aware of.
+
+**Exponential family structure.**  The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  The log-normalizer is $\log \Zw{\bw}{n}$, a convex function of $\btheta$.  Many properties follow automatically: the inclusion probabilities are the expected sufficient statistics ($\pip_i = \mathbb{E}[\mathbf{1}[i \in S]] = \partial \log \Z / \partial \theta_i$), the covariance of the inclusion indicators is the Hessian ($\text{Cov}[\mathbf{1}_{i \in S},\, \mathbf{1}_{j \in S}] = \partial^2 \log \Z / \partial \theta_i \partial \theta_j$), and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the *exponential fixed-size design* for this reason.
+
+## A Rejection Sampler
+
+Here is a simple rejection sampler that produces exactly the conditional Poisson distribution.  It gives useful intuition for what the distribution *is*.
+
+Draw $n$ items i.i.d. from the categorical distribution with probabilities $\propto \w_i$ (with replacement).  Reject unless all $n$ draws are distinct.  The resulting distribution over size-$n$ subsets satisfies $P(S) \propto \prod_{i \in S} \w_i$.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a>  The extra factors ($n!$ and $\W^n$, where $\W \defeq \sum_i \w_i$) are constant across all size-$n$ subsets and cancel upon conditioning.
+
+> **Bernoulli equivalence.**  The same distribution arises from flipping $N$ independent, nonidentical coins—coin $i$ has heads probability $p_i \defeq \w_i/(1+\w_i)$—and conditioning on exactly $n$ heads.  In this view, $\w_i = p_i/(1-p_i)$ is literally the *odds* of coin $i$.  This is *Poisson sampling* conditioned on sample size, hence the name.  (The [parameterizations table](#Parameterizations) gives the precise relationship between the odds and probability generating functions.)
+
+```
+Draw n items i.i.d. from Categorical(w / sum(w)), with replacement
+If all n draws are distinct, return the set; otherwise retry
+```
+
+
+The acceptance rate is $n! \cdot \Zw{\bw}{n} / \W^n$<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a>, which can be very small when $n$ is not much smaller than $N$.  This sampler works well when $n \ll N$ but becomes impractical otherwise.
+
+**The gap.** The rejection sampler doesn't give you a way to compute $\Zw{\bw}{n}$, the inclusion probabilities, or gradients for fitting—that's the gap the product tree fills.
+
 
 <style>
 #content { overflow: visible !important; }
@@ -857,4 +889,399 @@ svg text { font-family: 'EB Garamond', serif; }
 
 </div>
 
-{% notebook conditional-poisson-sampling.ipynb cells[10:] %}
+## The Polynomial Product Tree
+
+The key idea is to encode the sum over all $\binom{N}{n}$ subsets as the coefficient of $\z^n$ in a product of polynomials:
+
+$$
+(1 + \w_1 \z)(1 + \w_2 \z) \cdots (1 + \w_N \z) = \sum_{k=0}^{N} \Zw{\bw}{k}\, \z^k
+$$
+
+The $n$-th coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the *subproduct tree* (see [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065), Chapter 10).
+
+**Polynomials as arrays.** Each polynomial is stored as an array of coefficients: `[1, 3, 2]` represents $1 + 3\z + 2\z^2$.  Multiplying two polynomials is *convolution* of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving `[1, 2]` with `[1, 3]` to get `[1, 5, 6]`.  Using the FFT, this convolution costs $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.
+
+**Notation.** We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.
+
+### Computing the Normalizing Constant $\Z$
+
+Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$-th coefficient is $\Zw{\bw}{n}$.
+
+For example, with $N = 8$ items, the tree has three levels of internal nodes.  At the first level, pairs of leaves are multiplied: $P_{12}(\z) = (1 + \w_1 \z)(1 + \w_2 \z)$, and so on.  At the next level, $P_{1234} = P_{12} \cdot P_{34}$.  The root is $P_{12345678} = P_{1234} \cdot P_{5678}$.
+
+```mermaid
+graph BT
+    L1["$$(1 + w_1 z)$$"] --> N12["$$P_{12} = P_1 \cdot P_2$$"]
+    L2["$$(1 + w_2 z)$$"] --> N12
+    L3["$$(1 + w_3 z)$$"] --> N34["$$P_{34} = P_3 \cdot P_4$$"]
+    L4["$$(1 + w_4 z)$$"] --> N34
+    L5["$$(1 + w_5 z)$$"] --> N56["$$P_{56} = P_5 \cdot P_6$$"]
+    L6["$$(1 + w_6 z)$$"] --> N56
+    L7["$$(1 + w_7 z)$$"] --> N78["$$P_{78} = P_7 \cdot P_8$$"]
+    L8["$$(1 + w_8 z)$$"] --> N78
+    N12 --> N1234["$$P_{1\text{-}4} = P_{12} \cdot P_{34}$$"]
+    N34 --> N1234
+    N56 --> N5678["$$P_{5\text{-}8} = P_{56} \cdot P_{78}$$"]
+    N78 --> N5678
+    N1234 --> ROOT["$$\text{root: } P_{1\text{-}8}$$"]
+    N5678 --> ROOT
+
+    style ROOT fill:#4a90d9,color:#fff
+    style N1234 fill:#4a90d9,color:#fff
+    style N5678 fill:#4a90d9,color:#fff
+    style N12 fill:#4a90d9,color:#fff
+    style N34 fill:#4a90d9,color:#fff
+    style N56 fill:#4a90d9,color:#fff
+    style N78 fill:#4a90d9,color:#fff
+    style L1 fill:#e0e0e0,color:#000
+    style L2 fill:#e0e0e0,color:#000
+    style L3 fill:#e0e0e0,color:#000
+    style L4 fill:#e0e0e0,color:#000
+    style L5 fill:#e0e0e0,color:#000
+    style L6 fill:#e0e0e0,color:#000
+    style L7 fill:#e0e0e0,color:#000
+    style L8 fill:#e0e0e0,color:#000
+```
+
+**Complexity.** At each level of the tree, the total size of the polynomials being multiplied is $\mathcal{O}(N)$, and each multiplication is done via FFT in $\mathcal{O}(d \log d)$ time where $d$ is the degree. The recurrence is
+
+$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N)$$
+
+which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
+The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be **truncated to degree $n$** without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.
+
+
+### Computing Inclusion Probabilities $\bpip$
+
+The inclusion probability is the gradient of the log-normalizer (an [exponential family](#Exponential-family-structure) identity):
+
+$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$
+
+Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running [backpropagation](https://timvieira.github.io/blog/evaluating-fx-is-as-fast-as-fx/) on the same tree—no new algorithm needed.  By the Baur-Strassen theorem ([1983](https://doi.org/10.1016/0304-3975(83)90110-X)), the gradient costs at most a constant factor more than the forward computation.
+
+**Why the tree matters.**  Computing $\pip_i$ requires the "leave-one-out" product $\prod_{j \neq i}(1 + \w_j \z)$—a single item removed from the full product.  A naive approach recomputes this from scratch for each $i$, which is $\mathcal{O}(N)$ per item and $\mathcal{O}(N^2 n)$ total.  This is a classic [gradient-of-a-product](https://timvieira.github.io/blog/gradient-of-a-product/) problem: the product tree's [balanced binary structure](https://timvieira.github.io/blog/heaps-for-incremental-computation/) computes all $N$ leave-one-out values simultaneously in $\mathcal{O}(N \log^2 n)$.
+
+This "accidentally quadratic" trap is common.  For example, the k-DPP marginal formula ([Kulesza & Taskar, 2012](https://arxiv.org/abs/1207.6083)) requires all $N$ leave-one-out elementary symmetric polynomials $\Zw{\bw^{(-i)}}{k-1}$.  Their Algorithm 7 computes $\Zw{\bw}{k}$ in $\mathcal{O}(Nk)$ via the Pascal recurrence, but naively rerunning it $N$ times for the leave-one-outs gives $\mathcal{O}(N^2 k)$.  The product tree avoids this.
+
+In the PyTorch implementation, the gradient comes for free via `torch.autograd`—no hand-coded tree traversal needed.
+
+
+### Drawing Exact Samples
+
+Sampling reuses the product tree (no gradient computation needed).  Starting at the root with a quota of $k = n$ items to select, we walk top-down: at each internal node, randomly split the quota between the left and right subtrees.  The probability of assigning $j$ items to the left is proportional to $\llbracket P_L \rrbracket(\z^j) \cdot \llbracket P_R \rrbracket(\z^{k-j})$.  This is exact, not approximate—it follows from the **weighted Vandermonde identity**: $\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$, which says the number of ways to choose $k$ items from $A \cup B$ is the convolution of the two groups' counts.  Each term in the sum is the conditional probability of a particular left/right split.  At the leaves, quota 1 means "include this item"; quota 0 means "exclude."
+
+```mermaid
+graph TB
+    ROOT["$$\text{quota} = n$$"] -->|"$$j_1 \text{ items}$$"| LEFT["$$\text{quota} = j_1$$"]
+    ROOT -->|"$$n - j_1 \text{ items}$$"| RIGHT["$$\text{quota} = n - j_1$$"]
+    LEFT -->|"$$j_2$$"| LL["$$\text{quota} = j_2$$"]
+    LEFT -->|"$$j_1 - j_2$$"| LR["$$\text{quota} = j_1 - j_2$$"]
+    RIGHT -->|"$$j_3$$"| RL["$$\text{quota} = j_3$$"]
+    RIGHT -->|"$$n - j_1 - j_3$$"| RR["$$\text{quota} = n - j_1 - j_3$$"]
+    LL --> L1["$$0 \text{ or } 1$$"]
+    LL --> L2["$$0 \text{ or } 1$$"]
+    LR --> L3["$$0 \text{ or } 1$$"]
+    LR --> L4["$$0 \text{ or } 1$$"]
+    RL --> L5["$$0 \text{ or } 1$$"]
+    RL --> L6["$$0 \text{ or } 1$$"]
+    RR --> L7["$$0 \text{ or } 1$$"]
+    RR --> L8["$$0 \text{ or } 1$$"]
+
+    style ROOT fill:#4a90d9,color:#fff
+    style LEFT fill:#4a90d9,color:#fff
+    style RIGHT fill:#4a90d9,color:#fff
+    style LL fill:#4a90d9,color:#fff
+    style LR fill:#4a90d9,color:#fff
+    style RL fill:#4a90d9,color:#fff
+    style RR fill:#4a90d9,color:#fff
+    style L1 fill:#e0e0e0,color:#000
+    style L2 fill:#e0e0e0,color:#000
+    style L3 fill:#e0e0e0,color:#000
+    style L4 fill:#e0e0e0,color:#000
+    style L5 fill:#e0e0e0,color:#000
+    style L6 fill:#e0e0e0,color:#000
+    style L7 fill:#e0e0e0,color:#000
+    style L8 fill:#e0e0e0,color:#000
+```
+
+In pseudocode:
+
+```python
+def sample(node, quota):
+    if node.is_leaf:
+        return [node.item] if quota == 1 else []
+    # P_L[j] * P_R[quota-j] for j = 0, ..., quota
+    probs = [node.left.poly[j] * node.right.poly[quota - j]
+             for j in range(quota + 1)]
+    j = categorical(probs)              # how many items from the left subtree
+    return sample(node.left, j) + sample(node.right, quota - j)
+
+S = sample(root, n)                     # exactly n items
+```
+
+The tree is built once ($\mathcal{O}(N \log^2 N)$) and reused for each sample ($\mathcal{O}(n \log N)$ per sample)—at each of the $\mathcal{O}(\log N)$ levels, only nodes whose quota is nonzero are visited, and there are at most $n$ such nodes.  (When $n \approx N$, nearly all nodes are visited, so the per-sample cost approaches $\mathcal{O}(N \log N)$.)  No $\binom{N}{n}$-sized table is ever constructed.
+
+All computations are verified against brute-force enumeration in the [test suite](test_identities.py).
+
+
+## Basic Usage
+
+Now that we've seen how the product tree works under the hood, here's the library interface.  The simplest entry point is `from_weights`: hand it a subset size $n$ and a weight vector $\bw$.
+
+{% notebook conditional-poisson-sampling.ipynb cells[15:16] %}
+
+The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="test_identities.py#test_pi_sums_to_n" title="test_pi_sums_to_n" class="verified" target="_blank">✓</a> and each $\pip_i \in [0, 1]$.<a href="test_identities.py#test_pi_in_unit_interval" title="test_pi_in_unit_interval" class="verified" target="_blank">✓</a>  Items with larger weights get higher inclusion probabilities.
+
+{% notebook conditional-poisson-sampling.ipynb cells[17:18] %}
+
+The blue curve shows the *Poisson approximation*: if each item were included independently with probability $p_i = w_i r / (1 + w_i r)$ (where $r$ is the tilting parameter that makes $\sum p_i = n$), we would get $\pip_i \approx p_i$.  The actual inclusion probabilities (dots) are close but not identical—conditioning on $|S| = n$ introduces a correction of $\mathcal{O}(1/N)$ per item ([Hájek, 1964](https://doi.org/10.1214/aoms/1177700375)).  This approximation is the warm start for [fitting](#Fitting-Weights-to-Target-Probabilities): inverting the Poisson relationship gives $\theta_i \approx \log(\pip^*_i / (1 - \pip^*_i))$, which is close enough that the optimizer converges in a few iterations.
+
+
+## Drawing Samples
+
+Drawing samples works by walking a binary tree top-down, splitting a "quota" of $n$ items between the left and right subtrees at each node.  Each split is exact (not approximate),<a href="test_identities.py#test_sampling_distribution" title="test_sampling_distribution" class="verified" target="_blank">✓</a> and the tree is built once and cached, so subsequent samples are cheap.
+
+{% notebook conditional-poisson-sampling.ipynb cells[20:21] %}
+
+Let's verify that the empirical inclusion frequencies match the exact $\bpip$ values.
+
+{% notebook conditional-poisson-sampling.ipynb cells[22:23] %}
+
+## Fitting Weights to Target Probabilities
+
+A common use case: you know the inclusion probabilities you *want* and need to find weights that produce them.<a href="test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a>
+
+**Objective.**  The log-probability of a subset is $\log P(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$, where $\theta_i \defeq \log \w_i$.  Taking the expectation under the target marginals $\bpip^*$ gives the objective:
+
+$$
+L(\btheta) \defeq \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
+$$
+
+This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function), guaranteeing a unique global maximum.
+
+**Gradient.**  $\nabla_{\btheta} L(\btheta) = \bpip^* - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpip^*$ exactly, so the gradient is zero.  Each evaluation of $L$ and $\nabla L$ costs $\mathcal{O}(N \log^2 n)$ (one pass through the product tree + backpropagation).
+
+**Optimizer.**  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The warm start $\theta_i \defeq \log(\bpip^*_i / (1 - \bpip^*_i))$ has initialization error $\mathcal{O}(1/N)$ per item ([Hájek, 1964, Theorem 5.2](https://doi.org/10.1214/aoms/1177700375)), so the optimizer starts close to the solution.
+
+
+<details class="derivation">
+<summary><b>Warm start: why logit(π*) is a good initialization</b> (click to expand)</summary>
+
+The optimizer is initialized at $\theta_i \defeq \log(\pip^*_i / (1 - \pip^*_i))$, i.e., the odds of the target inclusion probabilities.  This is the exact solution in the *unconditional* Poisson case: if we flip independent coins with $p_i = \pip^*_i$, the odds are $\w_i \defeq p_i/(1-p_i)$ and the expected sample size is $\sum \pip^*_i = n$.  Conditioning on the sample size being exactly $n$ perturbs the inclusion probabilities, but the perturbation is small.
+
+Hájek (1964, Theorem 5.2) showed that under standard regularity conditions, the conditional Poisson inclusion probabilities satisfy
+
+$$\pip_i = p_i + \mathcal{O}(1/N)$$
+
+where $p_i \defeq \w_i/(1+\w_i)$ are the unconditional Poisson probabilities.  [Boistard, Lopuhaä & Ruiz-Gazen (2012)](https://arxiv.org/abs/1207.5654) give the explicit correction term:
+
+$$\pip_i = p_i\Big(1 - d^{-1}(p_i - \bar{p})(1 - p_i) + \mathcal{O}(d^{-2})\Big)$$
+
+where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size and $\bar{p} \defeq d^{-1}\sum_i p_i^2(1-p_i)$.  Under the regularity condition $\limsup N/d < \infty$ (which holds whenever the $p_i$ are bounded away from 0 and 1), we have $d = \Theta(N)$, so the initialization error is $\mathcal{O}(1/N)$—essentially exact for large $N$, and a good starting point for Newton's method at any $N$.
+
+</details>
+
+{% notebook conditional-poisson-sampling.ipynb cells[25:26] %}
+
+## Timing
+
+The tree-based approach scales to moderately large $N$ comfortably.  For comparison, the naive $\mathcal{O}(N^2 n)$ DP baseline is also shown.  (The PyTorch FFT implementation in the next section is significantly faster—see below.)
+
+{% notebook conditional-poisson-sampling.ipynb cells[27:28] %}
+
+## PyTorch Implementation with Contour Scaling
+
+The NumPy implementation above uses hand-coded tree traversals with `scipy.signal.convolve`.  A natural question: can we use PyTorch's autograd to compute the gradient (inclusion probabilities) automatically, given only the forward pass?
+
+The answer is yes—and it's both simpler and faster.  The key insight is that **computing $\bpip$ is just backpropagation** applied to the upward pass.  The [Baur-Strassen theorem](https://timvieira.github.io/blog/evaluating-fx-is-as-fast-as-fx/) guarantees that the gradient costs at most a small constant factor more than the forward pass ([Baur & Strassen, 1983](https://doi.org/10.1016/0304-3975(83)90110-X) prove $3\times$ for nonscalar operations on polynomials; [Griewank & Walther, 2008](https://doi.org/10.1137/1.9780898717761) give $5\times$ for general reverse-mode AD), and [Pearlmutter's R-operator](https://doi.org/10.1162/neco.1994.6.1.147) gives us the Hessian-vector product for another constant factor.  [Griewank & Walther (2008)](https://doi.org/10.1137/1.9780898717761) show that the numerical stability of the derivatives is inherited from the forward pass—so if we make the forward pass stable, everything else follows.
+
+The computation is just the product tree: build $\prod_i (1 + \w_i \z)$ bottom-up using polynomial multiplication, then extract $\llbracket \cdot \rrbracket(\z^n)$ and take the log.  In PyTorch, we batch all multiplications at each tree level into a single operation—$\mathcal{O}(\log N)$ torch calls instead of $\mathcal{O}(N)$.
+
+### The FFT Precision Problem and Weight Rescaling
+
+Using FFT for the polynomial multiplications gives $\mathcal{O}(N \log^2 n)$ complexity (with truncation to degree $n$).  But naively, FFT introduces rounding errors $\sim \varepsilon \cdot \max_k|c_k|$ per coefficient, where $c_k$ denotes the $k$-th coefficient of the product polynomial $\prod_i(1 + \w_i \z) = \sum_k c_k \z^k$.  The largest coefficient (near degree $N/2$) can be $\sim 10^{300}$ times larger than $c_n$, the coefficient we need—so FFT noise drowns the signal.
+
+**The key identity.**  For any $r > 0$:<a href="test_identities.py#test_contour_scaling" title="test_contour_scaling" class="verified" target="_blank">✓</a>
+
+$$\Zw{\bw}{n} = r^{-n} \cdot \llbracket \textstyle\prod_i(1 + \w_i r\, \z) \rrbracket(\z^n)$$
+
+This is immediate: each $\z^n$ term in the product picks up a factor of $r$ per item, giving $r^n \cdot \Zw{\bw}{n}$.  The identity says we can rescale all weights by any $r > 0$ and recover the same answer.  In exact arithmetic, $r$ doesn't matter.  In floating-point, it matters enormously: different values of $r$ shift which coefficient is largest, changing the dynamic range and thus the FFT rounding error relative to $c_n$.
+
+**Choosing $r$.**  The FFT error in $c_n$ is $\mathcal{O}(\varepsilon \cdot \max_k |c_k|)$, so the relative error is $\max_k |c_k| / |c_n|$ times machine epsilon.  If $c_n$ is the largest coefficient, the relative error is just $\mathcal{O}(\varepsilon)$.  After rescaling by $r$, the $k$-th coefficient becomes $c_k(r) = \Zw{\bw}{k} \cdot r^k$.  We want $r$ such that $c_n(r) \approx \max_k c_k(r)$.
+
+Define $p_i \defeq \w_i r/(1 + \w_i r)$.  Then $c_k(r) = \prod_i(1+\w_i r) \cdot \Pr[K = k]$ where $K \defeq \sum_i \text{Bernoulli}(p_i)$ and $\prod_i(1+\w_i r)$ is independent of $k$.  So $\arg\max_k c_k(r) = \text{mode}(K)$.  For a sum of independent Bernoullis, $|\text{mode}(K) - \mathbb{E}[K]| \le 1$ ([Darroch, 1964](https://doi.org/10.1214/aoms/1177703287)).  Setting $\mathbb{E}[K] = n$ places the mode at degree $n \pm 1$:<a href="test_identities.py#test_contour_r_solves_expected_size" title="test_contour_r_solves_expected_size" class="verified" target="_blank">✓</a>
+
+$$\sum_i \frac{\w_i \cdot r}{1 + \w_i \cdot r} = n$$
+
+This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's method converges in a few iterations.  A simpler heuristic, $r = n / \W$ (where $\W \defeq \sum_i \w_i$), linearizes $\w_i r / (1 + \w_i r) \approx \w_i r$ and works for mild weights but breaks down with heavy tails.
+
+**Guarantee.** With this choice of $r$, the coefficients $c_k(r)$ are proportional to the PMF of $K$, whose mode is at $n \pm 1$.  The PMF of a sum of Bernoullis is log-concave, so it decays exponentially away from the mode.  In practice, this makes the dynamic range $\max_k c_k / c_n$ a modest constant (typically $\approx 1$), ensuring the relative FFT error in $c_n$ is $\mathcal{O}(\varepsilon)$.
+
+
+**Autograd compatibility.** The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).
+
+
+{% notebook conditional-poisson-sampling.ipynb cells[29:31] %}
+
+The speedup comes from three sources:
+
+1. **FFT-based polynomial multiplication**: $\mathcal{O}(d \log d)$ per multiply instead of $\mathcal{O}(d^2)$, giving $\mathcal{O}(N \log^2 n)$ total with truncation to degree $n$.
+
+2. **Batched execution**: all multiplications at each tree level are batched into a single torch operation ($\mathcal{O}(\log N)$ torch calls, not $\mathcal{O}(N)$).
+
+3. **Autograd**: the gradient (inclusion probabilities) and Hessian-vector product come from backpropagation—no hand-coded downward pass or D-tree needed.
+
+The contour scaling is essential: without it, FFT precision collapses at $N \gtrsim 1000$.  With it, the implementation achieves machine-epsilon accuracy at all tested sizes ($N$ up to 10,000) and handles extreme weight ranges ($r$ from $10^{-10}$ to $10^{8}$).
+
+Code: [`torch_fft_prototype.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py)
+
+## Application: Horvitz-Thompson Estimation
+
+So far we've built machinery for sampling fixed-size subsets and computing inclusion probabilities.  A natural question: what can you *do* with this?  One important application is unbiased estimation.
+
+**Setup.** Suppose you have a distribution $p$ over a universe $\mathcal{S}$ of $N$ items, and a function $f$ that is expensive to evaluate.  You want to estimate $\mu = \sum_i p(i)\, f(i)$ using only $n$ evaluations of $f$.  With i.i.d. Monte Carlo, you'd draw $n$ samples—but some items may repeat, wasting evaluations.
+
+**The estimator.** The **Horvitz-Thompson estimator** ([Horvitz & Thompson, 1952](https://doi.org/10.1080/01621459.1952.10483446)) uses sampling *without* replacement to guarantee $n$ *distinct* evaluations.  Draw a fixed-size subset $S \sim P_n$ using CPS, then form:
+
+$$
+\hat{\mu}_{\text{HT}}(S) = \sum_{i \in S} \frac{p(i)}{\pip_i}\, f(i), \quad S \sim P_n
+$$
+
+This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.
+
+**Example.** With $N = 100$ items and $n = 5$, set weights proportional to $p(i)$ so that high-probability items are more likely to be selected.  Each sample gives 5 distinct evaluations of $f$; the HT formula reweights them to produce an unbiased estimate of the full sum.
+
+For more on SWOR-based estimation (including the near-optimal priority sampling scheme), see my earlier post on [estimating means in a finite universe](https://timvieira.github.io/blog/post/2017/07/03/estimating-means-in-a-finite-universe/).
+
+## Identities for $\Z$ and Its Relatives
+
+The normalizing constant $\Zw{\bw}{n}$ is the $n$-th elementary symmetric polynomial $e_n(\bw)$.  Here are some useful identities.
+
+### Parameterizations
+
+The conditional Poisson distribution arises from Poisson sampling—flip $N$ independent coins where coin $i$ lands heads with probability $p_i$, then condition on exactly $n$ heads.  There are two natural parameterizations:
+
+| | Probability $p_i$ | Odds $\w_i$ |
+|---|---|---|
+| **Parameter** | $\boldsymbol{p} \in [0,1]^N$ | $\bw \in [0,\infty]^N$ where $\w_i \defeq p_i/(1-p_i)$ |
+| **Leaf polynomial** | $(1-p_i) + p_i\, \z$ | $1 + \w_i\, \z$ |
+| **Generating function** | $\prod_i\big((1-p_i) + p_i \z\big) = \sum_k \Pr[k \text{ heads}]\, \z^k$ | $\prod_i(1 + \w_i \z) = \sum_k \Zw{\bw}{k} \z^k$ |
+| **$k$-th coefficient** | $\Pr[\text{exactly } k \text{ heads}]$ | $\Zw{\bw}{k}$ |
+
+> **WLOG: finite positive weights.**  The code requires $\w_i \in (0, \infty)$.  This is without loss of generality: items with $\w_i = 0$ are excluded from the universe (they are never selected), and items with $\w_i = \infty$ are deterministically included (reduce $n$ and $N$ by 1 each).  The general case reduces to the finite positive case by preprocessing.
+
+These are **probability generating functions** (PGFs) for the random variable $K = |S|$ (the number of heads in $N$ independent coin flips): the coefficient of $\z^k$ is the probability (or unnormalized weight) that exactly $k$ items are selected.  The formal variable $\z$ is a bookkeeping device—it "marks" each included item so that the coefficient-extraction operator $\llbracket \cdot \rrbracket(\z^k)$ picks out the contribution from exactly $k$ items.
+
+The two generating functions are related by factoring out $\prod_i(1-p_i) = 1/\prod_i(1+\w_i)$:
+
+$$\prod_i\big((1-p_i) + p_i \z\big) = \prod_i(1-p_i) \cdot \prod_i(1 + \w_i \z)$$
+
+so $\Pr[k \text{ heads}] = \Zw{\bw}{k} / \prod_i(1+\w_i)$.<a href="test_identities.py#test_prob_odds_generating_function_relation" title="test_prob_odds_generating_function_relation" class="verified" target="_blank">✓</a>
+
+The odds parameterization is more convenient for computation (the leaf polynomial $1 + \w_i \z$ is monic), while the probability parameterization is more natural for interpretation (the normalizer is literally $\Pr[n \text{ heads}]$).  The conditional distribution is the same either way—scaling all weights by $\alpha > 0$ doesn't change it.<a href="test_identities.py#test_scaling_invariance" title="test_scaling_invariance" class="verified" target="_blank">✓</a>
+
+### Differential Identities
+
+The [exponential family structure](#Exponential-family-structure) gives the inclusion probability as the gradient of the log-normalizer, and the covariance as the Hessian (see the [fitting section](#Fitting-weights-to-target-probabilities) for how these are computed via the P-tree and D-tree):
+
+$$\pip_i \defeq \frac{\partial \log \Z}{\partial \theta_i} = \frac{\w_i \cdot \Zw{\bw^{(-i)}}{n-1}}{\Zw{\bw}{n}}$$
+<a href="test_identities.py#test_pi_is_gradient_of_log_Z" title="test_pi_is_gradient_of_log_Z, test_pi_leave_one_out, test_pi_matches_brute_force" class="verified" target="_blank">✓</a>
+
+$$\text{Cov}[\mathbf{1}_{i \in S},\, \mathbf{1}_{j \in S}] = \frac{\partial^2 \log \Z}{\partial \theta_i \partial \theta_j}$$
+<a href="test_identities.py#test_covariance_is_hessian" title="test_covariance_is_hessian" class="verified" target="_blank">✓</a>
+
+The leave-one-out formula generalizes to **higher-order inclusion probabilities**: $\pip(X) = P(X \subseteq S) = \prod_{i \in X} \w_i \cdot \Zw{\bw^{(-X)}}{n-|X|} / \Zw{\bw}{n}$.<a href="test_identities.py#test_higher_order_inclusion" title="test_higher_order_inclusion" class="verified" target="_blank">✓</a>
+
+### Recurrences and Algorithms
+
+**Weighted Pascal recurrence.** The $\mathcal{O}(Nn)$ dynamic programming algorithm for $\Z$:
+
+$$\Zw{\w_1, \ldots, \w_m}{k} = \Zw{\w_1, \ldots, \w_{m-1}}{k} + \w_m \cdot \Zw{\w_1, \ldots, \w_{m-1}}{k-1}$$
+
+This is a weighted generalization of Pascal's identity $\binom{m}{k} = \binom{m-1}{k} + \binom{m-1}{k-1}$.  Include item $m$ (second term) or exclude it (first term).<a href="test_identities.py#test_weighted_pascal_recurrence" title="test_weighted_pascal_recurrence" class="verified" target="_blank">✓</a>
+
+
+Running this DP forward gives $\Z$; running backpropagation on it gives $\bpip$—all in $\mathcal{O}(Nn)$.  This is simpler than the product tree for moderate $N$, and illustrates the same principle: the gradient comes for free via AD.
+
+**Proposition (Weighted Vandermonde identity).** For disjoint groups $A, B$ with weight vectors $\ba$ and $\bb$:
+
+$$\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$$
+
+This is a weighted generalization of [Vandermonde's identity](https://en.wikipedia.org/wiki/Vandermonde%27s_identity) $\binom{a+b}{k} = \sum_{j=0}^{k} \binom{a}{j}\binom{b}{k-j}$.<a href="test_identities.py#test_weighted_vandermonde" title="test_weighted_vandermonde" class="verified" target="_blank">✓</a>
+
+<details class="derivation">
+<summary>Proof</summary>
+
+Factor the generating function over $A \cup B$:
+
+$$\prod_{i \in A \cup B}(1 + \w_i \z) = \prod_{i \in A}(1 + \w_i \z) \;\cdot\; \prod_{i \in B}(1 + \w_i \z)$$
+
+The left side is $\sum_k \Zw{(\ba;\,\bb)}{k}\, \z^k$.  The right side is a product of two polynomials, so its $k$-th coefficient is the convolution $\sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$.  Equating coefficients of $\z^k$ gives the result. <span style="float:right">$\blacksquare$</span>
+
+</details>
+
+This is why polynomial multiplication computes $\Z$: the product tree exploits this identity at every node.  It is also what makes the sampling algorithm correct—splitting a quota of $k$ items between two subtrees according to $\Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$ produces the exact conditional distribution.
+
+
+**Newton's identities.** The elementary symmetric polynomials can be computed from **power sums** $g_k \defeq \sum_i \w_i^k$ (see [Stanley (1999)](https://doi.org/10.1017/CBO9780511609589), Chapter 7):
+
+$$\Zw{\bw}{k} = \sum_{i=1}^{k} \frac{(-1)^{i-1}}{k}\, \Zw{\bw}{k-i} \cdot g_i$$
+
+<a href="test_identities.py#test_newtons_identities" title="test_newtons_identities" class="verified" target="_blank">✓</a> This is an $\mathcal{O}(Nn)$ algorithm that only needs the power sums, not the individual weights—useful when the universe is implicitly defined (e.g., paths in a weighted finite-state automaton, where $g_k$ can be computed via matrix methods).
+
+### Connection to K-DPPs
+
+<details class="derivation">
+<summary>A diagonal K-DPP is exactly a conditional Poisson distribution (click to expand)</summary>
+
+A $K$-DPP (fixed-size determinantal point process) on $\{1, \ldots, N\}$ with a **diagonal** kernel matrix $L = \text{diag}(\w_1, \ldots, \w_N)$ is exactly the conditional Poisson distribution:
+
+$$\mathcal{P}_L^K(S) = \frac{\det(L_S)}{\sum_{|S'|=K} \det(L_{S'})} = \frac{\prod_{i \in S} \w_i}{\Zw{\bw}{K}}$$
+
+since the determinant of a diagonal submatrix is the product of its diagonal entries.<a href="test_identities.py#test_kdpp_diagonal" title="test_kdpp_diagonal" class="verified" target="_blank">✓</a>  The normalizer $\sum_{|S|=K} \det(L_S) = e_K(\lambda_1, \ldots, \lambda_N)$ is an elementary symmetric polynomial of the eigenvalues—which for a diagonal matrix are just the weights.  Newton's identities connect the two: compute $e_K$ from the power sums $g_k = \text{tr}(L^k)$.
+
+For non-diagonal $L$, the K-DPP introduces correlations between items (repulsion), while CPS has only the size constraint.  See [Kulesza & Taskar (2011)](https://arxiv.org/abs/1207.6083) for details.
+
+</details>
+
+## Summary
+
+**The takeaway.** A single data structure—the polynomial product tree—unifies normalizing constant computation, marginal inference, sampling, and parameter fitting for the conditional Poisson distribution.  Each capability is a mechanical program transformation of the previous one:
+
+| | What | How | Cost |
+|---|---|---|---|
+| $\Z$ | normalizing constant | forward pass (polynomial multiply) | $\mathcal{O}(N \log^2 n)$ |
+| $\bpip$ | inclusion probabilities | backward pass (reverse-mode AD) | $\mathcal{O}(N \log^2 n)$ |
+| $S$ | exact samples | top-down quota splitting (Vandermonde) | $\mathcal{O}(n \log N)$ per sample |
+| $\btheta^*$ | fitted parameters | L-BFGS (gradient only) | $\mathcal{O}(N \log^2 n)$ per iteration |
+
+There are no problem-specific derivations here—each row follows from a general theorem in automatic differentiation or computer algebra.
+
+The NumPy implementation ([`conditional_poisson.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson.py)) uses hand-coded tree traversals with $\mathcal{O}(N \log^2 n)$ complexity.  The PyTorch implementation ([`torch_fft_prototype.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py)) uses FFT-based polynomial multiplication with **contour radius scaling**—rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stable—achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.  The gradient and HVP come from PyTorch's autograd, not hand-coded passes.
+
+In the NumPy implementation, polynomials use a scaled representation `(coeffs, log_scale)` with $\max|c_k| = 1$ to prevent floating-point overflow.  The PyTorch implementation uses contour radius scaling instead (see [above](#The-FFT-Precision-Problem-and-Contour-Scaling)).
+
+**References:**
+
+- [Hájek (1964)](https://doi.org/10.1214/aoms/1177700375). "Asymptotic Theory of Rejective Sampling with Varying Probabilities from a Finite Population." *The Annals of Mathematical Statistics*, 35(4), 1491–1523.
+
+- [Jaynes (1957)](https://doi.org/10.1103/PhysRev.106.620). "Information Theory and Statistical Mechanics." *Physical Review*, 106(4), 620–630.
+
+- [Chen, Dempster & Liu (1994)](https://academic.oup.com/biomet/article-abstract/81/3/457/256956). "Weighted Finite Population Sampling to Maximize Entropy." *Biometrika*, 81(3), 457–469.
+
+- [Horvitz & Thompson (1952)](https://doi.org/10.1080/01621459.1952.10483446). "A Generalization of Sampling Without Replacement from a Finite Universe." *Journal of the American Statistical Association*, 47(260), 663–685.
+
+- [Darroch (1964)](https://doi.org/10.1214/aoms/1177703287). "On the Distribution of the Number of Successes in Independent Trials." *The Annals of Mathematical Statistics*, 35(3), 1317–1321.
+- [Baur & Strassen (1983)](https://doi.org/10.1016/0304-3975(83)90110-X). "The Complexity of Partial Derivatives." *Theoretical Computer Science*, 22(3), 317–330.
+
+- [Pearlmutter (1994)](https://doi.org/10.1162/neco.1994.6.1.147). "Fast Exact Multiplication by the Hessian." *Neural Computation*, 6(1), 147–160.
+
+- [Griewank & Walther (2008)](https://doi.org/10.1137/1.9780898717761). *Evaluating Derivatives: Principles and Techniques of Algorithmic Differentiation*, 2nd edition. SIAM.
+
+- [Stanley (1999)](https://doi.org/10.1017/CBO9780511609589). *Enumerative Combinatorics*, Volume 2. Cambridge University Press.
+
+- [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065). *Modern Computer Algebra*, 3rd edition. Cambridge University Press.
+
+- [Tillé (2006)](https://link.springer.com/book/10.1007/978-0-387-34240-0). *Sampling Algorithms*. Springer.
+
+- [Meister, Amini, Vieira & Cotterell (2021)](https://aclanthology.org/2021.emnlp-main.52/). "Conditional Poisson Stochastic Beams." *Proceedings of EMNLP 2021*.
