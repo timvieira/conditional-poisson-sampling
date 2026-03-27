@@ -952,7 +952,7 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
 
 ### Computing Inclusion Probabilities $\bpip$
 
-The inclusion probability is the gradient of the log-normalizer (an [exponential family](#Exponential-family-structure) identity):
+The inclusion probability is the gradient of the log-normalizer (an exponential family identity):
 
 $$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$
 
@@ -1179,7 +1179,7 @@ The odds parameterization is more convenient for computation (the leaf polynomia
 
 ### Differential Identities
 
-The [exponential family structure](#Exponential-family-structure) gives the inclusion probability as the gradient of the log-normalizer:
+The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:
 
 $$\pip_i \defeq \frac{\partial \log \Z}{\partial \theta_i} = \frac{\w_i \cdot \Zw{\bw^{(-i)}}{n-1}}{\Zw{\bw}{n}}$$
 <a href="test_identities.py#test_pi_is_gradient_of_log_Z" title="test_pi_is_gradient_of_log_Z, test_pi_leave_one_out, test_pi_matches_brute_force" class="verified" target="_blank">✓</a>
