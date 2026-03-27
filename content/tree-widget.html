@@ -148,7 +148,7 @@ svg text { font-family: 'EB Garamond', serif; }
 
     // Layout: leaves at top, root at bottom
     // Compute each node's box width
-    var nodePad = 6;
+    var nodePad = 12;
     function nodeBoxW(nd) {
       if (nd.pad) return 0;
       var nc = Math.min(nd.poly.length, n + 1);
@@ -173,7 +173,8 @@ svg text { font-family: 'EB Garamond', serif; }
     var labelH = 16;
     var topPad = 10;
     var leafY = topPad + labelH + sliderH + 4;
-    var svgH = leafY + depth * (bH + vGap) + 30;
+    var nodeH = bH + nodePad;
+    var svgH = leafY + depth * (nodeH + vGap) + 30;
 
     var svgWrap = root.append('div')
       .style('position', 'relative').style('width', svgW + 'px')
@@ -198,7 +199,7 @@ svg text { font-family: 'EB Garamond', serif; }
         } else if (nd.left) {
           nd.x = nd.left.x;
         }
-        nd.y = leafY + li * (bH + vGap);
+        nd.y = leafY + li * (nodeH + vGap);
       });
     }
 
@@ -207,7 +208,7 @@ svg text { font-family: 'EB Garamond', serif; }
       levels[li].forEach(function(nd) {
         [nd.left, nd.right].forEach(function(child) {
           if (!child || child.pad) return;
-          var x1 = child.x, y1 = child.y + bH;
+          var x1 = child.x, y1 = child.y + bH + nodePad;
           var x2 = nd.x, y2 = nd.y;
           var my = (y1 + y2) / 2;
           svg.append('path')
@@ -238,9 +239,9 @@ svg text { font-family: 'EB Garamond', serif; }
         var g = svg.append('g')
           .attr('transform', 'translate(' + gx + ',' + nd.y + ')');
 
-        // Group box
-        g.append('rect').attr('width', boxW).attr('height', bH)
-          .attr('fill', '#fff').attr('stroke', '#e0e0e0').attr('rx', 4);
+        // Group box (no border, subtle background)
+        g.append('rect').attr('width', boxW).attr('height', bH + nodePad)
+          .attr('fill', '#f9f9f9').attr('stroke', 'none').attr('rx', 5);
 
         var cRects = [], cTexts = [];
         for (var k = 0; k < nCoeffs; k++) {
@@ -249,20 +250,21 @@ svg text { font-family: 'EB Garamond', serif; }
           var barPx = Math.max(0.5, barFrac * bH);
           var isHighlight = (li === levels.length - 1 && k === n);
           var col = isHighlight ? CR : CW;
+          var by = nodePad/2; // vertical offset inside group
           // Track (same as cps-widget slider)
           g.append('rect')
-            .attr('x', bx).attr('y', 0)
+            .attr('x', bx).attr('y', by)
             .attr('width', bW).attr('height', bH)
             .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 2);
           // Fill
           var cr = g.append('rect')
             .attr('x', bx + 1).attr('width', bW - 2).attr('rx', 2)
-            .attr('y', bH - barPx).attr('height', barPx)
+            .attr('y', by + bH - barPx).attr('height', barPx)
             .attr('fill', col).attr('opacity', 0.7);
           cRects.push(cr);
           // Value label above fill
           var ct = g.append('text')
-            .attr('x', bx + bW/2).attr('y', bH - barPx - 3)
+            .attr('x', bx + bW/2).attr('y', nodePad/2 + bH - barPx - 3)
             .attr('text-anchor', 'middle')
             .style('font-size', '9px').style('fill', col)
             .style('font-family', "'EB Garamond', serif")
@@ -351,7 +353,7 @@ svg text { font-family: 'EB Garamond', serif; }
     // Z label beside root (HTML overlay)
     var rootNd = levels[levels.length - 1][0];
     var rootBoxW = nodeBoxW(rootNd);
-    var zLabelDiv = addMathLabel(svgWrap, rootNd.x + rootBoxW/2 + 8, rootNd.y + bH/2 - 8, '', {color: CR, fontSize: '12px'});
+    var zLabelDiv = addMathLabel(svgWrap, rootNd.x + rootBoxW/2 + 8, rootNd.y + nodeH/2 - 8, '', {color: CR, fontSize: '12px'});
 
     root.datum({ levels: levels, tree: tree, globalMax: globalMax });
     updateTree();
@@ -408,9 +410,9 @@ svg text { font-family: 'EB Garamond', serif; }
         for (var k = 0; k < nCoeffs; k++) {
           var barFrac = Math.min(1, Math.abs(coeffs[k]) / gMax);
           var barPx = Math.max(1, barFrac * bH);
-          ref.cellRects[k].attr('y', bH - barPx).attr('height', barPx);
+          ref.cellRects[k].attr('y', nodePad/2 + bH - barPx).attr('height', barPx);
           if (ref.cellTexts[k]) {
-            ref.cellTexts[k].attr('y', bH - barPx - 3).text(fmtCoeff(coeffs[k]));
+            ref.cellTexts[k].attr('y', nodePad/2 + bH - barPx - 3).text(fmtCoeff(coeffs[k]));
           }
         }
       }
