@@ -81,11 +81,13 @@ svg text { font-family: 'EB Garamond', serif; }
   var bH = mobile ? 50 : 70;  // bar height (same as slider)
   var sliderH = bH;            // sliders are the same size
   var bGap = 4;                // gap between bars within a node
+  var nodePad = 12;            // padding inside group box
   var vGap = 30;
   var hGap = 20;
 
   var sliderFills = [], sliderLabels = [];
   var nodeRefs = [];
+  var zLabelDiv = null;
 
   // Place MathJax labels as absolutely-positioned HTML divs over the SVG
   // svgContainer must be position:relative
@@ -114,6 +116,7 @@ svg text { font-family: 'EB Garamond', serif; }
     root.selectAll('*').remove();
     sliderFills = []; sliderLabels = [];
     nodeRefs = [];
+    mathLabels = [];
 
     // Controls
     var ctrl = root.append('div').attr('id', 'tw-controls');
@@ -140,7 +143,6 @@ svg text { font-family: 'EB Garamond', serif; }
 
     // Layout: leaves at top, root at bottom
     // Compute each node's box width
-    var nodePad = 12;
     function nodeBoxW(nd) {
       if (nd.pad) return 0;
       var nc = Math.min(nd.poly.length, n + 1);
@@ -345,16 +347,18 @@ svg text { font-family: 'EB Garamond', serif; }
     // Z label beside root (HTML overlay)
     var rootNd = levels[levels.length - 1][0];
     var rootBoxW = nodeBoxW(rootNd);
-    var zLabelDiv = addMathLabel(svgWrap, rootNd.x + rootBoxW/2 + 8, rootNd.y + nodeH/2 - 8, '', {color: CR, fontSize: '12px'});
+    zLabelDiv = addMathLabel(svgWrap, rootNd.x + rootBoxW/2 + 8, rootNd.y + nodeH/2 - 8, '', {color: CR, fontSize: '12px'});
 
     root.datum({ levels: levels, tree: tree, globalMax: globalMax });
     updateTree();
-    // MathJax: typeset all the HTML overlay labels
-    if (window.MathJax && MathJax.typesetPromise) {
-      var els = mathLabels.map(function(d) { return d.node(); });
-      MathJax.typesetClear(els);
-      MathJax.typesetPromise(els);
-    }
+    // MathJax: typeset the entire widget container after rebuild
+    setTimeout(function() {
+      if (window.MathJax && MathJax.typesetPromise) {
+        var tw = document.getElementById('tw');
+        MathJax.typesetClear([tw]);
+        MathJax.typesetPromise([tw]);
+      }
+    }, 10);
   }
 
   function fmtCoeff(v) {
