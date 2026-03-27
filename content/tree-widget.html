@@ -231,19 +231,21 @@ svg text { font-family: 'EB Garamond', serif; }
       .attr('y1', sep1Y).attr('y2', sep1Y)
       .attr('stroke', '#e0e0e0').attr('stroke-width', 1).attr('stroke-dasharray', '4,4');
 
-    // Small arrows from sliders to leaf nodes
+    // Arrow markers
     var arrowDef = svg.append('defs');
-    arrowDef.append('marker').attr('id','downarrow').attr('viewBox','0 0 6 10').attr('refX',3).attr('refY',10)
-      .attr('markerWidth',5).attr('markerHeight',8).attr('orient','auto')
-      .append('path').attr('d','M0,0 L3,10 L6,0').attr('fill','#ccc');
+    // Downward arrow (for connector lines going top→bottom)
+    arrowDef.append('marker').attr('id','arrowDown').attr('viewBox','0 0 6 8').attr('refX',3).attr('refY',8)
+      .attr('markerWidth',5).attr('markerHeight',7).attr('orient','auto-start-reverse')
+      .append('path').attr('d','M0,0 L6,0 L3,8 Z').attr('fill','#ccc');
 
     levels[0].forEach(function(nd) {
       if (nd.pad) return;
+      // From bottom of slider (inputZoneBot) to top of leaf node (nd.y)
       svg.append('line')
-        .attr('x1', nd.x).attr('y1', sep1Y + 2)
-        .attr('x2', nd.x).attr('y2', nd.y - 2)
+        .attr('x1', nd.x).attr('y1', inputZoneBot)
+        .attr('x2', nd.x).attr('y2', nd.y)
         .attr('stroke', '#ccc').attr('stroke-width', 1)
-        .attr('marker-end', 'url(#downarrow)');
+        .attr('marker-end', 'url(#arrowDown)');
     });
 
     // Separator 2: circuit → output
@@ -251,16 +253,16 @@ svg text { font-family: 'EB Garamond', serif; }
       .attr('y1', sep2Y).attr('y2', sep2Y)
       .attr('stroke', '#e0e0e0').attr('stroke-width', 1).attr('stroke-dasharray', '4,4');
 
-    // Arrow from root to output zone
+    // Arrow from root bottom to output zone
     var rootNdForArrow = levels[levels.length - 1][0];
-    arrowDef.append('marker').attr('id','downarrow2').attr('viewBox','0 0 6 10').attr('refX',3).attr('refY',10)
-      .attr('markerWidth',5).attr('markerHeight',8).attr('orient','auto')
-      .append('path').attr('d','M0,0 L3,10 L6,0').attr('fill', CR);
+    arrowDef.append('marker').attr('id','arrowDownRed').attr('viewBox','0 0 6 8').attr('refX',3).attr('refY',8)
+      .attr('markerWidth',5).attr('markerHeight',7).attr('orient','auto-start-reverse')
+      .append('path').attr('d','M0,0 L6,0 L3,8 Z').attr('fill', CR);
     svg.append('line')
-      .attr('x1', rootNdForArrow.x).attr('y1', sep2Y + 2)
-      .attr('x2', rootNdForArrow.x).attr('y2', outputY - 2)
+      .attr('x1', rootNdForArrow.x).attr('y1', rootBot)
+      .attr('x2', rootNdForArrow.x).attr('y2', outputY)
       .attr('stroke', CR).attr('stroke-width', 1.5)
-      .attr('marker-end', 'url(#downarrow2)');
+      .attr('marker-end', 'url(#arrowDownRed)');
 
     // --- Draw edges ---
     for (var li = 1; li < levels.length; li++) {
