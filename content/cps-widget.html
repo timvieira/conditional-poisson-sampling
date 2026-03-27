@@ -89,7 +89,7 @@ body {
       .attr('fill',color).attr('opacity',0.7).style('pointer-events','none');
     var label = svg.append('text').attr('x',bw/2).attr('y',barH-frac*barH-4)
       .attr('text-anchor','middle').style('font-size','14px').style('fill',color).style('font-family',"'EB Garamond', serif")
-      .style('pointer-events','none').text(val.toFixed(val>=1?2:3));
+      .style('pointer-events','none').text(val < 0.001 ? val.toExponential(0) : val.toFixed(3));
     if (draggable) {
       svg.append('rect').attr('width',bw).attr('height',barH)
         .attr('fill','transparent').attr('cursor','ns-resize')
@@ -136,19 +136,19 @@ body {
       (function(idx){
         var td = wb.append('td').attr('class','bar-td');
         var b = makeBar(td, w[idx], getMaxW(), CW, true, function(frac){
-          var target = Math.max(0.001, Math.min(0.99, frac));
+          var target = Math.max(1e-10, Math.min(0.99, frac));
           // Scale the *others* to keep sum = 1
           var others = 0;
           for(var k=0;k<N;k++) if(k!==idx) others+=w[k];
           var remain = 1 - target;
-          if(others > 0 && remain > 0) {
+          if(others > 1e-20 && remain > 0) {
             var scale = remain / others;
             for(var k=0;k<N;k++){
               if(k===idx) w[k]=target;
-              else w[k]=Math.max(0.001, w[k]*scale);
+              else w[k]*=scale;
             }
           }
-          normW();  // clean up any float drift
+          normW();
           // Check: need at least n items with meaningful weight
           var nontrivial = w.filter(function(v){return v > 0.005;}).length;
           if(nontrivial < n){
@@ -230,7 +230,7 @@ body {
     for(var i=0;i<N;i++){
       var wFrac=Math.min(w[i]/maxW,1);
       wFills[i].attr('y',barH-wFrac*barH).attr('height',wFrac*barH);
-      wLabels[i].attr('y',barH-wFrac*barH-4).text(w[i].toFixed(2));
+      wLabels[i].attr('y',barH-wFrac*barH-4).text(w[i] < 0.001 ? w[i].toExponential(0) : w[i].toFixed(3));
       var pFrac=pi[i];
       pFills[i].attr('y',barH-pFrac*barH).attr('height',pFrac*barH);
       pLabels[i].attr('y',barH-pFrac*barH-4).text(pi[i].toFixed(3));
