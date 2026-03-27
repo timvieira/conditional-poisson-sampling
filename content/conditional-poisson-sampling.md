@@ -314,6 +314,60 @@ The acceptance rate is $n! \cdot \Zw{\bw}{n} / \W^n$<a href="test_identities.py#
 **The gap.** The rejection sampler doesn't give you a way to compute $\Zw{\bw}{n}$, the inclusion probabilities, or gradients for fitting—that's the gap the product tree fills.
 
 
+## The Polynomial Product Tree
+
+The key idea is to encode the sum over all $\binom{N}{n}$ subsets as the coefficient of $\z^n$ in a product of polynomials:
+
+$$
+(1 + \w_1 \z)(1 + \w_2 \z) \cdots (1 + \w_N \z) = \sum_{k=0}^{N} \Zw{\bw}{k}\, \z^k
+$$
+
+The $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the *subproduct tree* (see [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065), Chapter 10).
+
+**Polynomials as arrays.** Each polynomial is stored as an array of coefficients: `[1, 3, 2]` represents $1 + 3\z + 2\z^2$.  Multiplying two polynomials is *convolution* of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving `[1, 2]` with `[1, 3]` to get `[1, 5, 6]`.  Using the fast Fourier transform (FFT), this convolution costs $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.
+
+**Notation.** We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.
+
+### Computing the Normalizing Constant $\Z$
+
+Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.
+
+For example, with $N = 8$ items, the tree has three levels of internal nodes.  At the first level, pairs of leaves are multiplied: $P_{12}(\z) = (1 + \w_1 \z)(1 + \w_2 \z)$, and so on.  At the next level, $P_{1234} = P_{12} \cdot P_{34}$.  The root is $P_{12345678} = P_{1234} \cdot P_{5678}$.
+
+```mermaid
+graph BT
+    L1["$$(1 + w_1 z)$$"] --> N12["$$P_{12} = P_1 \cdot P_2$$"]
+    L2["$$(1 + w_2 z)$$"] --> N12
+    L3["$$(1 + w_3 z)$$"] --> N34["$$P_{34} = P_3 \cdot P_4$$"]
+    L4["$$(1 + w_4 z)$$"] --> N34
+    L5["$$(1 + w_5 z)$$"] --> N56["$$P_{56} = P_5 \cdot P_6$$"]
+    L6["$$(1 + w_6 z)$$"] --> N56
+    L7["$$(1 + w_7 z)$$"] --> N78["$$P_{78} = P_7 \cdot P_8$$"]
+    L8["$$(1 + w_8 z)$$"] --> N78
+    N12 --> N1234["$$P_{1\text{-}4} = P_{12} \cdot P_{34}$$"]
+    N34 --> N1234
+    N56 --> N5678["$$P_{5\text{-}8} = P_{56} \cdot P_{78}$$"]
+    N78 --> N5678
+    N1234 --> ROOT["$$\text{root: } P_{1\text{-}8}$$"]
+    N5678 --> ROOT
+
+    style ROOT fill:#4a90d9,color:#fff
+    style N1234 fill:#4a90d9,color:#fff
+    style N5678 fill:#4a90d9,color:#fff
+    style N12 fill:#4a90d9,color:#fff
+    style N34 fill:#4a90d9,color:#fff
+    style N56 fill:#4a90d9,color:#fff
+    style N78 fill:#4a90d9,color:#fff
+    style L1 fill:#e0e0e0,color:#000
+    style L2 fill:#e0e0e0,color:#000
+    style L3 fill:#e0e0e0,color:#000
+    style L4 fill:#e0e0e0,color:#000
+    style L5 fill:#e0e0e0,color:#000
+    style L6 fill:#e0e0e0,color:#000
+    style L7 fill:#e0e0e0,color:#000
+    style L8 fill:#e0e0e0,color:#000
+```
+
 <style>
 #content { overflow: visible !important; }
 svg text { font-family: 'EB Garamond', serif; }
@@ -887,59 +941,6 @@ svg text { font-family: 'EB Garamond', serif; }
 
 </div>
 
-## The Polynomial Product Tree
-
-The key idea is to encode the sum over all $\binom{N}{n}$ subsets as the coefficient of $\z^n$ in a product of polynomials:
-
-$$
-(1 + \w_1 \z)(1 + \w_2 \z) \cdots (1 + \w_N \z) = \sum_{k=0}^{N} \Zw{\bw}{k}\, \z^k
-$$
-
-The $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the *subproduct tree* (see [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065), Chapter 10).
-
-**Polynomials as arrays.** Each polynomial is stored as an array of coefficients: `[1, 3, 2]` represents $1 + 3\z + 2\z^2$.  Multiplying two polynomials is *convolution* of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving `[1, 2]` with `[1, 3]` to get `[1, 5, 6]`.  Using the fast Fourier transform (FFT), this convolution costs $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.
-
-**Notation.** We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.
-
-### Computing the Normalizing Constant $\Z$
-
-Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.
-
-For example, with $N = 8$ items, the tree has three levels of internal nodes.  At the first level, pairs of leaves are multiplied: $P_{12}(\z) = (1 + \w_1 \z)(1 + \w_2 \z)$, and so on.  At the next level, $P_{1234} = P_{12} \cdot P_{34}$.  The root is $P_{12345678} = P_{1234} \cdot P_{5678}$.
-
-```mermaid
-graph BT
-    L1["$$(1 + w_1 z)$$"] --> N12["$$P_{12} = P_1 \cdot P_2$$"]
-    L2["$$(1 + w_2 z)$$"] --> N12
-    L3["$$(1 + w_3 z)$$"] --> N34["$$P_{34} = P_3 \cdot P_4$$"]
-    L4["$$(1 + w_4 z)$$"] --> N34
-    L5["$$(1 + w_5 z)$$"] --> N56["$$P_{56} = P_5 \cdot P_6$$"]
-    L6["$$(1 + w_6 z)$$"] --> N56
-    L7["$$(1 + w_7 z)$$"] --> N78["$$P_{78} = P_7 \cdot P_8$$"]
-    L8["$$(1 + w_8 z)$$"] --> N78
-    N12 --> N1234["$$P_{1\text{-}4} = P_{12} \cdot P_{34}$$"]
-    N34 --> N1234
-    N56 --> N5678["$$P_{5\text{-}8} = P_{56} \cdot P_{78}$$"]
-    N78 --> N5678
-    N1234 --> ROOT["$$\text{root: } P_{1\text{-}8}$$"]
-    N5678 --> ROOT
-
-    style ROOT fill:#4a90d9,color:#fff
-    style N1234 fill:#4a90d9,color:#fff
-    style N5678 fill:#4a90d9,color:#fff
-    style N12 fill:#4a90d9,color:#fff
-    style N34 fill:#4a90d9,color:#fff
-    style N56 fill:#4a90d9,color:#fff
-    style N78 fill:#4a90d9,color:#fff
-    style L1 fill:#e0e0e0,color:#000
-    style L2 fill:#e0e0e0,color:#000
-    style L3 fill:#e0e0e0,color:#000
-    style L4 fill:#e0e0e0,color:#000
-    style L5 fill:#e0e0e0,color:#000
-    style L6 fill:#e0e0e0,color:#000
-    style L7 fill:#e0e0e0,color:#000
-    style L8 fill:#e0e0e0,color:#000
-```
 
 **Complexity.** At each level of the tree, the total size of the polynomials being multiplied is $\mathcal{O}(N)$, and each multiplication is done via FFT in $\mathcal{O}(d \log d)$ time where $d$ is the degree. The recurrence is
 
