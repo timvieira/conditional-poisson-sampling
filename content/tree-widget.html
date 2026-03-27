@@ -112,7 +112,44 @@ svg text { font-family: 'EB Garamond', serif; }
     return div;
   }
 
-  var dur = 400; // animation duration ms
+  var dur = 400;
+  var animating = false;
+
+  function changeN(target) {
+    if (animating || target === N) return;
+    if (target < 2) return;
+    animating = true;
+
+    function step() {
+      if (N === target) { animating = false; return; }
+      var oldN = N;
+      if (target > N) {
+        // Add rightmost: give it a share of the total (steal proportionally from others)
+        var newVal = 1 / (N + 1); // new item gets 1/(N+1) of total
+        var scale = (1 - newVal); // others shrink proportionally
+        w = w.map(function(v) { return v * scale; });
+        w.push(newVal);
+        N = N + 1;
+      } else {
+        // Remove rightmost: redistribute its weight proportionally
+        var removed = w.pop();
+        N = N - 1;
+        var s = w.reduce(function(a,b){return a+b;}, 0);
+        if (s > 0) w = w.map(function(v) { return v / s; });
+      }
+      n = Math.min(n, N);
+      normW();
+      // Rebuild with animation
+      buildInner();
+      // Schedule next step
+      if (N !== target) {
+        setTimeout(step, dur * 0.7);
+      } else {
+        animating = false;
+      }
+    }
+    step();
+  }
 
   function build() {
     // Fade out old content, then rebuild
@@ -139,9 +176,7 @@ svg text { font-family: 'EB Garamond', serif; }
       .on('change input', function() {
         var v = Math.max(2, Math.round(+this.value));
         if (v === N) return;
-        N = v; n = Math.min(n, N);
-        while (w.length < N) w.push(0.2);
-        w = w.slice(0, N); normW(); build();
+        changeN(v);
       });
     ctrl.append('span').html('&ensp;$n$ = ');
     ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n)
@@ -459,7 +494,7 @@ svg text { font-family: 'EB Garamond', serif; }
     updateTree();
 
     // Fade in new content
-    svgWrap.style('opacity', 0).transition().duration(dur).style('opacity', 1);
+    svgWrap.style('opacity', 0).transition().duration(dur * 0.6).style('opacity', 1);
 
     // MathJax: typeset after fade starts
     setTimeout(function() {
