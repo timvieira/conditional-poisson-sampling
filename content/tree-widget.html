@@ -348,12 +348,14 @@ svg text { font-family: 'EB Garamond', serif; }
     if (rootNdFinal._barXs && n < rootNdFinal._barXs.length) {
       var rootCx = rootNdFinal._barXs[n] + bW/2;
       zLabelX = rootCx;
-      // Bezier from the red bar's bottom to the Z label
+      // Bezier curve from red bar bottom to Z label
       var x1 = rootCx, y1 = rootBot;
-      var x2 = rootCx, y2 = outputY;
-      var my = (y1 + y2) / 2;
+      var x2 = rootNdFinal.x, y2 = outputY; // aim at node center for the label
+      zLabelX = x2;
+      var cp1x = x1, cp1y = y1 + (y2-y1)*0.4;
+      var cp2x = x2, cp2y = y1 + (y2-y1)*0.6;
       svg.append('path')
-        .attr('d', 'M'+x1+','+y1+' C'+x1+','+my+' '+x2+','+my+' '+x2+','+y2)
+        .attr('d', 'M'+x1+','+y1+' C'+cp1x+','+cp1y+' '+cp2x+','+cp2y+' '+x2+','+y2)
         .attr('fill', 'none').attr('stroke', CR).attr('stroke-width', 1.5)
         .attr('marker-end', 'url(#arrowDownRed)');
     }
