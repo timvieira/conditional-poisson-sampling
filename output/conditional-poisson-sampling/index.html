@@ -2083,7 +2083,7 @@ $$</p>
 
     // Shared column widths for all three tables
     var colLabelW = '90px';
-    var colItemW = Math.floor(Math.min(60, (440 - 90 - 65) / N)) + 'px';
+    var colItemW = (bw + 12) + 'px';  // bar width + small padding
     var colPSW = '65px';
     function addCols(table) {
       var cg = table.append('colgroup');
