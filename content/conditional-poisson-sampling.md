@@ -5,6 +5,30 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 
 {% notebook conditional-poisson-sampling.ipynb cells[1:4] %}
 
+<style>
+#cps table { border-collapse: collapse; width: 100%; margin: 0.2em 0; table-layout: fixed; }
+#cps th, #cps td { padding: 5px 8px; font-family: inherit; font-size: inherit; }
+#cps th { border-bottom: 2px solid #333; font-weight: normal; }
+#cps .rl { text-align: left; width: 100px; }
+#cps .ic { text-align: center; }
+#cps .pc { text-align: right; }
+#cps .zero { color: #bbb; }
+#cps .bar-td {
+  vertical-align: bottom; text-align: center; padding: 4px 2px;
+  cursor: ns-resize; user-select: none; -webkit-user-select: none;
+  touch-action: none;  /* prevent scroll on touch drag */
+}
+#cps .bar-td.readonly { cursor: default; }
+#cps .bar-td svg { display: block; margin: 0 auto; }
+@media (max-width: 600px) {
+  body { font-size: 14pt; padding: 0 0.5em; }
+  #cps .rl { width: 60px; font-size: 0.8em; }
+  #cps table { table-layout: auto; }
+  #cps th, #cps td { padding: 3px 4px; }
+}
+
+</style>
+
 <div id="cps"></div>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
