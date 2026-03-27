@@ -220,18 +220,19 @@ svg text { font-family: 'EB Garamond', serif; }
     var outputY = sep2Y + sepGap/2 + arrowLen;
     var svgH = outputY + 18;
 
-    var svgScroll = root.append('div')
-      .style('overflow-x', 'auto')
-      .style('overflow-y', 'visible')
-      .style('transition', 'height ' + dur + 'ms ease')
-      .style('height', svgH + 'px');
-    var svgWrap = svgScroll.append('div')
+    // Scale everything (SVG + HTML labels) to fit page width
+    var pageW = root.node().getBoundingClientRect().width || 700;
+    var scale = Math.min(1, pageW / svgW);
+    var svgWrap = root.append('div')
       .style('position', 'relative')
       .style('width', svgW + 'px')
       .style('height', svgH + 'px')
-      .style('min-width', svgW + 'px');
-    var svg = svgWrap.append('svg').attr('width', svgW).attr('height', svgH)
-      .style('display', 'block').style('user-select', 'none').style('overflow', 'visible');
+      .style('transform', 'scale(' + scale + ')')
+      .style('transform-origin', 'top left')
+      .style('margin-bottom', (-(1 - scale) * svgH) + 'px');
+    var svg = svgWrap.append('svg')
+      .attr('width', svgW).attr('height', svgH)
+      .style('display', 'block').style('user-select', 'none');
 
     // Assign x: leaves left-aligned, so adding on the right doesn't shift the left
     var leafCount = levels[0].length;
