@@ -176,7 +176,7 @@ Apply before every commit touching the notebook:
 - [x] Every mathematical claim has a ✓ pill linking to its test — audited; all testable claims have pills; unpilled equations are definitions, complexity results, or cited theorems
 - [x] Code and math use consistent notation (per CLAUDE.md) — audited w/p/θ parameterization; all transitions explicit
 - [x] No undefined abbreviations (spell out on first use)
-- [ ] Citations verified against the actual publication
+- [x] Citations verified against the actual publication — Kulesza & Taskar year fixed from 2011→2012; all others verified correct
 - [x] Every hardcoded number verified: static example tables (the source of past bugs) replaced by the widget. Remaining code cells contain only input values (w_ex, plot params) and computed outputs. No stale values found.
 
 ## Minor
