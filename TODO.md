@@ -123,9 +123,9 @@
 - [x] Summary table: replaced "~15-50 iterations" with "O(N log² n) per iteration".
 - [ ] Compare CPS to priority sampling in the HT estimation section — replicate the style of the "estimating means in a finite universe" blog post (https://timvieira.github.io/blog/post/2017/07/03/estimating-means-in-a-finite-universe/). Show variance reduction of CPS-HT vs priority sampling vs i.i.d. Monte Carlo on the same estimation problem. CPS gives optimal variance (max-entropy) but is more expensive to set up; priority sampling is O(N log N) but suboptimal. The comparison would make the HT section much more concrete.
 - [x] Explain truncation to degree n: added paragraph in Cell 11 after Master Theorem — convolution of truncated polynomials gives correct coefficients up to degree n.
-- [ ] PyTorch timing section (Cell 38) outputs a plain text table of numbers — should be a plot (log-log, NumPy vs FFT vs FFT+autograd) consistent with the earlier timing plot. Show speedup visually, not as a wall of text.
+- [x] PyTorch timing: merged into a single log-log plot with DP baseline, NumPy tree, PyTorch FFT, and HVP. Removed text table.
 - [x] Stray `[z^k]` notation in worked example code (Cell 16 table header) — fixed to Scott brackets.
-- [ ] Sampling timing plot (right panel) just shows one line with no baseline — it's not clear what the reader should take away. Add baselines: rejection sampling (Bernoulli construction), sequential DP-based sampling, or at minimum show cost per sample vs amortized cost (tree build once, then O(n log N) per sample). Or cut the plot and just state the complexity.
+- [x] Sampling timing plot: added O(n log N) reference line as baseline.
 - [x] Mention alternative O(Nn) algorithm: added note after Pascal recurrence in Cell 41 — DP forward gives Z, backprop gives π, all in O(Nn).
 - [x] Rename tree subsections: "Upward Pass" → "Computing the Normalizing Constant Z", "Downward Pass (Backpropagation)" → "Computing Inclusion Probabilities π", "Sampling" → "Drawing Exact Samples". Updated #Sampling anchor in Cell 41.
 - [x] Remove NumPy downward pass code: deleted the hand-coded downward pass and π computation code cells. Kept the conceptual explanation and mermaid diagram.
