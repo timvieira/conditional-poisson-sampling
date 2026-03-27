@@ -196,13 +196,22 @@ svg text { font-family: 'EB Garamond', serif; }
           }
         }
 
-        // Highlight n-th coefficient at root
-        if (li === levels.length - 1 && n < nCoeffs) {
-          var hBarH = Math.max(1, (Math.abs(coeffs[n]) / globalMax) * histH);
-          g.append('rect')
-            .attr('x', n * cW).attr('y', histH - hBarH - 1)
-            .attr('width', cW).attr('height', hBarH + 2)
-            .attr('fill', 'none').attr('stroke', CR).attr('stroke-width', 1.5).attr('rx', 1);
+        // At root: highlight n-th bar + add index labels below
+        if (li === levels.length - 1) {
+          if (n < nCoeffs) {
+            var hBarH = Math.max(1, (Math.abs(coeffs[n]) / globalMax) * histH);
+            g.append('rect')
+              .attr('x', n * cW).attr('y', histH - hBarH - 1)
+              .attr('width', cW).attr('height', hBarH + 2)
+              .attr('fill', 'none').attr('stroke', CR).attr('stroke-width', 1.5).attr('rx', 1);
+          }
+          for (var k = 0; k < nCoeffs; k++) {
+            g.append('text')
+              .attr('x', k * cW + cW/2).attr('y', histH + 10)
+              .attr('text-anchor', 'middle')
+              .style('font-size', '7px').style('fill', k === n ? CR : '#bbb')
+              .text(k);
+          }
         }
 
         // Store x position of each coefficient bar for slider alignment
@@ -277,16 +286,13 @@ svg text { font-family: 'EB Garamond', serif; }
       })(idx);
     });
 
-    // Z label beside root
+    // Z label beside root (updated dynamically)
     var rootNd = levels[levels.length - 1][0];
     var rootBoxW = Math.min(rootNd.poly.length, n+1) * cW;
-    svg.append('text')
+    var zLabel = svg.append('text')
       .attr('x', rootNd.x + rootBoxW/2 + 8).attr('y', rootNd.y + histH/2 + 4)
       .attr('text-anchor', 'start')
-      .style('font-size', '11px').style('fill', CR)
-      .text('← Z');
-
-    statusEl = root.append('div').attr('id', 'tw-status');
+      .style('font-size', '11px').style('fill', CR);
 
     root.datum({ levels: levels, tree: tree, globalMax: globalMax });
     updateTree();
@@ -346,7 +352,7 @@ svg text { font-family: 'EB Garamond', serif; }
     }
 
     var Z = newTree.root.poly[Math.min(n, newTree.root.poly.length - 1)];
-    statusEl.text('Z = ' + (Z !== undefined ? Z.toFixed(4) : '—'));
+    zLabel.text('← Z = ' + (Z !== undefined ? Z.toFixed(4) : '—'));
   }
 
   build();
