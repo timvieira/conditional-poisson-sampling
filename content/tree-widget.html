@@ -12,44 +12,21 @@ body {
   color: #333; font-size: 16pt;
   max-width: 800px; margin: 2em auto; padding: 0 1em;
 }
-#tree-widget { position: relative; }
-#tree-controls {
+svg text { font-family: 'EB Garamond', serif; }
+#tw-controls {
   display: flex; align-items: center; gap: 12px;
-  margin-bottom: 10px; font-size: 0.9em;
+  margin-bottom: 8px; font-size: 0.9em;
 }
-#tree-controls input[type=number] {
+#tw-controls input[type=number] {
   width: 44px; padding: 2px 4px;
   font-family: inherit; font-size: inherit;
   border: 1px solid #ccc; border-radius: 3px;
 }
-.slider-row {
-  display: flex; align-items: flex-end; gap: 4px;
-  margin-bottom: 8px;
-}
-.slider-col {
-  display: flex; flex-direction: column; align-items: center;
-}
-.slider-col .slabel { font-size: 0.7em; color: #5b9bd5; margin-top: 2px; }
-.slider-track {
-  width: 28px; height: 70px; position: relative;
-  background: #f8f8f8; border: 1px solid #eee; border-radius: 2px;
-  cursor: ns-resize; user-select: none; touch-action: none;
-}
-.slider-fill {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  background: #5b9bd5; opacity: 0.7; border-radius: 0 0 2px 2px;
-  pointer-events: none;
-}
-.slider-val {
-  position: absolute; width: 100%; text-align: center;
-  font-size: 9px; color: #5b9bd5; pointer-events: none;
-  font-family: 'EB Garamond', serif;
-}
-svg text { font-family: 'EB Garamond', serif; }
+#tw-status { font-size: 0.75em; color: #999; margin-top: 4px; }
 </style>
 </head>
 <body>
-<div id="tree-widget"></div>
+<div id="tw"></div>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
 (function() {
@@ -58,8 +35,8 @@ svg text { font-family: 'EB Garamond', serif; }
   function normW() { var s=w.reduce(function(a,b){return a+b;},0); w=w.map(function(v){return v/s;}); }
   normW();
 
-  var CW = '#5b9bd5';
-  var root = d3.select('#tree-widget');
+  var CW = '#5b9bd5', CR = '#c0504d';
+  var root = d3.select('#tw');
 
   function polyMul(a, b) {
     var out = new Array(a.length + b.length - 1).fill(0);
@@ -69,19 +46,14 @@ svg text { font-family: 'EB Garamond', serif; }
     return out;
   }
 
-  // Build the tree: returns array of nodes
-  // Each node: {left, right, poly, items (which leaf indices), depth, x, y}
   function buildTree(w, n) {
     var leaves = w.map(function(wi, i) {
       return { poly: [1, wi], items: [i], leaf: true };
     });
-    // Pad to power of 2
     var size = 1;
     while (size < leaves.length) size *= 2;
-    while (leaves.length < size) {
+    while (leaves.length < size)
       leaves.push({ poly: [1], items: [], leaf: true, pad: true });
-    }
-    // Build bottom-up
     var level = leaves;
     var allLevels = [level];
     while (level.length > 1) {
@@ -89,7 +61,6 @@ svg text { font-family: 'EB Garamond', serif; }
       for (var i = 0; i < level.length; i += 2) {
         var l = level[i], r = level[i+1];
         var p = polyMul(l.poly, r.poly);
-        // Truncate to degree n
         if (p.length > n + 1) p = p.slice(0, n + 1);
         next.push({ left: l, right: r, poly: p, items: l.items.concat(r.items), leaf: false });
       }
@@ -99,11 +70,20 @@ svg text { font-family: 'EB Garamond', serif; }
     return { root: level[0], levels: allLevels };
   }
 
+  // Refs for fast updates
+  var sliderFills = [], sliderLabels = [];
+  var nodeRefs = []; // [{cellRects:[], cellTexts:[], nCoeffs}]
+  var statusEl;
+
+  var cellW = 16, nodeH = 26, barW = 28, barH = 60;
+
   function build() {
     root.selectAll('*').remove();
+    sliderFills = []; sliderLabels = [];
+    nodeRefs = [];
 
     // Controls
-    var ctrl = root.append('div').attr('id', 'tree-controls');
+    var ctrl = root.append('div').attr('id', 'tw-controls');
     ctrl.append('span').html('$N$ = ');
     ctrl.append('input').attr('type','number').attr('min',2).attr('max',8).attr('value',N)
       .on('change input', function() {
@@ -111,9 +91,7 @@ svg text { font-family: 'EB Garamond', serif; }
         if (v === N) return;
         N = v; n = Math.min(n, N);
         while (w.length < N) w.push(0.2);
-        w = w.slice(0, N);
-        normW();
-        build();
+        w = w.slice(0, N); normW(); build();
       });
     ctrl.append('span').html('&ensp;$n$ = ');
     ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n)
@@ -123,71 +101,37 @@ svg text { font-family: 'EB Garamond', serif; }
         n = v; build();
       });
 
-    // Weight sliders
-    var sliderH = 70;
-    var srow = root.append('div').attr('class', 'slider-row');
-    var sliderFills = [], sliderLabels = [];
-    for (var i = 0; i < N; i++) {
-      (function(idx) {
-        var col = srow.append('div').attr('class', 'slider-col');
-        var track = col.append('div').attr('class', 'slider-track');
-        var fill = track.append('div').attr('class', 'slider-fill')
-          .style('height', (w[idx]*100) + '%');
-        sliderFills.push(fill);
-        var lab = track.append('div').attr('class', 'slider-val')
-          .style('bottom', (w[idx]*sliderH + 2) + 'px')
-          .text(w[idx].toFixed(2));
-        sliderLabels.push(lab);
-        track.call(d3.drag().on('drag', function(event) {
-          var rect = this.getBoundingClientRect();
-          var frac = 1 - (event.y - rect.top) / sliderH;
-          var target = Math.max(0.01, Math.min(0.99, frac));
-          var others = 0;
-          for (var k=0;k<N;k++) if(k!==idx) others+=w[k];
-          var remain = 1 - target;
-          if (others > 1e-10 && remain > 0) {
-            var scale = remain / others;
-            for (var k=0;k<N;k++) {
-              if (k===idx) w[k]=target;
-              else w[k] = Math.max(0.001, w[k]*scale);
-            }
-          }
-          normW();
-          updateTree();
-        }));
-        col.append('div').attr('class', 'slabel').html('$w_' + (idx+1) + '$');
-      })(i);
-    }
-
-    // Build tree data
+    // Build tree
     var tree = buildTree(w, n);
-    var levels = tree.levels;
+    var levels = tree.levels; // levels[0] = leaves, levels[last] = root
     var depth = levels.length;
 
-    // Layout
-    var nodeW = 60, nodeH = 28, cellW = 14, cellH = 16;
-    var hGap = 12, vGap = 50;
-    var svgW = Math.max(400, levels[0].length * (nodeW + hGap));
-    var svgH = depth * (nodeH + vGap) + 20;
+    // Layout: leaves at BOTTOM, root at TOP
+    var hGap = 8;
+    var vGap = 40;
+    var leafCount = levels[0].length;
+    var nodeW = function(nd) { return Math.min(nd.poly.length, n+1) * cellW + 2; };
+    var svgW = Math.max(350, leafCount * (barW + hGap + 8));
+    var sliderSpace = barH + 30; // space for sliders below leaves
+    var svgH = depth * (nodeH + vGap) + sliderSpace + 10;
 
     var svg = root.append('svg').attr('width', svgW).attr('height', svgH)
-      .style('display', 'block').style('margin', '8px auto');
+      .style('display', 'block').style('margin', '0 auto').style('user-select', 'none');
 
-    // Assign positions bottom-up
-    // Leaves at bottom
+    // Assign positions: root at top, leaves at bottom
     for (var li = 0; li < levels.length; li++) {
       var lev = levels[li];
-      var y = (depth - 1 - li) * (nodeH + vGap) + 10;
-      var totalW = lev.length * (nodeW + hGap) - hGap;
+      var y = svgH - sliderSpace - (li + 1) * (nodeH + vGap) + vGap;
+      var totalW = lev.length * (barW + hGap + 8);
       var startX = (svgW - totalW) / 2;
       for (var ni = 0; ni < lev.length; ni++) {
         var nd = lev[ni];
-        nd.x = startX + ni * (nodeW + hGap) + nodeW / 2;
+        nd.x = startX + ni * (barW + hGap + 8) + (barW + hGap + 8) / 2;
         nd.y = y;
       }
     }
 
-    // Draw edges as bezier curves
+    // Draw bezier edges (parent above child)
     for (var li = 1; li < levels.length; li++) {
       levels[li].forEach(function(nd) {
         [nd.left, nd.right].forEach(function(child) {
@@ -202,124 +146,179 @@ svg text { font-family: 'EB Garamond', serif; }
       });
     }
 
-    // Draw nodes with polynomial arrays
-    var allNodeGroups = [];
+    // Draw nodes (all levels)
     for (var li = 0; li < levels.length; li++) {
-      levels[li].forEach(function(nd) {
-        if (nd.pad) return;
+      levels[li].forEach(function(nd, ni) {
+        if (nd.pad) { nodeRefs.push(null); return; }
         var coeffs = nd.poly;
         var nCoeffs = Math.min(coeffs.length, n + 1);
         var boxW = nCoeffs * cellW + 2;
         var g = svg.append('g')
           .attr('transform', 'translate(' + (nd.x - boxW/2) + ',' + nd.y + ')');
-
-        // Background
         g.append('rect').attr('width', boxW).attr('height', nodeH)
-          .attr('fill', '#fff').attr('stroke', '#ddd').attr('rx', 3);
+          .attr('fill', '#fff').attr('stroke', '#e8e8e8').attr('rx', 3);
 
-        // Coefficient cells — store direct references for fast updates
-        nd._cellRects = [];
-        nd._cellTexts = [];
         var maxC = Math.max.apply(null, coeffs.map(function(c){return Math.abs(c);}));
         if (maxC === 0) maxC = 1;
+        var cRects = [], cTexts = [];
         for (var k = 0; k < nCoeffs; k++) {
           var intensity = Math.min(1, Math.abs(coeffs[k]) / maxC);
-          var r = 91, gg = 155, b = 213;
           var cr = g.append('rect')
             .attr('x', 1 + k * cellW).attr('y', 1)
             .attr('width', cellW - 1).attr('height', nodeH - 2)
-            .attr('fill', 'rgba(' + r + ',' + gg + ',' + b + ',' + (0.1 + 0.8 * intensity) + ')')
+            .attr('fill', 'rgba(91,155,213,' + (0.1 + 0.8 * intensity) + ')')
             .attr('rx', 1);
-          nd._cellRects.push(cr);
-          if (N <= 5) {
+          cRects.push(cr);
+          if (N <= 6) {
             var ct = g.append('text')
               .attr('x', 1 + k * cellW + cellW/2).attr('y', nodeH/2 + 4)
               .attr('text-anchor', 'middle')
-              .style('font-size', '8px').style('fill', intensity > 0.5 ? '#fff' : '#666')
-              .text(coeffs[k] < 0.001 && coeffs[k] > 0 ? '' : coeffs[k].toFixed(coeffs[k] >= 10 ? 0 : coeffs[k] >= 1 ? 1 : 2));
-            nd._cellTexts.push(ct);
+              .style('font-size', '8px').style('fill', intensity > 0.5 ? '#fff' : '#888')
+              .text(fmtCoeff(coeffs[k]));
+            cTexts.push(ct);
           }
         }
-
         // Highlight n-th coefficient at root
         if (li === levels.length - 1 && n < nCoeffs) {
           g.append('rect')
             .attr('x', 1 + n * cellW).attr('y', 0)
             .attr('width', cellW - 1).attr('height', nodeH)
-            .attr('fill', 'none').attr('stroke', '#c0504d').attr('stroke-width', 2).attr('rx', 1);
+            .attr('fill', 'none').attr('stroke', CR).attr('stroke-width', 2).attr('rx', 1);
         }
-
-        nd._group = g;
-        nd._nCoeffs = nCoeffs;
-        allNodeGroups.push(nd);
+        nodeRefs.push({ cellRects: cRects, cellTexts: cTexts, nCoeffs: nCoeffs, level: li, idx: ni });
       });
     }
-
-    // Leaf labels
-    levels[0].forEach(function(nd, i) {
-      if (nd.pad) return;
-      svg.append('text')
-        .attr('x', nd.x).attr('y', nd.y - 6)
-        .attr('text-anchor', 'middle')
-        .style('font-size', '10px').style('fill', '#999')
-        .text('item ' + (i+1));
-    });
 
     // Root label
     var rootNd = levels[levels.length - 1][0];
     svg.append('text')
-      .attr('x', rootNd.x).attr('y', rootNd.y + nodeH + 16)
+      .attr('x', rootNd.x).attr('y', rootNd.y - 6)
       .attr('text-anchor', 'middle')
-      .style('font-size', '11px').style('fill', '#c0504d')
-      .text('↑ coefficient ' + n + ' = Z');
+      .style('font-size', '11px').style('fill', CR)
+      .text('coefficient ' + n + ' = Z');
 
-    // Status
-    var status = root.append('div').style('font-size', '0.75em').style('color', '#999');
-
-    // Update without rebuilding layout
-    function updateTree() {
-      // Update sliders
-      for (var i = 0; i < N; i++) {
-        sliderFills[i].style('height', (w[i]*100) + '%');
-        sliderLabels[i].style('bottom', (w[i]*sliderH + 2) + 'px').text(w[i].toFixed(2));
-      }
-      // Rebuild tree data
-      var newTree = buildTree(w, n);
-      var newLevels = newTree.levels;
-
-      // Update node visuals using stored references (no DOM queries)
-      for (var li = 0; li < newLevels.length; li++) {
-        for (var ni = 0; ni < newLevels[li].length; ni++) {
-          var nd = levels[li][ni];
-          var newNd = newLevels[li][ni];
-          if (!nd || !nd._cellRects || nd.pad) continue;
-          nd.poly = newNd.poly;
-          var coeffs = nd.poly;
-          var nCoeffs = nd._nCoeffs;
-          var maxC = Math.max.apply(null, coeffs.map(function(c){return Math.abs(c);}));
-          if (maxC === 0) maxC = 1;
-          for (var k = 0; k < nCoeffs; k++) {
-            var intensity = Math.min(1, Math.abs(coeffs[k]) / maxC);
-            nd._cellRects[k].attr('fill', 'rgba(91,155,213,' + (0.1 + 0.8 * intensity) + ')');
-            if (nd._cellTexts && nd._cellTexts[k]) {
-              nd._cellTexts[k]
-                .style('fill', intensity > 0.5 ? '#fff' : '#666')
-                .text(coeffs[k] < 0.001 && coeffs[k] > 0 ? '' : coeffs[k].toFixed(coeffs[k] >= 10 ? 0 : coeffs[k] >= 1 ? 1 : 2));
+    // Sliders below leaves (same pattern as cps-widget)
+    var sliderY = svgH - sliderSpace + 5;
+    levels[0].forEach(function(nd, idx) {
+      if (nd.pad) return;
+      (function(idx) {
+        var x = nd.x - barW / 2;
+        // Track
+        svg.append('rect').attr('x', x).attr('y', sliderY)
+          .attr('width', barW).attr('height', barH)
+          .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 2);
+        // Fill
+        var frac = Math.min(w[idx], 1);
+        var sf = svg.append('rect').attr('x', x+1).attr('width', barW-2).attr('rx', 2)
+          .attr('y', sliderY + barH - frac*barH).attr('height', frac*barH)
+          .attr('fill', CW).attr('opacity', 0.7).style('pointer-events', 'none');
+        sliderFills.push(sf);
+        // Label
+        var sl = svg.append('text').attr('x', nd.x).attr('y', sliderY + barH - frac*barH - 3)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '10px').style('fill', CW)
+          .style('pointer-events', 'none')
+          .text(w[idx].toFixed(2));
+        sliderLabels.push(sl);
+        // Item label
+        svg.append('text').attr('x', nd.x).attr('y', sliderY + barH + 14)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '10px').style('fill', '#999')
+          .text('item ' + (idx+1));
+        // Drag target
+        svg.append('rect').attr('x', x-4).attr('y', sliderY-2)
+          .attr('width', barW+8).attr('height', barH+4)
+          .attr('fill', 'transparent').attr('cursor', 'ns-resize')
+          .style('touch-action', 'none')
+          .call(d3.drag().on('drag', function(event) {
+            var frac = (sliderY + barH - event.y) / barH;
+            var target = Math.max(0.01, Math.min(0.99, frac));
+            var others = 0;
+            for (var k=0;k<N;k++) if(k!==idx) others+=w[k];
+            var remain = 1 - target;
+            if (others > 1e-10 && remain > 0) {
+              var scale = remain / others;
+              for (var k=0;k<N;k++) {
+                if (k===idx) w[k]=target;
+                else w[k] = Math.max(0.001, w[k]*scale);
+              }
             }
-          }
-        }
-      }
+            normW();
+            updateTree();
+          }));
+      })(idx);
+    });
 
-      // Update Z label
-      var Z = newTree.root.poly[Math.min(n, newTree.root.poly.length - 1)];
-      status.text('Z = ' + (Z !== undefined ? Z.toFixed(4) : '—'));
-    }
+    statusEl = root.append('div').attr('id', 'tw-status');
+
+    // Store levels for updateTree
+    root.datum({ levels: levels, tree: tree });
 
     updateTree();
     if (window.MathJax && MathJax.typesetPromise) {
       MathJax.typesetClear();
       MathJax.typesetPromise();
     }
+  }
+
+  function fmtCoeff(v) {
+    if (v === 0) return '0';
+    if (v < 0.01 && v > 0) return '';
+    if (v >= 10) return v.toFixed(0);
+    if (v >= 1) return v.toFixed(1);
+    return v.toFixed(2);
+  }
+
+  function updateTree() {
+    var data = root.datum();
+    var levels = data.levels;
+
+    // Update sliders
+    for (var i = 0; i < N; i++) {
+      var frac = Math.min(w[i], 1);
+      sliderFills[i].attr('y', parseFloat(sliderFills[i].attr('y')) + parseFloat(sliderFills[i].attr('height')) - frac * barH)
+        .attr('height', frac * barH);
+      // Simpler: just recompute from barH
+      var sliderY = parseFloat(sliderFills[i].attr('y')) + parseFloat(sliderFills[i].attr('height')) - frac * barH;
+    }
+    // Actually, easier to just set directly
+    var svgH = parseFloat(root.select('svg').attr('height'));
+    var sliderSpace = barH + 30;
+    var sliderY = svgH - sliderSpace + 5;
+    for (var i = 0; i < N; i++) {
+      var frac = Math.min(w[i], 1);
+      sliderFills[i].attr('y', sliderY + barH - frac*barH).attr('height', frac*barH);
+      sliderLabels[i].attr('y', sliderY + barH - frac*barH - 3).text(w[i].toFixed(2));
+    }
+
+    // Rebuild tree data
+    var newTree = buildTree(w, n);
+    var newLevels = newTree.levels;
+
+    // Update node visuals
+    var ri = 0;
+    for (var li = 0; li < newLevels.length; li++) {
+      for (var ni = 0; ni < newLevels[li].length; ni++) {
+        var ref = nodeRefs[ri++];
+        if (!ref) continue;
+        var coeffs = newLevels[li][ni].poly;
+        var nCoeffs = ref.nCoeffs;
+        var maxC = Math.max.apply(null, coeffs.map(function(c){return Math.abs(c);}));
+        if (maxC === 0) maxC = 1;
+        for (var k = 0; k < nCoeffs; k++) {
+          var intensity = Math.min(1, Math.abs(coeffs[k]) / maxC);
+          ref.cellRects[k].attr('fill', 'rgba(91,155,213,' + (0.1 + 0.8 * intensity) + ')');
+          if (ref.cellTexts[k]) {
+            ref.cellTexts[k]
+              .style('fill', intensity > 0.5 ? '#fff' : '#888')
+              .text(fmtCoeff(coeffs[k]));
+          }
+        }
+      }
+    }
+
+    var Z = newTree.root.poly[Math.min(n, newTree.root.poly.length - 1)];
+    statusEl.text('Z = ' + (Z !== undefined ? Z.toFixed(4) : '—'));
   }
 
   build();
