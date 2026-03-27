@@ -29,6 +29,7 @@
 
 ## Mathematical / Logical Errors
 
+- [ ] Check whether the expected size equation needs `min(1, ...)` clipping
 - [x] Rejection bound in Cell 4 — added expandable derivation following De Vita (2023) and defined $W$
 - [x] Brute-force log Z verification (Cell 15) is circular — it adds `cp_small.log_normalizer` to already-normalized log-probs and recovers it; compute log Z from brute force independently instead
 - [x] Fitting objective (Cell 16) is called "log-likelihood" but is actually the expected log-probability E_{S~P*}[log P_θ(S)]; call it "expected log-probability" or "cross-entropy objective"
