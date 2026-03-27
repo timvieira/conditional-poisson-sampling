@@ -161,7 +161,7 @@ Apply before every commit touching the notebook:
 - [ ] Code and math use consistent notation (per CLAUDE.md)
 - [ ] No undefined abbreviations (spell out on first use)
 - [ ] Citations verified against the actual publication
-- [ ] Every hardcoded number in the notebook is correct (recompute from the current weights/parameters and verify)
+- [x] Every hardcoded number verified: static example tables (the source of past bugs) replaced by the widget. Remaining code cells contain only input values (w_ex, plot params) and computed outputs. No stale values found.
 
 ## Minor
 
