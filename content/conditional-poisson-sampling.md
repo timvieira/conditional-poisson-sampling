@@ -282,7 +282,7 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 
 </div>
 
-{% notebook conditional-poisson-sampling.ipynb cells[4:12] %}
+{% notebook conditional-poisson-sampling.ipynb cells[4:11] %}
 
 <style>
 #content { overflow: visible !important; }
@@ -857,4 +857,4 @@ svg text { font-family: 'EB Garamond', serif; }
 
 </div>
 
-{% notebook conditional-poisson-sampling.ipynb cells[12:] %}
+{% notebook conditional-poisson-sampling.ipynb cells[11:] %}

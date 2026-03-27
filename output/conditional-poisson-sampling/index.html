@@ -2245,60 +2245,6 @@ If all n draws are distinct, return the set; otherwise retry
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="The-Polynomial-Product-Tree">The Polynomial Product Tree<a class="anchor-link" href="#The-Polynomial-Product-Tree">¶</a></h2><p>The key idea is to encode the sum over all $\binom{N}{n}$ subsets as the coefficient of $\z^n$ in a product of polynomials:</p>
-<p>$$
-(1 + \w_1 \z)(1 + \w_2 \z) \cdots (1 + \w_N \z) = \sum_{k=0}^{N} \Zw{\bw}{k}\, \z^k
-$$</p>
-<p>The $n$-th coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a class="verified" href="test_identities.py#test_product_polynomial_coefficients" target="_blank" title="test_product_polynomial_coefficients">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the <em>subproduct tree</em> (see <a href="https://doi.org/10.1017/CBO9781139856065">von zur Gathen &amp; Gerhard (2013)</a>, Chapter 10).</p>
-<p><strong>Polynomials as arrays.</strong> Each polynomial is stored as an array of coefficients: <code>[1, 3, 2]</code> represents $1 + 3\z + 2\z^2$.  Multiplying two polynomials is <em>convolution</em> of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving <code>[1, 2]</code> with <code>[1, 3]</code> to get <code>[1, 5, 6]</code>.  Using the FFT, this convolution costs $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.</p>
-<p><strong>Notation.</strong> We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.</p>
-<h3 id="Computing-the-Normalizing-Constant-$%5CZ$">Computing the Normalizing Constant $\Z$<a class="anchor-link" href="#Computing-the-Normalizing-Constant-$%5CZ$">¶</a></h3><p>Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$-th coefficient is $\Zw{\bw}{n}$.</p>
-<p>For example, with $N = 8$ items, the tree has three levels of internal nodes.  At the first level, pairs of leaves are multiplied: $P_{12}(\z) = (1 + \w_1 \z)(1 + \w_2 \z)$, and so on.  At the next level, $P_{1234} = P_{12} \cdot P_{34}$.  The root is $P_{12345678} = P_{1234} \cdot P_{5678}$.</p>
-<div class="jp-Mermaid"><pre class="mermaid">
-graph BT
-    L1["$$(1 + w_1 z)$$"] --&gt; N12["$$P_{12} = P_1 \cdot P_2$$"]
-    L2["$$(1 + w_2 z)$$"] --&gt; N12
-    L3["$$(1 + w_3 z)$$"] --&gt; N34["$$P_{34} = P_3 \cdot P_4$$"]
-    L4["$$(1 + w_4 z)$$"] --&gt; N34
-    L5["$$(1 + w_5 z)$$"] --&gt; N56["$$P_{56} = P_5 \cdot P_6$$"]
-    L6["$$(1 + w_6 z)$$"] --&gt; N56
-    L7["$$(1 + w_7 z)$$"] --&gt; N78["$$P_{78} = P_7 \cdot P_8$$"]
-    L8["$$(1 + w_8 z)$$"] --&gt; N78
-    N12 --&gt; N1234["$$P_{1\text{-}4} = P_{12} \cdot P_{34}$$"]
-    N34 --&gt; N1234
-    N56 --&gt; N5678["$$P_{5\text{-}8} = P_{56} \cdot P_{78}$$"]
-    N78 --&gt; N5678
-    N1234 --&gt; ROOT["$$\text{root: } P_{1\text{-}8}$$"]
-    N5678 --&gt; ROOT
-
-    style ROOT fill:#4a90d9,color:#fff
-    style N1234 fill:#4a90d9,color:#fff
-    style N5678 fill:#4a90d9,color:#fff
-    style N12 fill:#4a90d9,color:#fff
-    style N34 fill:#4a90d9,color:#fff
-    style N56 fill:#4a90d9,color:#fff
-    style N78 fill:#4a90d9,color:#fff
-    style L1 fill:#e0e0e0,color:#000
-    style L2 fill:#e0e0e0,color:#000
-    style L3 fill:#e0e0e0,color:#000
-    style L4 fill:#e0e0e0,color:#000
-    style L5 fill:#e0e0e0,color:#000
-    style L6 fill:#e0e0e0,color:#000
-    style L7 fill:#e0e0e0,color:#000
-    style L8 fill:#e0e0e0,color:#000
-</pre></div><p><strong>Complexity.</strong> At each level of the tree, the total size of the polynomials being multiplied is $\mathcal{O}(N)$, and each multiplication is done via FFT in $\mathcal{O}(d \log d)$ time where $d$ is the degree. The recurrence is</p>
-<p>$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N)$$</p>
-<p>which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
-The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be <strong>truncated to degree $n$</strong> without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.</p>
-</div>
-</div>
-</div>
-</div>
 </main>
 
 <style>
@@ -2873,144 +2819,57 @@ svg text { font-family: 'EB Garamond', serif; }
 
 </div>
 
-<main><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
+<main>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span><span class="o">,</span><span class="w"> </span><span class="nn">os</span>
-<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="s1">'..'</span><span class="p">))</span>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="The-Polynomial-Product-Tree">The Polynomial Product Tree<a class="anchor-link" href="#The-Polynomial-Product-Tree">¶</a></h2><p>The key idea is to encode the sum over all $\binom{N}{n}$ subsets as the coefficient of $\z^n$ in a product of polynomials:</p>
+<p>$$
+(1 + \w_1 \z)(1 + \w_2 \z) \cdots (1 + \w_N \z) = \sum_{k=0}^{N} \Zw{\bw}{k}\, \z^k
+$$</p>
+<p>The $n$-th coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a class="verified" href="test_identities.py#test_product_polynomial_coefficients" target="_blank" title="test_product_polynomial_coefficients">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the <em>subproduct tree</em> (see <a href="https://doi.org/10.1017/CBO9781139856065">von zur Gathen &amp; Gerhard (2013)</a>, Chapter 10).</p>
+<p><strong>Polynomials as arrays.</strong> Each polynomial is stored as an array of coefficients: <code>[1, 3, 2]</code> represents $1 + 3\z + 2\z^2$.  Multiplying two polynomials is <em>convolution</em> of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving <code>[1, 2]</code> with <code>[1, 3]</code> to get <code>[1, 5, 6]</code>.  Using the FFT, this convolution costs $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.</p>
+<p><strong>Notation.</strong> We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.</p>
+<h3 id="Computing-the-Normalizing-Constant-$%5CZ$">Computing the Normalizing Constant $\Z$<a class="anchor-link" href="#Computing-the-Normalizing-Constant-$%5CZ$">¶</a></h3><p>Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$-th coefficient is $\Zw{\bw}{n}$.</p>
+<p>For example, with $N = 8$ items, the tree has three levels of internal nodes.  At the first level, pairs of leaves are multiplied: $P_{12}(\z) = (1 + \w_1 \z)(1 + \w_2 \z)$, and so on.  At the next level, $P_{1234} = P_{12} \cdot P_{34}$.  The root is $P_{12345678} = P_{1234} \cdot P_{5678}$.</p>
+<div class="jp-Mermaid"><pre class="mermaid">
+graph BT
+    L1["$$(1 + w_1 z)$$"] --&gt; N12["$$P_{12} = P_1 \cdot P_2$$"]
+    L2["$$(1 + w_2 z)$$"] --&gt; N12
+    L3["$$(1 + w_3 z)$$"] --&gt; N34["$$P_{34} = P_3 \cdot P_4$$"]
+    L4["$$(1 + w_4 z)$$"] --&gt; N34
+    L5["$$(1 + w_5 z)$$"] --&gt; N56["$$P_{56} = P_5 \cdot P_6$$"]
+    L6["$$(1 + w_6 z)$$"] --&gt; N56
+    L7["$$(1 + w_7 z)$$"] --&gt; N78["$$P_{78} = P_7 \cdot P_8$$"]
+    L8["$$(1 + w_8 z)$$"] --&gt; N78
+    N12 --&gt; N1234["$$P_{1\text{-}4} = P_{12} \cdot P_{34}$$"]
+    N34 --&gt; N1234
+    N56 --&gt; N5678["$$P_{5\text{-}8} = P_{56} \cdot P_{78}$$"]
+    N78 --&gt; N5678
+    N1234 --&gt; ROOT["$$\text{root: } P_{1\text{-}8}$$"]
+    N5678 --&gt; ROOT
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">pylab</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">conditional_poisson</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConditionalPoisson</span>
-<span class="c1"># Worked example: N=8, n=3—trace the upward and downward passes</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.signal</span><span class="w"> </span><span class="kn">import</span> <span class="n">convolve</span> <span class="k">as</span> <span class="n">poly_mul</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">display_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">html_table</span><span class="p">,</span> <span class="n">poly_html</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">HTML</span><span class="p">,</span> <span class="n">display</span>
-
-<span class="n">w_ex</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.5</span><span class="p">,</span> <span class="mf">3.2</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">])</span>  <span class="c1"># 0-indexed; the math above uses 1-indexed</span>
-<span class="n">n_ex</span> <span class="o">=</span> <span class="mi">3</span>
-<span class="n">N_ex</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">w_ex</span><span class="p">)</span>
-
-<span class="c1"># ── Upward pass ──</span>
-<span class="n">P</span> <span class="o">=</span> <span class="p">{}</span>
-<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N_ex</span><span class="p">):</span>
-    <span class="n">P</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">w_ex</span><span class="p">[</span><span class="n">i</span><span class="p">]])</span>
-
-<span class="c1"># Level 1: pairs</span>
-<span class="n">P</span><span class="p">[</span><span class="s1">'01'</span><span class="p">]</span> <span class="o">=</span> <span class="n">poly_mul</span><span class="p">(</span><span class="n">P</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">P</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
-<span class="n">P</span><span class="p">[</span><span class="s1">'23'</span><span class="p">]</span> <span class="o">=</span> <span class="n">poly_mul</span><span class="p">(</span><span class="n">P</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">P</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
-<span class="n">P</span><span class="p">[</span><span class="s1">'45'</span><span class="p">]</span> <span class="o">=</span> <span class="n">poly_mul</span><span class="p">(</span><span class="n">P</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span> <span class="n">P</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>
-<span class="n">P</span><span class="p">[</span><span class="s1">'67'</span><span class="p">]</span> <span class="o">=</span> <span class="n">poly_mul</span><span class="p">(</span><span class="n">P</span><span class="p">[</span><span class="mi">6</span><span class="p">],</span> <span class="n">P</span><span class="p">[</span><span class="mi">7</span><span class="p">])</span>
-
-<span class="c1"># Level 2: quads</span>
-<span class="n">P</span><span class="p">[</span><span class="s1">'L'</span><span class="p">]</span>    <span class="o">=</span> <span class="n">poly_mul</span><span class="p">(</span><span class="n">P</span><span class="p">[</span><span class="s1">'01'</span><span class="p">],</span> <span class="n">P</span><span class="p">[</span><span class="s1">'23'</span><span class="p">])</span>   <span class="c1"># items 0-3</span>
-<span class="n">P</span><span class="p">[</span><span class="s1">'R'</span><span class="p">]</span>    <span class="o">=</span> <span class="n">poly_mul</span><span class="p">(</span><span class="n">P</span><span class="p">[</span><span class="s1">'45'</span><span class="p">],</span> <span class="n">P</span><span class="p">[</span><span class="s1">'67'</span><span class="p">])</span>   <span class="c1"># items 4-7</span>
-
-<span class="c1"># Level 3: root</span>
-<span class="n">P</span><span class="p">[</span><span class="s1">'root'</span><span class="p">]</span> <span class="o">=</span> <span class="n">poly_mul</span><span class="p">(</span><span class="n">P</span><span class="p">[</span><span class="s1">'L'</span><span class="p">],</span> <span class="n">P</span><span class="p">[</span><span class="s1">'R'</span><span class="p">])</span>
-
-<span class="n">labels</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="mi">0</span><span class="p">:</span> <span class="s1">'P₁'</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span> <span class="s1">'P₂'</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="s1">'P₃'</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="s1">'P₄'</span><span class="p">,</span> <span class="mi">4</span><span class="p">:</span> <span class="s1">'P₅'</span><span class="p">,</span> <span class="mi">5</span><span class="p">:</span> <span class="s1">'P₆'</span><span class="p">,</span> <span class="mi">6</span><span class="p">:</span> <span class="s1">'P₇'</span><span class="p">,</span> <span class="mi">7</span><span class="p">:</span> <span class="s1">'P₈'</span><span class="p">,</span>
-    <span class="s1">'01'</span><span class="p">:</span> <span class="s1">'P₁₂'</span><span class="p">,</span> <span class="s1">'23'</span><span class="p">:</span> <span class="s1">'P₃₄'</span><span class="p">,</span> <span class="s1">'45'</span><span class="p">:</span> <span class="s1">'P₅₆'</span><span class="p">,</span> <span class="s1">'67'</span><span class="p">:</span> <span class="s1">'P₇₈'</span><span class="p">,</span>
-    <span class="s1">'L'</span><span class="p">:</span> <span class="s1">'P₁₋₄'</span><span class="p">,</span> <span class="s1">'R'</span><span class="p">:</span> <span class="s1">'P₅₋₈'</span><span class="p">,</span> <span class="s1">'root'</span><span class="p">:</span> <span class="s1">'P_root'</span><span class="p">,</span>
-<span class="p">}</span>
-<span class="n">display</span><span class="p">(</span><span class="n">HTML</span><span class="p">(</span><span class="s1">'&lt;h4&gt;Upward pass&lt;/h4&gt;'</span><span class="p">))</span>
-<span class="n">rows</span> <span class="o">=</span> <span class="p">[(</span><span class="n">labels</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">poly_html</span><span class="p">(</span><span class="n">P</span><span class="p">[</span><span class="n">k</span><span class="p">]))</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">'01'</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="s1">'23'</span><span class="p">,</span> <span class="s1">'L'</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="s1">'45'</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="s1">'67'</span><span class="p">,</span> <span class="s1">'R'</span><span class="p">,</span> <span class="s1">'root'</span><span class="p">]]</span>
-<span class="n">html_table</span><span class="p">([</span><span class="s1">'node'</span><span class="p">,</span> <span class="s1">'polynomial'</span><span class="p">],</span> <span class="n">rows</span><span class="p">)</span>
-<span class="n">Z</span> <span class="o">=</span> <span class="n">P</span><span class="p">[</span><span class="s1">'root'</span><span class="p">][</span><span class="n">n_ex</span><span class="p">]</span>
-<span class="n">display</span><span class="p">(</span><span class="n">HTML</span><span class="p">(</span><span class="sa">f</span><span class="s1">'$Z(</span><span class="se">\\</span><span class="s1">mathbf</span><span class="se">{{{{</span><span class="s1">w</span><span class="se">}}}}</span><span class="s1">,</span><span class="si">{</span><span class="n">n_ex</span><span class="si">}</span><span class="s1">)$ = coeff of $z^</span><span class="si">{</span><span class="n">n_ex</span><span class="si">}</span><span class="s1">$ = &lt;b&gt;</span><span class="si">{</span><span class="n">Z</span><span class="si">:</span><span class="s1">g</span><span class="si">}</span><span class="s1">&lt;/b&gt;'</span><span class="p">))</span>
-</pre></div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child">
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<h4>Upward pass</h4>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<table style="border-collapse:collapse; font-size:14px; margin:8px 0;">
-<thead><tr>
-<th style="border-bottom:2px solid #333; padding:6px 12px; text-align:left;">node</th>
-<th style="border-bottom:2px solid #333; padding:6px 12px; text-align:left;">polynomial</th>
-</tr></thead><tbody>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₁</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 2z</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₂</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 3z</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₁₂</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 5z + 6z<sup>2</sup></td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₃</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + z</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₄</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 5z</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₃₄</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 6z + 5z<sup>2</sup></td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₁₋₄</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 11z + 41z<sup>2</sup> + 61z<sup>3</sup> + 30z<sup>4</sup></td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₅</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 4z</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₆</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 0.5z</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₅₆</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 4.5z + 2z<sup>2</sup></td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₇</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 2.5z</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₈</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 1.5z</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₇₈</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 4z + 3.75z<sup>2</sup></td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P₅₋₈</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 8.5z + 23.75z<sup>2</sup> + 24.875z<sup>3</sup> + 7.5z<sup>4</sup></td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">P_root</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1 + 19.5z + 158.25z<sup>2</sup> + 695.625z<sup>3</sup> + 1803.38z<sup>4</sup> + 2806.12z<sup>5</sup> + 2537.38z<sup>6</sup> + 1203.75z<sup>7</sup> + 225z<sup>8</sup></td>
-</tr>
-</tbody></table>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-$Z(\mathbf{{w}},3)$ = coeff of $z^3$ = <b>695.625</b>
-</div>
+    style ROOT fill:#4a90d9,color:#fff
+    style N1234 fill:#4a90d9,color:#fff
+    style N5678 fill:#4a90d9,color:#fff
+    style N12 fill:#4a90d9,color:#fff
+    style N34 fill:#4a90d9,color:#fff
+    style N56 fill:#4a90d9,color:#fff
+    style N78 fill:#4a90d9,color:#fff
+    style L1 fill:#e0e0e0,color:#000
+    style L2 fill:#e0e0e0,color:#000
+    style L3 fill:#e0e0e0,color:#000
+    style L4 fill:#e0e0e0,color:#000
+    style L5 fill:#e0e0e0,color:#000
+    style L6 fill:#e0e0e0,color:#000
+    style L7 fill:#e0e0e0,color:#000
+    style L8 fill:#e0e0e0,color:#000
+</pre></div><p><strong>Complexity.</strong> At each level of the tree, the total size of the polynomials being multiplied is $\mathcal{O}(N)$, and each multiplication is done via FFT in $\mathcal{O}(d \log d)$ time where $d$ is the degree. The recurrence is</p>
+<p>$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N)$$</p>
+<p>which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
+The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be <strong>truncated to degree $n$</strong> without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.</p>
 </div>
 </div>
 </div>
@@ -3022,7 +2881,7 @@ $Z(\mathbf{{w}},3)$ = coeff of $z^3$ = <b>695.625</b>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h3 id="Computing-Inclusion-Probabilities-$%5Cbpip$">Computing Inclusion Probabilities $\bpip$<a class="anchor-link" href="#Computing-Inclusion-Probabilities-$%5Cbpip$">¶</a></h3><p>The inclusion probability is the gradient of the log-normalizer (an <a href="#Exponential-family-structure">exponential family</a> identity):</p>
 <p>$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$</p>
-<p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running backpropagation on the same tree—no new algorithm needed.  By the <a href="https://doi.org/10.1016/0304-3975(83">Baur-Strassen theorem</a>90110-X) (<a href="https://doi.org/10.1016/0304-3975(83">Baur &amp; Strassen, 1983</a>90110-X); see also <a href="../evaluating-fx-is-as-fast-as-fx/">this post</a>), the gradient costs at most a constant factor more than the forward computation.</p>
+<p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running <a href="../evaluating-fx-is-as-fast-as-fx/">backpropagation</a> on the same tree—no new algorithm needed.  By the Baur-Strassen theorem (<a href="https://doi.org/10.1016/0304-3975(83">1983</a>90110-X)), the gradient costs at most a constant factor more than the forward computation.</p>
 <p><strong>Why the tree matters.</strong>  Computing $\pip_i$ requires the "leave-one-out" product $\prod_{j \neq i}(1 + \w_j \z)$—a single item removed from the full product.  A naive approach recomputes this from scratch for each $i$, which is $\mathcal{O}(N)$ per item and $\mathcal{O}(N^2 n)$ total.  This is a classic <a href="../gradient-of-a-product/">gradient-of-a-product</a> problem: the product tree's <a href="../heaps-for-incremental-computation/">balanced binary structure</a> computes all $N$ leave-one-out values simultaneously in $\mathcal{O}(N \log^2 n)$.</p>
 <p>This "accidentally quadratic" trap is common.  For example, the k-DPP marginal formula (<a href="https://arxiv.org/abs/1207.6083">Kulesza &amp; Taskar, 2012</a>) requires all $N$ leave-one-out elementary symmetric polynomials $\Zw{\bw^{(-i)}}{k-1}$.  Their Algorithm 7 computes $\Zw{\bw}{k}$ in $\mathcal{O}(Nk)$ via the Pascal recurrence, but naively rerunning it $N$ times for the leave-one-outs gives $\mathcal{O}(N^2 k)$.  The product tree avoids this.</p>
 <p>In the PyTorch implementation, the gradient comes for free via <code>torch.autograd</code>—no hand-coded tree traversal needed.</p>
