@@ -112,16 +112,16 @@ svg text { font-family: 'EB Garamond', serif; }
     var leafCount = levels[0].length;
     var nodeW = function(nd) { return Math.min(nd.poly.length, n+1) * cellW + 2; };
     var svgW = Math.max(350, leafCount * (barW + hGap + 8));
-    var sliderSpace = barH + 30; // space for sliders below leaves
+    var sliderSpace = barH + 30; // space for sliders above leaves
     var svgH = depth * (nodeH + vGap) + sliderSpace + 10;
 
     var svg = root.append('svg').attr('width', svgW).attr('height', svgH)
       .style('display', 'block').style('margin', '0 auto').style('user-select', 'none');
 
-    // Assign positions: root at top, leaves at bottom
+    // Assign positions: leaves at TOP, root at BOTTOM
     for (var li = 0; li < levels.length; li++) {
       var lev = levels[li];
-      var y = svgH - sliderSpace - (li + 1) * (nodeH + vGap) + vGap;
+      var y = sliderSpace + li * (nodeH + vGap);
       var totalW = lev.length * (barW + hGap + 8);
       var startX = (svgW - totalW) / 2;
       for (var ni = 0; ni < lev.length; ni++) {
@@ -131,13 +131,13 @@ svg text { font-family: 'EB Garamond', serif; }
       }
     }
 
-    // Draw bezier edges (parent above child)
+    // Draw bezier edges (parent below children)
     for (var li = 1; li < levels.length; li++) {
       levels[li].forEach(function(nd) {
         [nd.left, nd.right].forEach(function(child) {
           if (!child || child.pad) return;
-          var x1 = nd.x, y1 = nd.y + nodeH;
-          var x2 = child.x, y2 = child.y;
+          var x1 = child.x, y1 = child.y + nodeH; // child bottom
+          var x2 = nd.x, y2 = nd.y;                // parent top
           var my = (y1 + y2) / 2;
           svg.append('path')
             .attr('d', 'M'+x1+','+y1+' C'+x1+','+my+' '+x2+','+my+' '+x2+','+y2)
@@ -189,16 +189,17 @@ svg text { font-family: 'EB Garamond', serif; }
       });
     }
 
-    // Root label
+    // Root label — beside the root node
     var rootNd = levels[levels.length - 1][0];
+    var rootBoxW = Math.min(rootNd.poly.length, n+1) * cellW + 2;
     svg.append('text')
-      .attr('x', rootNd.x).attr('y', rootNd.y - 6)
-      .attr('text-anchor', 'middle')
+      .attr('x', rootNd.x + rootBoxW/2 + 8).attr('y', rootNd.y + nodeH/2 + 4)
+      .attr('text-anchor', 'start')
       .style('font-size', '11px').style('fill', CR)
-      .text('coefficient ' + n + ' = Z');
+      .text('← Z');
 
-    // Sliders below leaves (same pattern as cps-widget)
-    var sliderY = svgH - sliderSpace + 5;
+    // Sliders above leaves (aligned)
+    var sliderY = 18; // room for item labels above
     levels[0].forEach(function(nd, idx) {
       if (nd.pad) return;
       (function(idx) {
@@ -220,8 +221,8 @@ svg text { font-family: 'EB Garamond', serif; }
           .style('pointer-events', 'none')
           .text(w[idx].toFixed(2));
         sliderLabels.push(sl);
-        // Item label
-        svg.append('text').attr('x', nd.x).attr('y', sliderY + barH + 14)
+        // Item label above slider
+        svg.append('text').attr('x', nd.x).attr('y', sliderY - 4)
           .attr('text-anchor', 'middle')
           .style('font-size', '10px').style('fill', '#999')
           .text('item ' + (idx+1));
@@ -282,9 +283,7 @@ svg text { font-family: 'EB Garamond', serif; }
       var sliderY = parseFloat(sliderFills[i].attr('y')) + parseFloat(sliderFills[i].attr('height')) - frac * barH;
     }
     // Actually, easier to just set directly
-    var svgH = parseFloat(root.select('svg').attr('height'));
-    var sliderSpace = barH + 30;
-    var sliderY = svgH - sliderSpace + 5;
+    var sliderY = 18;
     for (var i = 0; i < N; i++) {
       var frac = Math.min(w[i], 1);
       sliderFills[i].attr('y', sliderY + barH - frac*barH).attr('height', frac*barH);
