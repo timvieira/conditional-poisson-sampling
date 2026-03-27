@@ -198,7 +198,7 @@ svg text { font-family: 'EB Garamond', serif; }
       var lw = levels[li].length * levelSpacings[li];
       if (lw > maxLevelW) maxLevelW = lw;
     }
-    var svgW = Math.max(300, maxLevelW + 40);
+    var svgW = Math.max(300, leafCount * leafSpacing + 60);
 
     var labelH = 16;
     var topPad = 10;
@@ -226,11 +226,10 @@ svg text { font-family: 'EB Garamond', serif; }
     var svg = svgWrap.append('svg').attr('width', svgW).attr('height', svgH)
       .style('display', 'block').style('user-select', 'none');
 
-    // Assign x: leaves evenly spaced, internal nodes at midpoint of children
-    // First spread leaves
+    // Assign x: leaves left-aligned, so adding on the right doesn't shift the left
     var leafCount = levels[0].length;
-    var leafSpacing = Math.max(levelSpacings[0], (svgW - 40) / leafCount);
-    var leafStartX = (svgW - leafCount * leafSpacing) / 2;
+    var leafSpacing = levelSpacings[0];
+    var leafStartX = 20;
     for (var ni = 0; ni < leafCount; ni++) {
       levels[0][ni].x = leafStartX + ni * leafSpacing + leafSpacing / 2;
       levels[0][ni].y = leafY;
@@ -283,9 +282,11 @@ svg text { font-family: 'EB Garamond', serif; }
           var x1 = child.x, y1 = child.y + bH + nodePad;
           var x2 = nd.x, y2 = nd.y;
           var my = (y1 + y2) / 2;
+          var edgeNew = lastAction === 'add' && nd.items && nd.items.indexOf(N-1) >= 0;
           svg.append('path')
             .attr('d', 'M'+x1+','+y1+' C'+x1+','+my+' '+x2+','+my+' '+x2+','+y2)
-            .attr('fill', 'none').attr('stroke', '#ddd').attr('stroke-width', 1.2);
+            .attr('fill', 'none').attr('stroke', '#ddd').attr('stroke-width', 1.2)
+            .classed('new-node', edgeNew);
         });
       });
     }
@@ -308,8 +309,10 @@ svg text { font-family: 'EB Garamond', serif; }
         var nCoeffs = Math.min(coeffs.length, n + 1);
         var boxW = nCoeffs * (bW + bGap) - bGap + nodePad;
         var gx = nd.x - boxW/2;
+        var isNew = lastAction === 'add' && nd.items && nd.items.indexOf(N-1) >= 0;
         var g = svg.append('g')
-          .attr('transform', 'translate(' + gx + ',' + nd.y + ')');
+          .attr('transform', 'translate(' + gx + ',' + nd.y + ')')
+          .classed('new-node', isNew);
 
         // Group box
         g.append('rect').attr('width', boxW).attr('height', bH + nodePad)
@@ -406,40 +409,43 @@ svg text { font-family: 'EB Garamond', serif; }
     }
 
     // --- Connector arrows from slider bottom to leaf w_i bar top ---
-    levels[0].forEach(function(nd) {
+    levels[0].forEach(function(nd, idx) {
       if (nd.pad || !nd._barXs) return;
-      var cx = nd._barXs[1] + bW/2; // center of the w_i bar
+      var cx = nd._barXs[1] + bW/2;
+      var isNew = lastAction === 'add' && nd.items && nd.items.indexOf(N-1) >= 0;
       svg.append('line')
         .attr('x1', cx).attr('y1', inputZoneBot)
         .attr('x2', cx).attr('y2', nd.y)
         .attr('stroke', '#ccc').attr('stroke-width', 1)
-        .attr('marker-end', 'url(#arrowDown)');
+        .attr('marker-end', 'url(#arrowDown)')
+        .classed('new-node', isNew);
     });
 
     // --- Sliders above leaves, aligned to the w_i bar (index 1) ---
     levels[0].forEach(function(nd, idx) {
       if (nd.pad) return;
       (function(idx) {
-        // The w_i bar is at index 1 in the leaf histogram [1, w_i]
-        var barX = nd._barXs[1]; // left edge of the w_i coefficient bar
+        var barX = nd._barXs[1];
         var sliderTop = topPad + labelH;
+        var isNew = lastAction === 'add' && idx === N - 1;
+        var sg = svg.append('g').classed('new-node', isNew);
 
-        // Track (same width as one histogram bar)
-        svg.append('rect')
+        // Track
+        sg.append('rect')
           .attr('x', barX + 1).attr('y', sliderTop)
           .attr('width', bW - 2).attr('height', sliderH)
           .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
 
         // Fill
         var frac = Math.min(w[idx], 1);
-        var sf = svg.append('rect')
+        var sf = sg.append('rect')
           .attr('x', barX + 2).attr('width', bW - 4).attr('rx', 1)
           .attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH)
           .attr('fill', CI).attr('opacity', 0.8).style('pointer-events', 'none');
         sliderFills.push(sf);
 
         // Label
-        var sl = svg.append('text')
+        var sl = sg.append('text')
           .attr('x', barX + bW/2).attr('y', sliderTop + sliderH - frac * sliderH - 2)
           .attr('text-anchor', 'middle')
           .style('font-size', '9px').style('fill', CI).style('pointer-events', 'none')
@@ -447,10 +453,11 @@ svg text { font-family: 'EB Garamond', serif; }
         sliderLabels.push(sl);
 
         // Item label above slider (MathJax)
-        addMathLabel(svgWrap, barX + bW/2, topPad, '$w_{' + (idx+1) + '}$', {anchor:'middle', color:CI, fontSize:'11px'});
+        var ml = addMathLabel(svgWrap, barX + bW/2, topPad, '$w_{' + (idx+1) + '}$', {anchor:'middle', color:CI, fontSize:'11px'});
+        if (isNew) ml.classed('new-node', true);
 
         // Drag target (wider for touch)
-        svg.append('rect')
+        sg.append('rect')
           .attr('x', barX - 4).attr('y', sliderTop - 2)
           .attr('width', bW + 8).attr('height', sliderH + 4)
           .attr('fill', 'transparent').attr('cursor', 'ns-resize')
@@ -480,29 +487,17 @@ svg text { font-family: 'EB Garamond', serif; }
     root.datum({ levels: levels, tree: tree, globalMax: globalMax });
     updateTree();
 
-    // Animate new node sprouting in
+    // Animate new node sprouting in: fade in elements tagged 'new'
     if (lastAction === 'add') {
-      // Find all SVG elements near the rightmost leaf x and fade them in
-      var rightX = levels[0][N-1] ? levels[0][N-1].x : 0;
-      svg.selectAll('rect, line, path, text').each(function() {
-        var el = d3.select(this);
-        var x = parseFloat(el.attr('x') || el.attr('x1') || '0');
-        var transform = el.attr('transform') || '';
-        // Check if element belongs to the rightmost column
-        var parentTransform = '';
-        try { parentTransform = el.node().parentNode.getAttribute('transform') || ''; } catch(e) {}
-        var tx = 0;
-        var m = parentTransform.match(/translate\(([^,]+)/);
-        if (m) tx = parseFloat(m[1]);
-        if (tx + x > rightX - 40) {
-          el.style('opacity', 0).transition().duration(dur).style('opacity', null);
+      svg.selectAll('.new-node')
+        .style('opacity', 0)
+        .transition().duration(dur)
+        .style('opacity', null);
+      mathLabels.forEach(function(ml) {
+        if (ml.classed('new-node')) {
+          ml.style('opacity', 0).transition().duration(dur).style('opacity', '1');
         }
       });
-      // Also fade in the rightmost math label
-      if (mathLabels.length > 0) {
-        var last = mathLabels[mathLabels.length - 1];
-        last.style('opacity', 0).transition().duration(dur).style('opacity', 1);
-      }
     }
     lastAction = null;
 
