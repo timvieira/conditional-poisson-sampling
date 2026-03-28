@@ -2137,7 +2137,9 @@ $\quad$ $S \leftarrow \{s_1, \ldots, s_n\}$<br>
 <b>return</b> $S$</p>
 </div>
 
-<p>The resulting distribution over size-$n$ subsets is exactly $P(S)$.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a><label class="sidenote-number"></label><span class="margin-note">The acceptance probability of this construction is $n! \cdot \Zw{\bw}{n} / \W^n$.<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a></span>  This rejection sampler is not a practical sampling algorithm; it simply establishes what the distribution <em>is</em>.  We will derive sampling algorithms that sample from $P(S)$ efficiently.</p>
+<p>The resulting distribution over size-$n$ subsets is exactly $P(S)$.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a>
+This rejection sampler is not a practical sampling algorithm;<label class="sidenote-number"></label><span class="margin-note">The acceptance probability of this construction is $n! \cdot \Zw{\bw}{n} / \W^n$.<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a></span>
+it simply establishes what the distribution <em>is</em>.  We will derive sampling algorithms that sample from $P(S)$ efficiently.</p>
 <h2 id="the-polynomial-product-tree">The Polynomial Product Tree</h2>
 <p>The key idea is to encode the sum over all $\binom{N}{n}$ subsets as the coefficient of $\z^n$ in a product of polynomials:</p>
 <p>$$
