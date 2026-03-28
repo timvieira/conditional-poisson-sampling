@@ -1863,6 +1863,16 @@ The tree-based approach scales to moderately large $N$ comfortably.  For compari
 
 {% notebook conditional-poisson-sampling.ipynb cells[5:6] %}
 
+The PyTorch FFT implementation (next section) is faster for three reasons:
+
+1. **FFT-based polynomial multiplication**: $\mathcal{O}(d \log d)$ per multiply instead of $\mathcal{O}(d^2)$, giving $\mathcal{O}(N \log^2 n)$ total with truncation to degree $n$.
+
+2. **Batched execution**: all multiplications at each tree level are batched into a single torch operation ($\mathcal{O}(\log N)$ torch calls, not $\mathcal{O}(N)$).
+
+3. **Autograd**: the gradient (inclusion probabilities) comes from backpropagation—no hand-coded downward pass needed.
+
+The contour scaling (described below) is essential: without it, FFT precision collapses at $N \gtrsim 1000$.  With it, the implementation achieves machine-epsilon accuracy at all tested sizes ($N$ up to 10,000) and handles extreme weight ranges ($r$ from $10^{-10}$ to $10^{8}$).
+
 ## PyTorch Implementation with Contour Scaling
 
 The NumPy implementation above uses hand-coded tree traversals with `scipy.signal.convolve`.  A natural question: can we use PyTorch's autograd to compute the gradient (inclusion probabilities) automatically, given only the forward pass?
@@ -1873,7 +1883,7 @@ The computation is just the product tree: build $\prod_i (1 + \w_i \z)$ bottom-u
 
 ### The FFT Precision Problem and Weight Rescaling
 
-Using FFT for the polynomial multiplications gives $\mathcal{O}(N \log^2 n)$ complexity (with truncation to degree $n$).  But naively, FFT introduces rounding errors $\sim \varepsilon \cdot \max_k|c_k|$ per coefficient, where $c_k$ denotes the $k$<sup>th</sup> coefficient of the product polynomial $\prod_i(1 + \w_i \z) = \sum_k c_k \z^k$.  The largest coefficient (near degree $N/2$) can be $\sim 10^{300}$ times larger than $c_n$, the coefficient we need—so FFT noise drowns the signal.
+Using FFT for the polynomial multiplications gives $\mathcal{O}(N \log^2 n)$ complexity (with truncation to degree $n$).  But naively, FFT introduces rounding errors $\approx \varepsilon \cdot \max_k|c_k|$ per coefficient, where $c_k$ denotes the $k$<sup>th</sup> coefficient of the product polynomial $\prod_i(1 + \w_i \z) = \sum_k c_k \z^k$.  The largest coefficient (near degree $N/2$) can be $\approx 10^{300}$ times larger than $c_n$, the coefficient we need—so FFT noise drowns the signal.
 
 **The key identity.**  For any $r > 0$:<a href="test_identities.py#test_contour_scaling" title="test_contour_scaling" class="verified" target="_blank">✓</a>
 
@@ -1883,9 +1893,11 @@ This is immediate: each $\z^n$ term in the product picks up a factor of $r$ per 
 
 **Choosing $r$.**  The FFT error in $c_n$ is $\mathcal{O}(\varepsilon \cdot \max_k |c_k|)$, so the relative error is $\max_k |c_k| / |c_n|$ times machine epsilon.  If $c_n$ is the largest coefficient, the relative error is just $\mathcal{O}(\varepsilon)$.  After rescaling by $r$, the $k$<sup>th</sup> coefficient becomes $c_k(r) = \Zw{\bw}{k} \cdot r^k$.  We want $r$ such that $c_n(r) \approx \max_k c_k(r)$.
 
-Define $p_i \defeq \w_i r/(1 + \w_i r)$.  Then $c_k(r) = \prod_i(1+\w_i r) \cdot \Pr[K = k]$ where $K \defeq \sum_i \text{Bernoulli}(p_i)$ and $\prod_i(1+\w_i r)$ is independent of $k$.  So $\arg\max_k c_k(r) = \text{mode}(K)$.  For a sum of independent Bernoullis, $|\text{mode}(K) - \mathbb{E}[K]| \le 1$ ([Darroch, 1964](https://doi.org/10.1214/aoms/1177703287)).  Setting $\mathbb{E}[K] = n$ places the mode at degree $n \pm 1$:<a href="test_identities.py#test_contour_r_solves_expected_size" title="test_contour_r_solves_expected_size" class="verified" target="_blank">✓</a>
+This is where the [Poisson approximation](#The-Poisson-Approximation) reappears.  Define $p_i \defeq \w_i r/(1 + \w_i r)$—the same Poisson inclusion probabilities from earlier.  Then $c_k(r) = \prod_i(1+\w_i r) \cdot \Pr[K = k]$ where $K \defeq \sum_i \text{Bernoulli}(p_i)$ and $\prod_i(1+\w_i r)$ is independent of $k$.  So $\arg\max_k c_k(r) = \text{mode}(K)$.  For a sum of independent Bernoullis, $|\text{mode}(K) - \mathbb{E}[K]| \le 1$ ([Darroch, 1964](https://doi.org/10.1214/aoms/1177703287)).  Setting $\mathbb{E}[K] = n$ places the mode at degree $n \pm 1$, which means the optimal contour radius is exactly the tilting parameter from the Poisson approximation:<a href="test_identities.py#test_contour_r_solves_expected_size" title="test_contour_r_solves_expected_size" class="verified" target="_blank">✓</a>
 
-$$\sum_i \frac{\w_i \cdot r}{1 + \w_i \cdot r} = n$$
+$$\sum_i \frac{\w_i \cdot r}{1 + \w_i \cdot r} = \sum_i p_i = n$$
+
+In other words, the $r$ that makes the Poisson approximation $\pip_i \approx p_i$ satisfy $\sum p_i = n$ is the same $r$ that minimizes FFT rounding error.  This is not a coincidence: both are asking for the rescaling that centers the Poisson Binomial distribution at degree $n$.
 
 This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's method converges in a few iterations.  A simpler heuristic, $r = n / \W$ (where $\W \defeq \sum_i \w_i$), linearizes $\w_i r / (1 + \w_i r) \approx \w_i r$ and works for mild weights but breaks down with heavy tails.
 
@@ -2096,17 +2108,87 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
 **Autograd compatibility.** The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).
 
 
-{% notebook conditional-poisson-sampling.ipynb cells[6:7] %}
+<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
-The speedup comes from three sources:
+**Numerical validation.** The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$).  With $r=1$ the dynamic range is $\approx 10^{16}$, destroying all precision.  The optimal $r^*$ brings it to $\approx 1$.
 
-1. **FFT-based polynomial multiplication**: $\mathcal{O}(d \log d)$ per multiply instead of $\mathcal{O}(d^2)$, giving $\mathcal{O}(N \log^2 n)$ total with truncation to degree $n$.
+<div id="r-comparison"></div>
+<script>
+(function() {
+  var data = [
+    {label:'r = 1',   dr:1e16, err:8e+01},
+    {label:'r = n/W', dr:1e0,  err:7e-15},
+    {label:'r = r*',  dr:1e0,  err:1e-14},
+    {label:'r = 1',   dr:1e16, err:2e+02},
+    {label:'r = n/W', dr:8e1,  err:2e-13},
+    {label:'r = r*',  dr:1e0,  err:4e-14},
+  ];
 
-2. **Batched execution**: all multiplications at each tree level are batched into a single torch operation ($\mathcal{O}(\log N)$ torch calls, not $\mathcal{O}(N)$).
+  var groups = [
+    {title: 'mild weights', rows: data.slice(0,3)},
+    {title: 'heavy tails',  rows: data.slice(3,6)},
+  ];
 
-3. **Autograd**: the gradient (inclusion probabilities) comes from backpropagation—no hand-coded downward pass needed.
+  var container = d3.select('#r-comparison');
+  var margin = {top: 4, right: 100, bottom: 30, left: 70};
+  var W = 500, rowH = 24, groupGap = 18, groupLabelH = 18;
+  var totalH = groups.length * (3 * rowH + groupLabelH + groupGap) - groupGap;
+  var H = margin.top + margin.bottom + totalH;
+  var width = W - margin.left - margin.right;
 
-The contour scaling is essential: without it, FFT precision collapses at $N \gtrsim 1000$.  With it, the implementation achieves machine-epsilon accuracy at all tested sizes ($N$ up to 10,000) and handles extreme weight ranges ($r$ from $10^{-10}$ to $10^{8}$).
+  var svg = container.append('svg').attr('width', W).attr('height', H)
+    .style('user-select','none').style('-webkit-user-select','none');
+  var g = svg.append('g').attr('transform','translate('+margin.left+','+margin.top+')');
+
+  var x = d3.scaleLog().domain([1, 1e17]).range([0, width]).clamp(true);
+
+  // x-axis at bottom
+  g.append('g').attr('transform','translate(0,'+totalH+')')
+    .call(d3.axisBottom(x).ticks(6, '.0e').tickSize(3))
+    .selectAll('text').style('font-size','10px');
+  g.append('text').attr('x', width/2).attr('y', totalH + 26)
+    .attr('text-anchor','middle').style('font-size','11px').style('fill','#666')
+    .text('dynamic range (log scale)');
+
+  var colors = {'r = 1':'#c0504d', 'r = n/W':'#999', 'r = r*':'#5b9bd5'};
+  var yPos = 0;
+
+  groups.forEach(function(grp, gi) {
+    // Group title
+    g.append('text').attr('x', -6).attr('y', yPos + 12)
+      .attr('text-anchor','end').style('font-size','11px')
+      .style('fill','#888').style('font-style','italic')
+      .text(grp.title);
+    yPos += groupLabelH;
+
+    grp.rows.forEach(function(d) {
+      var barW = Math.max(2, x(Math.max(1.01, d.dr)));
+      // Bar
+      g.append('rect').attr('x', 0).attr('y', yPos + 3)
+        .attr('width', barW).attr('height', rowH - 6)
+        .attr('fill', colors[d.label]).attr('opacity', 0.8).attr('rx', 2);
+      // Row label
+      g.append('text').attr('x', -6).attr('y', yPos + rowH/2 + 1)
+        .attr('text-anchor','end').attr('dominant-baseline','middle')
+        .style('font-size','12px').style('fill','#333')
+        .text(d.label);
+      // Dynamic range value on bar
+      var drText = d.dr >= 10 ? '10' + '\u2070\u00B9\u00B2\u00B3\u2074\u2075\u2076\u2077\u2078\u2079'.split('').slice(0,0) : '';
+      // simpler: just use text
+      var drStr = d.dr >= 1e3 ? '10^' + Math.round(Math.log10(d.dr)) : d.dr.toFixed(0);
+      var errStr = d.err.toExponential(0);
+      g.append('text').attr('x', barW + 5).attr('y', yPos + rowH/2 + 1)
+        .attr('dominant-baseline','middle')
+        .style('font-size','11px').style('fill','#666')
+        .text('DR=' + drStr + ',  |err|=' + errStr);
+      yPos += rowH;
+    });
+    yPos += groupGap;
+  });
+})();
+</script>
+
+</div>
 
 Code: [`torch_fft_prototype.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py)
 
