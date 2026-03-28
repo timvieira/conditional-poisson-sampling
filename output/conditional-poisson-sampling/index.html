@@ -3599,9 +3599,9 @@ graph TB
     tipText = tipG.append('text').style('font-size','11px').attr('text-anchor','middle').attr('dy','0.35em');
 
     // Legend — right-aligned, lower area
-    var lgW = 185, row1Y = 9, row2Y = 27;
+    var lgW = 165, row1Y = 9, row2Y = 27;
     var lg = gRoot.append('g').attr('transform','translate('+(width - lgW + 5)+','+(height-40)+')');
-    lg.append('rect').attr('x',-6).attr('y',-4).attr('width',lgW).attr('height',42)
+    lg.append('rect').attr('x',-6).attr('y',-4).attr('width',lgW-2).attr('height',42)
       .attr('fill','white').attr('opacity',0.85).attr('rx',3);
     // Row 1: line + label
     lg.append('line').attr('x1',0).attr('x2',18).attr('y1',row1Y).attr('y2',row1Y)
