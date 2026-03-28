@@ -3552,8 +3552,8 @@ graph TB
   function newWeights() { seed++; w = randExp(mulberry32(seed), N); }
 
   var svgEl, gRoot, xAxisG, curvePath, dotG, tipG, tipText;
-  var margin = {top: 8, right: 15, bottom: 48, left: 52};
-  var W = 530, H = 300;
+  var margin = {top: 8, right: 5, bottom: 48, left: 52};
+  var W = 510, H = 300;
   var width = W - margin.left - margin.right;
   var height = H - margin.top - margin.bottom;
   var x = d3.scaleLinear().range([0, width]);
