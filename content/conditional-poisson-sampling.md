@@ -1118,7 +1118,7 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
 **Autograd compatibility.** The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).
 
 
-{% notebook conditional-poisson-sampling.ipynb cells[29:31] %}
+{% notebook conditional-poisson-sampling.ipynb cells[29:30] %}
 
 The speedup comes from three sources:
 

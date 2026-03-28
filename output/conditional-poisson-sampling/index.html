@@ -3307,51 +3307,6 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
-
-<span class="c1"># Verify correctness against the NumPy implementation</span>
-<span class="n">theta_test</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>  <span class="c1"># reuse weights from earlier</span>
-<span class="n">theta_t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">theta_test</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-
-<span class="n">pi_fft</span> <span class="o">=</span> <span class="n">compute_pi</span><span class="p">(</span><span class="n">theta_t</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'max |pi_fft - pi_numpy| = </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">cp</span><span class="o">.</span><span class="n">pi</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">pi_fft</span><span class="p">))</span><span class="si">:</span><span class="s1">.2e</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>
-
-<span class="n">v_test</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
-<span class="n">v_t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">v_test</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-
-<span class="c1"># Verify autograd works end-to-end</span>
-<span class="n">theta_grad</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">theta_test</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">log_Z</span> <span class="o">=</span> <span class="n">forward_log_Z</span><span class="p">(</span><span class="n">theta_grad</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
-<span class="n">log_Z</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'autograd: log_Z differentiable = </span><span class="si">{</span><span class="n">log_Z</span><span class="o">.</span><span class="n">grad_fn</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="kc">None</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'autograd: theta.grad finite    = </span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">theta_grad</span><span class="o">.</span><span class="n">grad</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child">
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>max |pi_fft - pi_numpy| = 1.33e-15
-max |hvp_fft - hvp_numpy| = 3.66e-15
-autograd: log_Z differentiable = True
-autograd: theta.grad finite    = True
-</pre>
-</div>
-</div>
-</div>
-</div>
 </div>
 </main>
 
