@@ -3504,9 +3504,10 @@ graph TB
       .html('exact $\\pi_i$');
 
     redraw();
+    var el = container.node();
     if (window.MathJax && MathJax.typesetPromise) {
-      MathJax.typesetClear();
-      MathJax.typesetPromise();
+      MathJax.typesetClear([el]);
+      MathJax.typesetPromise([el]);
     }
   }
 
