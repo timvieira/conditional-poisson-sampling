@@ -32,13 +32,11 @@ $$
 
 The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is a weighted generalization of the binomial coefficient, which recovers $\binom{N}{n} = \Zw{\bw}{n}$ when $\bw = \mathbf{1}^N$.<a href="test_identities.py#test_Z_equals_binomial_when_uniform" title="test_Z_equals_binomial_when_uniform" class="verified" target="_blank">✓</a>
 
-**Where does the name come from?** The name comes from *Poisson sampling* (named after mathematician [Siméon Denis Poisson](https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson)—the French word for fish, but no fishing metaphor is intended).  In Poisson sampling, each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_i \mathbf{1}[i \in S]$ is random.  The *conditional* Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.
-
-**Weights are odds.** The weight $\w_i$ is the *odds* of the $i$<sup>th</sup> coin: $\w_i \defeq p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a>  (The [identities section](#Parameterizations) compares the odds and probability parameterizations.)
-
 **Inclusion probabilities.** The inclusion probability $\pip_i$ is the $P(S)$-weighted column sum of the $i$<sup>th</sup> indicator: $\pip_i \defeq \sum_{S} P(S)\, \mathbf{1}[i \in S]$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$ (the other items "push back" through the size constraint $|S| = n$).
 
 **Why is this distribution special?** The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, it is the unique *maximum-entropy* one<a href="test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>—making the fewest assumptions beyond the marginals ([Jaynes, 1957](https://doi.org/10.1103/PhysRev.106.620); [Chen, Dempster & Liu, 1994](https://academic.oup.com/biomet/article-abstract/81/3/457/256956)), in the same sense that the Gaussian is max-entropy for given mean and variance.  The log-normalizer $\log \Zw{\bw}{n}$ is convex in $\btheta$, so many properties follow mechanically: inclusion probabilities are the gradient ($\pip_i = \partial \log \Z / \partial \theta_i$) and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the *exponential fixed-size design* for this reason.
+
+**Relationship to Poisson sampling.** In Poisson sampling,<label class="sidenote-number"></label><span class="margin-note">Named after mathematician [Siméon Denis Poisson](https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson).  Although poisson is the French word for fish, no fishing metaphor is intended.</span> each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_i \mathbf{1}[i \in S]$ is random.  The *conditional* Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.  The weight $\w_i$ is the *odds* of the $i$<sup>th</sup> coin: $\w_i \defeq p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a>  (The [identities section](#Parameterizations) compares the odds and probability parameterizations.)
 
 **What this post covers.** The computational challenges are: computing $\Zw{\bw}{n}$ and $P(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim P$, and the inverse problem of finding $\bw$ from target $\bpip$.  This post gives efficient algorithms for all four—in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree.  The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).
 
@@ -46,6 +44,11 @@ The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ 
 
 
 <style>
+/* Tufte-style sidenote numbering */
+.sidenote-number { counter-increment: sidenote-counter; }
+.sidenote-number::after { content: counter(sidenote-counter); font-size: 0.6em; vertical-align: super; }
+.sidenote-number + .margin-note::before { content: counter(sidenote-counter); font-size: 0.6em; vertical-align: super; }
+
 #cps table { border-collapse: collapse; width: auto; margin: 0; }
 #cps th, #cps td { padding: 1px 2px; font-family: inherit; font-size: 0.85em; line-height: 1.3; }
 #cps th { border: none; font-weight: normal; color: #666; }
