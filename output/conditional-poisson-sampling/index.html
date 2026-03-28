@@ -3466,15 +3466,12 @@ graph TB
 </div>
 <script>
 (function() {
-  // --- Data from the table above: N=10, n=4, w ~ Exp(1) with seed 0 ---
-  // (hardcoded to match the notebook cell output)
   var N = 10, n = 4;
   var w = [0.6799, 1.0196, 0.0198, 0.0023, 0.5503, 1.6299, 0.6736, 0.7553, 2.8168, 6.0578];
 
-  // Brute force is infeasible for N=10, n=4 (210 subsets) — use DP instead
+  // O(N^2 n) DP for inclusion probabilities
   function dpPi(w, n) {
     var N = w.length;
-    // e[m][k] = e_k(w_0,...,w_{m-1})
     var e = [];
     for (var m = 0; m <= N; m++) e[m] = new Float64Array(n + 1);
     e[0][0] = 1;
@@ -3484,12 +3481,9 @@ graph TB
         e[m+1][k] = e[m][k] + w[m] * e[m][k-1];
     }
     var Z = e[N][n];
-    // pi_i = w_i * e_{n-1}(w without i) / Z
     var pi = new Float64Array(N);
     for (var i = 0; i < N; i++) {
-      // Build e_{n-1}(w without i) via leave-one-out DP
-      var ei = new Float64Array(n);
-      ei[0] = 1;
+      var ei = new Float64Array(n); ei[0] = 1;
       for (var m = 0; m < N; m++) {
         if (m === i) continue;
         for (var k = Math.min(n-1, m < i ? m+1 : m); k >= 1; k--)
@@ -3500,29 +3494,26 @@ graph TB
     return pi;
   }
 
-  // Find tilting parameter r such that sum_i w_i*r/(1+w_i*r) = n (Newton's method)
+  // Find r such that sum w_i r/(1+w_i r) = n via Newton
   function findR(w, n) {
     var r = n / w.reduce(function(a,b){return a+b;}, 0);
-    for (var iter = 0; iter < 100; iter++) {
+    for (var it = 0; it < 100; it++) {
       var f = 0, df = 0;
       for (var i = 0; i < w.length; i++) {
-        var wr = w[i] * r;
-        var p = wr / (1 + wr);
-        f += p;
-        df += w[i] / ((1 + wr) * (1 + wr));
+        var wr = w[i] * r, d = 1 + wr;
+        f += wr / d;
+        df += w[i] / (d * d);
       }
       var step = (f - n) / df;
-      r -= step;
-      if (r < 1e-15) r = 1e-15;
+      r = Math.max(1e-15, r - step);
       if (Math.abs(step) < 1e-12 * r) break;
     }
     return r;
   }
 
   var pi = dpPi(w, n);
-  var r = findR(w, n);
 
-  // --- D3 scatter plot ---
+  // --- Layout ---
   var margin = {top: 20, right: 20, bottom: 45, left: 55};
   var width = 520 - margin.left - margin.right;
   var height = 280 - margin.top - margin.bottom;
@@ -3533,18 +3524,16 @@ graph TB
     .attr('height', height + margin.top + margin.bottom)
     .append('g').attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
-  var wMax = Math.max.apply(null, w) * 1.15;
-  var x = d3.scaleLinear().domain([0, wMax]).range([0, width]);
+  var xMax = Math.max.apply(null, w) * 1.15;
+  var x = d3.scaleLinear().domain([0, xMax]).range([0, width]);
   var y = d3.scaleLinear().domain([0, 1]).range([height, 0]);
 
   // Axes
-  svg.append('g').attr('transform', 'translate(0,' + height + ')')
-    .call(d3.axisBottom(x).ticks(6))
-    .selectAll('text').style('font-size', '11px');
-  svg.append('g').call(d3.axisLeft(y).ticks(5))
-    .selectAll('text').style('font-size', '11px');
+  var xAxisG = svg.append('g').attr('transform', 'translate(0,' + height + ')');
+  xAxisG.call(d3.axisBottom(x).ticks(6));
+  svg.append('g').call(d3.axisLeft(y).ticks(5));
 
-  // Axis labels via foreignObject for MathJax
+  // Axis labels
   svg.append('foreignObject').attr('x', width/2 - 50).attr('y', height + 28).attr('width', 100).attr('height', 25)
     .append('xhtml:div').style('text-align','center').style('font-size','13px')
     .html('weight $w_i$');
@@ -3555,22 +3544,44 @@ graph TB
 
   // Poisson approximation curve
   var nPts = 200;
-  var curveData = [];
-  for (var j = 0; j <= nPts; j++) {
-    var wj = wMax * j / nPts;
-    curveData.push({w: wj, p: wj * r / (1 + wj * r)});
-  }
   var line = d3.line().x(function(d){return x(d.w);}).y(function(d){return y(d.p);});
-  svg.append('path').datum(curveData)
-    .attr('fill', 'none').attr('stroke', '#5b9bd5').attr('stroke-width', 2)
-    .attr('opacity', 0.8).attr('d', line);
+  var curvePath = svg.append('path')
+    .attr('fill', 'none').attr('stroke', '#5b9bd5').attr('stroke-width', 2).attr('opacity', 0.8);
 
-  // Scatter dots (actual pi)
-  svg.selectAll('.dot').data(w.map(function(wi,i){return {w:wi, pi:pi[i]};}))
-    .enter().append('circle').attr('class','dot')
-    .attr('cx', function(d){return x(d.w);})
-    .attr('cy', function(d){return y(d.pi);})
-    .attr('r', 5).attr('fill', '#E91E63').attr('opacity', 0.85);
+  // Scatter dots — draggable horizontally
+  var dots = svg.selectAll('.dot')
+    .data(d3.range(N)).enter().append('circle').attr('class','dot')
+    .attr('r', 6).attr('fill', '#E91E63').attr('opacity', 0.85)
+    .style('cursor', 'ew-resize')
+    .call(d3.drag()
+      .on('drag', function(event, i) {
+        var newW = Math.max(0.001, x.invert(event.x));
+        w[i] = newW;
+        redraw();
+      })
+    );
+
+  // Tooltip label (follows hovered/dragged dot)
+  var tipG = svg.append('g').style('display', 'none');
+  tipG.append('rect').attr('rx', 3).attr('fill', 'white').attr('stroke', '#ccc').attr('opacity', 0.9);
+  var tipText = tipG.append('text').style('font-size', '11px').attr('text-anchor', 'middle');
+
+  dots.on('mouseenter', function(event, i) {
+      tipG.style('display', null);
+      showTip(i);
+    })
+    .on('mouseleave', function() { tipG.style('display', 'none'); });
+
+  function showTip(i) {
+    var label = 'w=' + w[i].toFixed(2) + '  \u03C0=' + pi[i].toFixed(3);
+    tipText.text(label);
+    var bb = tipText.node().getBBox();
+    tipG.select('rect').attr('x', bb.x - 4).attr('y', bb.y - 2)
+      .attr('width', bb.width + 8).attr('height', bb.height + 4);
+    var tx = x(w[i]), ty = y(pi[i]) - 14;
+    if (ty < 10) ty = y(pi[i]) + 20;
+    tipG.attr('transform', 'translate(' + tx + ',' + ty + ')');
+  }
 
   // Legend
   var lg = svg.append('g').attr('transform', 'translate(' + (width - 195) + ',5)');
@@ -3581,6 +3592,43 @@ graph TB
   lg.append('circle').attr('cx',10).attr('cy',25).attr('r',5).attr('fill','#E91E63').attr('opacity',0.85);
   lg.append('foreignObject').attr('x',25).attr('y',15).attr('width',120).attr('height',22)
     .append('xhtml:div').style('font-size','12px').html('exact $\\pi_i$');
+
+  // Instruction
+  container.append('div').style('font-size', '0.85em').style('color', '#999')
+    .style('margin-top', '4px').text('Drag dots horizontally to change weights.');
+
+  function redraw() {
+    // Rescale x if needed
+    var newMax = Math.max.apply(null, w) * 1.15;
+    if (Math.abs(newMax - xMax) / xMax > 0.05) {
+      xMax = newMax;
+      x.domain([0, xMax]);
+      xAxisG.call(d3.axisBottom(x).ticks(6));
+    }
+
+    pi = dpPi(w, n);
+    var r = findR(w, n);
+
+    // Update curve
+    var curveData = [];
+    for (var j = 0; j <= nPts; j++) {
+      var wj = xMax * j / nPts;
+      curveData.push({w: wj, p: wj * r / (1 + wj * r)});
+    }
+    curvePath.datum(curveData).attr('d', line);
+
+    // Update dots
+    dots.attr('cx', function(i){return x(w[i]);})
+        .attr('cy', function(i){return y(pi[i]);});
+
+    // Update tooltip if visible
+    if (tipG.style('display') !== 'none') {
+      var active = d3.select(document.activeElement);
+      // just hide it during drag — it'll reappear on hover
+    }
+  }
+
+  redraw();
 
   if (window.MathJax && MathJax.typesetPromise) {
     MathJax.typesetClear();
