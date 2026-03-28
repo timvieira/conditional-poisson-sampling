@@ -3,7 +3,7 @@ date: 2026-03-25
 comments: true
 tags: notebook, sampling, algorithms, sampling-without-replacement
 
-$$
+<macros>
 \newcommand{\w}{w}
 \newcommand{\bw}{\boldsymbol{w}}
 \newcommand{\W}{W}
@@ -18,13 +18,14 @@ $$
 \newcommand{\llbracket}{[\![}
 \newcommand{\rrbracket}{]\!]}
 \newcommand{\defeq}{\overset{\small\text{def}}{=}}
-$$
+</macros>
 
 <div class="margin-note">
 <a href="test_identities.py" class="verified" target="_blank">✓</a> = numerically verified—each links to its test case in <a href="test_identities.py" style="color:#999">test_identities.py</a>.
 </div>
 
-Suppose you want to draw a random subset of exactly $n$ items from a universe of $N$ items, where each item $i$ has a positive weight $\w_i$.  The **conditional Poisson distribution** assigns each size-$n$ subset a probability proportional to the product of its weights:<a href="test_identities.py#test_distribution_definition" title="test_distribution_definition, test_Z_is_elementary_symmetric_poly" class="verified" target="_blank">✓</a>
+Suppose you want to draw a random subset of exactly $n$ items from a universe of $N$ items, where each item $i$ has a positive weight $\w_i$.<footnote>We assume $\w_i \in (0, \infty)$.  This is without loss of generality: items with $\w_i = 0$ are excluded from the universe (they are never selected), and items with $\w_i = \infty$ are deterministically included (reduce $n$ and $N$ by 1 each).  The general case reduces to the finite positive case by preprocessing.</footnote>
+The **conditional Poisson distribution** assigns each size-$n$ subset a probability proportional to the product of its weights:<a href="test_identities.py#test_distribution_definition" title="test_distribution_definition, test_Z_is_elementary_symmetric_poly" class="verified" target="_blank">✓</a>
 
 $$
 P(S) \propto \mathbf{1}\big[ |S| = n\big] \prod_{i \in S} \w_i
@@ -36,7 +37,25 @@ The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ 
 
 **Why is this distribution special?** The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, it is the unique *maximum-entropy* one<a href="test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>—making the fewest assumptions beyond the marginals ([Jaynes, 1957](https://doi.org/10.1103/PhysRev.106.620); [Chen, Dempster & Liu, 1994](https://academic.oup.com/biomet/article-abstract/81/3/457/256956)), in the same sense that the Gaussian is max-entropy for given mean and variance.  The log-normalizer $\log \Zw{\bw}{n}$ is convex in $\btheta$, so many properties follow mechanically: inclusion probabilities are the gradient ($\pip_i = \partial \log \Z / \partial \theta_i$) and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the *exponential fixed-size design* for this reason.
 
-**Relationship to Poisson sampling.** In Poisson sampling,<label class="sidenote-number"></label><span class="margin-note">Named after mathematician [Siméon Denis Poisson](https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson).  Although poisson is the French word for fish, no fishing metaphor is intended.</span> each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_i \mathbf{1}[i \in S]$ is random.  The *conditional* Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.  The weight $\w_i$ is the *odds* of the $i$<sup>th</sup> coin: $\w_i \defeq p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a>  (The [identities section](#Parameterizations) compares the odds and probability parameterizations.)
+**Relationship to Poisson sampling.** In Poisson sampling,<footnote>Named after mathematician [Siméon Denis Poisson](https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson).  Although poisson is the French word for fish, no fishing metaphor is intended.</footnote> each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_i \mathbf{1}[i \in S]$ is random.  The *conditional* Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.  The weight $\w_i$ is the *odds* of the $i$<sup>th</sup> coin: $\w_i \defeq p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a>  (The [identities section](#Parameterizations) compares the odds and probability parameterizations.)
+
+**Sampling without replacement.** The following construction shows how conditional
+Poisson can be used for sampling without replacement.  Draw $n$ items
+independently from the categorical distribution over weights, and keep only the
+samples where all draws are distinct:
+
+<div class="pseudocode">
+<b>repeat</b><br>
+$\quad$ Draw $s_1, \ldots, s_n \overset{\text{i.i.d.}}{\sim} \text{Categorical}(\bw / \W)$ where $\W \defeq \sum_i \w_i$<br>
+$\quad$ $S \leftarrow \{s_1, \ldots, s_n\}$<br>
+<b>until</b> $|S| = n$ (all draws are distinct)<br>
+<b>return</b> $S$
+</div>
+
+The resulting distribution over size-$n$ subsets is exactly $P(S)$.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a>
+This rejection sampler is not a practical sampling algorithm;<footnote>The acceptance probability of this construction is $n! \cdot \Zw{\bw}{n} / \W^n$.<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a></footnote>
+it simply establishes what the distribution *is*.  We will derive sampling algorithms that sample from $P(S)$ efficiently.
+
 
 **What this post covers.** The computational challenges are: computing $\Zw{\bw}{n}$ and $P(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim P$, and the inverse problem of finding $\bw$ from target $\bpip$.  This post gives efficient algorithms for all four—in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree.  The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).
 
@@ -45,6 +64,7 @@ The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ 
 
 <style>
 /* Tufte-style sidenote numbering */
+article { counter-reset: sidenote-counter; }
 .sidenote-number { counter-increment: sidenote-counter; }
 .sidenote-number::after { content: counter(sidenote-counter); font-size: 0.6em; vertical-align: super; }
 .sidenote-number + .margin-note::before { content: counter(sidenote-counter); font-size: 0.6em; vertical-align: super; }
@@ -324,20 +344,6 @@ The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ 
 </script>
 
 </div>
-
-## An Equivalent Construction
-
-The following construction makes the conditional Poisson distribution concrete.  Draw $n$ items independently from the categorical distribution over weights, and keep only the samples where all draws are distinct:
-
-<div class="pseudocode">
-<b>repeat</b><br>
-$\quad$ Draw $s_1, \ldots, s_n \overset{\text{i.i.d.}}{\sim} \text{Categorical}(\bw / \W)$ where $\W \defeq \sum_i \w_i$<br>
-$\quad$ $S \leftarrow \{s_1, \ldots, s_n\}$<br>
-<b>until</b> $|S| = n$ (all draws are distinct)<br>
-<b>return</b> $S$
-</div>
-
-The resulting distribution over size-$n$ subsets is exactly $P(S)$: the extra factors ($n!$ and $\W^n$) are constant across all size-$n$ subsets and cancel upon conditioning.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a><label class="sidenote-number"></label><span class="margin-note">**Poisson sampling equivalence.**  Equivalently, run Poisson sampling—include each item $i$ independently with probability $p_i \defeq \w_i/(1+\w_i)$—and condition on exactly $n$ inclusions.  The weight $\w_i = p_i/(1-p_i)$ is the *odds* of including item $i$.  (The [parameterizations table](#Parameterizations) gives the precise relationship between the odds and probability generating functions.)</span>  The acceptance probability of this construction is $n! \cdot \Zw{\bw}{n} / \W^n$<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a>—note that it involves the normalizing constant $\Zw{\bw}{n}$, which we have not yet shown how to compute.  This is not meant as a practical sampling algorithm; it simply establishes what the distribution *is*.
 
 
 ## The Polynomial Product Tree
@@ -1589,26 +1595,230 @@ Now that we've seen how the product tree works under the hood, here's the librar
 
 The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="test_identities.py#test_pi_sums_to_n" title="test_pi_sums_to_n" class="verified" target="_blank">✓</a> and each $\pip_i \in [0, 1]$.<a href="test_identities.py#test_pi_in_unit_interval" title="test_pi_in_unit_interval" class="verified" target="_blank">✓</a>  Items with larger weights get higher inclusion probabilities.
 
-{% notebook conditional-poisson-sampling.ipynb cells[1:2] %}
+<div id="pi-scatter"></div>
+<script>
+(function() {
+  var N = 10, n = 4;
+  var w0 = [0.6799, 1.0196, 0.0198, 0.0023, 0.5503, 1.6299, 0.6736, 0.7553, 2.8168, 6.0578];
+  var w = w0.slice();
 
-The blue curve shows the *Poisson approximation*: if each item were included independently with probability $p_i = w_i r / (1 + w_i r)$ (where $r$ is the tilting parameter that makes $\sum p_i = n$), we would get $\pip_i \approx p_i$.  The actual inclusion probabilities (dots) are close but not identical—conditioning on $|S| = n$ introduces a correction of $\mathcal{O}(1/N)$ per item ([Hájek, 1964](https://doi.org/10.1214/aoms/1177700375)).  This approximation is the warm start for [fitting](#Fitting-Weights-to-Target-Probabilities): inverting the Poisson relationship gives $\theta_i \approx \log(\pip^*_i / (1 - \pip^*_i))$, which is close enough that the optimizer converges in a few iterations.
+  function dpPi(w, n) {
+    var N = w.length;
+    var e = [];
+    for (var m = 0; m <= N; m++) e[m] = new Float64Array(n + 1);
+    e[0][0] = 1;
+    for (var m = 0; m < N; m++) {
+      e[m+1][0] = e[m][0];
+      for (var k = 1; k <= n; k++)
+        e[m+1][k] = e[m][k] + w[m] * e[m][k-1];
+    }
+    var Z = e[N][n];
+    var pi = new Float64Array(N);
+    for (var i = 0; i < N; i++) {
+      var ei = new Float64Array(n); ei[0] = 1;
+      for (var m = 0; m < N; m++) {
+        if (m === i) continue;
+        for (var k = Math.min(n-1, m < i ? m+1 : m); k >= 1; k--)
+          ei[k] += w[m] * ei[k-1];
+      }
+      pi[i] = w[i] * ei[n-1] / Z;
+    }
+    return pi;
+  }
 
+  function findR(w, n) {
+    var r = n / w.reduce(function(a,b){return a+b;}, 0);
+    for (var it = 0; it < 100; it++) {
+      var f = 0, df = 0;
+      for (var i = 0; i < w.length; i++) {
+        var wr = w[i] * r, d = 1 + wr;
+        f += wr / d; df += w[i] / (d * d);
+      }
+      var step = (f - n) / df;
+      r = Math.max(1e-15, r - step);
+      if (Math.abs(step) < 1e-12 * r) break;
+    }
+    return r;
+  }
 
-## Drawing Samples
+  function mulberry32(seed) {
+    return function() {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function randExp(rng, N) {
+    var w = [];
+    for (var i = 0; i < N; i++) w.push(-Math.log(1 - rng()));
+    return w;
+  }
 
-Drawing samples works by walking a binary tree top-down, splitting a "quota" of $n$ items between the left and right subtrees at each node.  Each split is exact (not approximate),<a href="test_identities.py#test_sampling_distribution" title="test_sampling_distribution" class="verified" target="_blank">✓</a> and the tree is built once and cached, so subsequent samples are cheap.
+  var pi;
+  var container = d3.select('#pi-scatter');
 
-{% notebook conditional-poisson-sampling.ipynb cells[2:3] %}
+  // Controls
+  var ctrl = container.append('div')
+    .style('font-size','0.9em').style('margin-bottom','6px').style('font-family','inherit');
+  ctrl.append('span').html('$N$ = ');
+  var nInput_N = ctrl.append('input').attr('type','number').attr('min',2).attr('max',50).attr('value',N)
+    .style('width','44px').style('font-family','inherit').style('font-size','inherit')
+    .style('border','1px solid #ccc').style('border-radius','3px').style('padding','2px 4px')
+    .on('change', function(){ var v=+this.value; if(v>=2&&v<=50){N=v; n=Math.min(n,N); nInput_n.property('value',n); newWeights(); build();} });
+  ctrl.append('span').html('&ensp;$n$ = ');
+  var nInput_n = ctrl.append('input').attr('type','number').attr('min',1).attr('max',N).attr('value',n)
+    .style('width','44px').style('font-family','inherit').style('font-size','inherit')
+    .style('border','1px solid #ccc').style('border-radius','3px').style('padding','2px 4px')
+    .on('change', function(){ var v=+this.value; if(v>=1&&v<=N){n=v; build();} });
+  ctrl.append('span').html('&ensp;');
+  ctrl.append('button').text('resample weights')
+    .style('font-family','inherit').style('font-size','0.85em')
+    .style('border','1px solid #ccc').style('border-radius','3px').style('padding','2px 8px')
+    .style('cursor','pointer').style('color','#555')
+    .on('click', function(){ newWeights(); build(); });
+  ctrl.append('span').style('font-size','0.8em').style('color','#999').style('margin-left','10px')
+    .text('(drag dots to change weights)');
 
-Let's verify that the empirical inclusion frequencies match the exact $\bpip$ values.
+  var seed = 42;
+  function newWeights() { seed++; w = randExp(mulberry32(seed), N); }
 
-{% notebook conditional-poisson-sampling.ipynb cells[3:4] %}
+  var svgEl, gRoot, xAxisG, curvePath, dotG, tipG, tipText;
+  var margin = {top: 8, right: 5, bottom: 48, left: 52};
+  var W = 510, H = 300;
+  var width = W - margin.left - margin.right;
+  var height = H - margin.top - margin.bottom;
+  var x = d3.scaleLinear().range([0, width]);
+  var y = d3.scaleLinear().domain([0, 1]).range([height, 0]);
+  var nPts = 200;
+  var lineFn = d3.line().x(function(d){return x(d.w);}).y(function(d){return y(d.p);});
+
+  function build() {
+    nInput_n.attr('max', N);
+    container.selectAll('svg').remove();
+    svgEl = container.append('svg').attr('width', W).attr('height', H)
+      .style('user-select','none').style('-webkit-user-select','none');
+    gRoot = svgEl.append('g').attr('transform','translate('+margin.left+','+margin.top+')');
+
+    // Axes
+    xAxisG = gRoot.append('g').attr('transform','translate(0,'+height+')');
+    gRoot.append('g').call(d3.axisLeft(y).ticks(5));
+
+    // x-axis label (MathJax via foreignObject)
+    gRoot.append('foreignObject')
+      .attr('x', width/2 - 40).attr('y', height + 26).attr('width', 80).attr('height', 24)
+      .append('xhtml:div').style('text-align','center').style('font-size','14px')
+      .html('$w_i$');
+
+    // y-axis label
+    var yLabelG = gRoot.append('g')
+      .attr('transform','translate(-38,'+height/2+') rotate(-90)');
+    yLabelG.append('foreignObject')
+      .attr('x', -30).attr('y', -10).attr('width', 60).attr('height', 24)
+      .append('xhtml:div').style('text-align','center').style('font-size','14px')
+      .html('$\\pi_i$');
+
+    // Curve
+    curvePath = gRoot.append('path')
+      .attr('fill','none').attr('stroke','#5b9bd5').attr('stroke-width',2).attr('opacity',0.8);
+
+    // Dots
+    dotG = gRoot.append('g');
+
+    // Tooltip
+    tipG = gRoot.append('g').style('display','none').style('pointer-events','none');
+    tipG.append('rect').attr('rx',3).attr('fill','white').attr('stroke','#ccc').attr('opacity',0.92);
+    tipText = tipG.append('text').style('font-size','11px').attr('text-anchor','middle').attr('dy','0.35em');
+
+    // Legend — right-aligned, lower area
+    var lgW = 150, row1Y = 9, row2Y = 27;
+    var lg = gRoot.append('g').attr('transform','translate('+(width - lgW + 3)+','+(height-40)+')');
+    lg.append('rect').attr('x',-4).attr('y',-3).attr('width',lgW-4).attr('height',40)
+      .attr('fill','white').attr('opacity',0.85).attr('rx',3);
+    // Row 1: line + label
+    lg.append('line').attr('x1',0).attr('x2',18).attr('y1',row1Y).attr('y2',row1Y)
+      .attr('stroke','#5b9bd5').attr('stroke-width',2);
+    lg.append('foreignObject').attr('x',24).attr('y',row1Y-10).attr('width',lgW-30).attr('height',22)
+      .append('xhtml:div').style('font-size','12px').style('line-height','20px')
+      .html('Poisson: $w_i r/(1{+}w_i r)$');
+    // Row 2: dot + label
+    lg.append('circle').attr('cx',9).attr('cy',row2Y).attr('r',4.5)
+      .attr('fill','#E91E63').attr('opacity',0.85);
+    lg.append('foreignObject').attr('x',24).attr('y',row2Y-10).attr('width',lgW-30).attr('height',22)
+      .append('xhtml:div').style('font-size','12px').style('line-height','20px')
+      .html('exact $\\pi_i$');
+
+    redraw();
+    if (window.MathJax && MathJax.typesetPromise) {
+      MathJax.typesetClear();
+      MathJax.typesetPromise();
+    }
+  }
+
+  function redraw() {
+    pi = dpPi(w, n);
+    var r = findR(w, n);
+    var xMax = Math.max.apply(null, w) * 1.2;
+    x.domain([0, xMax]);
+    xAxisG.call(d3.axisBottom(x).ticks(6));
+
+    var curveData = [];
+    for (var j = 0; j <= nPts; j++) {
+      var wj = xMax * j / nPts;
+      curveData.push({w: wj, p: wj * r / (1 + wj * r)});
+    }
+    curvePath.datum(curveData).attr('d', lineFn);
+
+    var dots = dotG.selectAll('.dot').data(d3.range(N));
+    dots.exit().remove();
+    dots.enter().append('circle').attr('class','dot')
+      .attr('r', 5.5).attr('fill','#E91E63').attr('opacity',0.85)
+      .style('cursor','ew-resize').style('touch-action','none')
+      .on('mouseenter', function(ev,i){ tipG.style('display',null); showTip(i); })
+      .on('mouseleave', function(){ tipG.style('display','none'); })
+      .call(d3.drag()
+        .on('start', function(ev,i){ tipG.style('display',null); })
+        .on('drag', function(ev,i){
+          w[i] = Math.max(0.001, x.invert(ev.x));
+          redraw(); showTip(i);
+        })
+        .on('end', function(){ tipG.style('display','none'); })
+      );
+    dotG.selectAll('.dot')
+      .attr('cx', function(d){return x(w[d]);})
+      .attr('cy', function(d){return y(pi[d]);});
+  }
+
+  function showTip(i) {
+    var label = 'w='+w[i].toFixed(2)+'  \u03C0='+pi[i].toFixed(3);
+    tipText.text(label);
+    var bb = tipText.node().getBBox();
+    tipG.select('rect').attr('x',bb.x-4).attr('y',bb.y-3)
+      .attr('width',bb.width+8).attr('height',bb.height+6);
+    var tx = x(w[i]), ty = y(pi[i]) - 16;
+    if (ty < 5) ty = y(pi[i]) + 18;
+    tipG.attr('transform','translate('+tx+','+ty+')');
+  }
+
+  build();
+})();
+</script>
+
+The blue curve shows the *Poisson approximation*:
+if each item were included independently with probability $p_i = w_i r / (1 +
+w_i r)$ (where $r$ is the tilting parameter that makes $\sum p_i = n$), we would
+get $\pip_i \approx p_i$.  The actual inclusion probabilities (dots) are close
+but not identical—conditioning on $|S| = n$ introduces a correction of $\mathcal{O}(1/N)$ per item ([Hájek, 1964](https://doi.org/10.1214/aoms/1177700375)).
+This approximation is the warm start for [fitting](#Fitting-Weights-to-Target-Probabilities): inverting the Poisson relationship gives
+$\theta_i \approx \log(\pip^*_i / (1 - \pip^*_i))$, which is close enough that the optimizer converges in a few iterations.
+
 
 ## Fitting Weights to Target Probabilities
 
 A common use case: you know the inclusion probabilities you *want* and need to find weights that produce them.<a href="test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a>
 
-**Objective.**  The log-probability of a subset is $\log P(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$, where $\theta_i \defeq \log \w_i$.  Taking the expectation under the target marginals $\bpip^*$ gives the objective:
+**Objective.**<footnote>@CLAUDE: the explanation of the objective doesn't make much sense still.  Should the objective be maximize entropy subject to the inclusion probability constraint?  I suppose the objective that we have may be the dual of that (per the usual exponential family duality).<br/><b>claude</b>: Yes, exactly. The primal is: maximize $H(P)$ subject to $\mathbb{E}_P[\mathbf{1}[i \in S]] = \pip^*_i$. The dual (Lagrangian) is $L(\btheta) = \bpip^{*\top}\btheta - \log Z(\btheta)$, where the $\theta_i$ are Lagrange multipliers. This is standard exponential-family duality—maximizing the dual recovers the max-entropy distribution with the prescribed marginals. The current prose jumps straight to the dual without motivating it from the primal; you might want to add a sentence like "This is the dual of the max-entropy problem: find the distribution over size-$n$ subsets with maximum entropy subject to inclusion probabilities $\bpip^*$."</footnote>
+The log-probability of a subset is $\log P(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$, where $\theta_i \defeq \log \w_i$.  Taking the expectation under the target marginals $\bpip^*$ gives the objective:
 
 $$
 L(\btheta) \defeq \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
@@ -1616,13 +1826,13 @@ $$
 
 This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function), guaranteeing a unique global maximum.
 
-**Gradient.**  $\nabla_{\btheta} L(\btheta) = \bpip^* - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpip^*$ exactly, so the gradient is zero.  Each evaluation of $L$ and $\nabla L$ costs $\mathcal{O}(N \log^2 n)$ (one pass through the product tree + backpropagation).
+**Gradient.**  $\nabla_{\btheta} L(\btheta) = \bpip^* - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpip^*$ exactly, so the gradient is zero.  Each evaluation of $L$ and $\nabla L$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
 
 **Optimizer.**  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The warm start $\theta_i^{(0)} = \log(\bpip^*_i / (1 - \bpip^*_i))$ has initialization error $\mathcal{O}(1/N)$ per item ([Hájek, 1964, Theorem 5.2](https://doi.org/10.1214/aoms/1177700375)), so the optimizer starts close to the solution.
 
 
 <details class="derivation">
-<summary><b>Warm start: why logit(π*) is a good initialization</b> (click to expand)</summary>
+<summary><b>Warm start: why logit(π*) is a good initialization</b></summary>
 
 The optimizer is initialized at $\theta_i^{(0)} = \log(\pip^*_i / (1 - \pip^*_i))$, i.e., the log-odds of the target inclusion probabilities.  This is the exact solution in the *unconditional* Poisson case: if we flip independent coins with $p_i = \pip^*_i$, the odds are $\w_i \defeq p_i/(1-p_i)$ and the expected sample size is $\sum \pip^*_i = n$.  Conditioning on the sample size being exactly $n$ perturbs the inclusion probabilities, but the perturbation is small.
 
@@ -1915,28 +2125,6 @@ For more on SWOR-based estimation (including the near-optimal priority sampling 
 
 The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> elementary symmetric polynomial $e_n(\bw)$.  Here are some useful identities.
 
-### Parameterizations
-
-The conditional Poisson distribution arises from Poisson sampling—flip $N$ independent coins where coin $i$ lands heads with probability $p_i$, then condition on exactly $n$ heads.  There are two natural parameterizations:
-
-| | Probability $p_i$ | Odds $\w_i$ |
-|---|---|---|
-| **Parameter** | $\boldsymbol{p} \in [0,1]^N$ | $\bw \in [0,\infty]^N$ where $\w_i \defeq p_i/(1-p_i)$ |
-| **Leaf polynomial** | $(1-p_i) + p_i\, \z$ | $1 + \w_i\, \z$ |
-| **Generating function** | $\prod_i\big((1-p_i) + p_i \z\big) = \sum_k \Pr[k \text{ heads}]\, \z^k$ | $\prod_i(1 + \w_i \z) = \sum_k \Zw{\bw}{k} \z^k$ |
-| **$k$<sup>th</sup> coefficient** | $\Pr[\text{exactly } k \text{ heads}]$ | $\Zw{\bw}{k}$ |
-
-> **WLOG: finite positive weights.**  The code requires $\w_i \in (0, \infty)$.  This is without loss of generality: items with $\w_i = 0$ are excluded from the universe (they are never selected), and items with $\w_i = \infty$ are deterministically included (reduce $n$ and $N$ by 1 each).  The general case reduces to the finite positive case by preprocessing.
-
-These are **probability generating functions** (PGFs) for the random variable $K = |S|$ (the number of heads in $N$ independent coin flips): the coefficient of $\z^k$ is the probability (or unnormalized weight) that exactly $k$ items are selected.  The formal variable $\z$ is a bookkeeping device—it "marks" each included item so that the coefficient-extraction operator $\llbracket \cdot \rrbracket(\z^k)$ picks out the contribution from exactly $k$ items.
-
-The two generating functions are related by factoring out $\prod_i(1-p_i) = 1/\prod_i(1+\w_i)$:
-
-$$\prod_i\big((1-p_i) + p_i \z\big) = \prod_i(1-p_i) \cdot \prod_i(1 + \w_i \z)$$
-
-so $\Pr[k \text{ heads}] = \Zw{\bw}{k} / \prod_i(1+\w_i)$.<a href="test_identities.py#test_prob_odds_generating_function_relation" title="test_prob_odds_generating_function_relation" class="verified" target="_blank">✓</a>
-
-The odds parameterization is more convenient for computation (the leaf polynomial $1 + \w_i \z$ is monic), while the probability parameterization is more natural for interpretation (the normalizer is literally $\Pr[n \text{ heads}]$).  The conditional distribution is the same either way—scaling all weights by $\alpha > 0$ doesn't change it.<a href="test_identities.py#test_scaling_invariance" title="test_scaling_invariance" class="verified" target="_blank">✓</a>
 
 ### Differential Identities
 
