@@ -2143,42 +2143,8 @@ $$</p>
 <p>The $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the <em>subproduct tree</em> (see <a href="https://doi.org/10.1017/CBO9781139856065">von zur Gathen &amp; Gerhard (2013)</a>, Chapter 10).</p>
 <p><strong>Polynomials as arrays.</strong> Each polynomial is stored as an array of coefficients: <code>[1, 3, 2]</code> represents $1 + 3\z + 2\z^2$.  Multiplying two polynomials is <em>convolution</em> of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving <code>[1, 2]</code> with <code>[1, 3]</code> to get <code>[1, 5, 6]</code>.  Using the fast Fourier transform (FFT), this convolution costs $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.</p>
 <p><strong>Notation.</strong> We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.</p>
-<h3 id="computing-the-normalizing-constant-math135">Computing the Normalizing Constant $\Z$</h3>
+<h3 id="computing-the-normalizing-constant-math120">Computing the Normalizing Constant $\Z$</h3>
 <p>Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.</p>
-<p>For example, with $N = 8$ items, the tree has three levels of internal nodes.  At the first level, pairs of leaves are multiplied: $P_{12}(\z) = (1 + \w_1 \z)(1 + \w_2 \z)$, and so on.  At the next level, $P_{1234} = P_{12} \cdot P_{34}$.  The root is $P_{12345678} = P_{1234} \cdot P_{5678}$.</p>
-<p><div class="mermaid">
-graph BT
-    L1["$$(1 + w_1 z)$$"] --> N12["$$P_{12} = P_1 \cdot P_2$$"]
-    L2["$$(1 + w_2 z)$$"] --> N12
-    L3["$$(1 + w_3 z)$$"] --> N34["$$P_{34} = P_3 \cdot P_4$$"]
-    L4["$$(1 + w_4 z)$$"] --> N34
-    L5["$$(1 + w_5 z)$$"] --> N56["$$P_{56} = P_5 \cdot P_6$$"]
-    L6["$$(1 + w_6 z)$$"] --> N56
-    L7["$$(1 + w_7 z)$$"] --> N78["$$P_{78} = P_7 \cdot P_8$$"]
-    L8["$$(1 + w_8 z)$$"] --> N78
-    N12 --> N1234["$$P_{1\text{-}4} = P_{12} \cdot P_{34}$$"]
-    N34 --> N1234
-    N56 --> N5678["$$P_{5\text{-}8} = P_{56} \cdot P_{78}$$"]
-    N78 --> N5678
-    N1234 --> ROOT["$$\text{root: } P_{1\text{-}8}$$"]
-    N5678 --> ROOT
-
-    style ROOT fill:#4a90d9,color:#fff
-    style N1234 fill:#4a90d9,color:#fff
-    style N5678 fill:#4a90d9,color:#fff
-    style N12 fill:#4a90d9,color:#fff
-    style N34 fill:#4a90d9,color:#fff
-    style N56 fill:#4a90d9,color:#fff
-    style N78 fill:#4a90d9,color:#fff
-    style L1 fill:#e0e0e0,color:#000
-    style L2 fill:#e0e0e0,color:#000
-    style L3 fill:#e0e0e0,color:#000
-    style L4 fill:#e0e0e0,color:#000
-    style L5 fill:#e0e0e0,color:#000
-    style L6 fill:#e0e0e0,color:#000
-    style L7 fill:#e0e0e0,color:#000
-    style L8 fill:#e0e0e0,color:#000
-</div></p>
 <style>
 #content { overflow: visible !important; }
 svg text { font-family: 'EB Garamond', serif; }
@@ -2752,10 +2718,10 @@ svg text { font-family: 'EB Garamond', serif; }
 </div>
 
 <p><strong>Complexity.</strong> At each level of the tree, the total size of the polynomials being multiplied is $\mathcal{O}(N)$, and each multiplication is done via FFT in $\mathcal{O}(d \log d)$ time where $d$ is the degree. The recurrence is</p>
-<p>$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N)$$</p>
+<p>$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N), \quad T(1) = \mathcal{O}(1)$$</p>
 <p>which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
 The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be <strong>truncated to degree $n$</strong> without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.</p>
-<h3 id="computing-inclusion-probabilities-math165">Computing Inclusion Probabilities $\bpip$</h3>
+<h3 id="computing-inclusion-probabilities-math146">Computing Inclusion Probabilities $\bpip$</h3>
 <p>The inclusion probability is the gradient of the log-normalizer (an exponential family identity):</p>
 <p>$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$</p>
 <p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running <a href="../evaluating-fx-is-as-fast-as-fx/">backpropagation</a> on the same tree—no new algorithm needed.  By the Baur-Strassen theorem (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">1983</a>), the gradient costs at most a constant factor more than the forward computation.</p>
