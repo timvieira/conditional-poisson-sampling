@@ -45,19 +45,34 @@ def watch():
     from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
 
-    last_build = [0]
+    WATCH_EXTENSIONS = {'.md', '.ipynb', '.html', '.css', '.js'}
+    lock = threading.Lock()
+    timer = [None]  # pending rebuild timer
+
+    REBUILD_EVENTS = {'modified', 'created', 'deleted', 'moved'}
 
     class Rebuild(FileSystemEventHandler):
         def on_any_event(self, event):
-            if event.src_path and '/output' in event.src_path:
+            if event.is_directory:
                 return
-            if event.src_path and '/.ipynb_checkpoints' in event.src_path:
+            if event.event_type not in REBUILD_EVENTS:
                 return
-            now = time.time()
-            if now - last_build[0] < 2:  # debounce
+            path = Path(event.src_path)
+            # Only rebuild for content files we care about
+            if path.suffix not in WATCH_EXTENSIONS:
                 return
-            last_build[0] = now
-            print(f"\n--- Rebuilding ({Path(event.src_path).name} changed) ---")
+            if '.ipynb_checkpoints' in event.src_path:
+                return
+
+            # Debounce: schedule a rebuild 0.5s from now, resetting on each event
+            with lock:
+                if timer[0] is not None:
+                    timer[0].cancel()
+                timer[0] = threading.Timer(0.5, self._rebuild, args=[path.name])
+                timer[0].start()
+
+        def _rebuild(self, name):
+            print(f"\n--- Rebuilding ({name} changed) ---")
             do_build()
 
     observer = Observer()

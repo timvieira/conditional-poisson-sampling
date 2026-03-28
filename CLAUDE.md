@@ -38,8 +38,25 @@ The blog post (`content/conditional-poisson-sampling.ipynb`) and the identity te
 
 The code informs the tests and the tests inform the code. They are two views of the same truth. **Testing is not optional — it is the ground truth.** If the test says the math is wrong, the math is wrong. No exceptions, no "we'll fix it later."
 
+## Blog post structure
+
+The blog post is assembled from two files:
+
+- **`content/conditional-poisson-sampling.md`** — the master template. Contains all prose, widget HTML/JS, and `{% notebook ... cells[X:Y] %}` directives that pull in code cells.
+- **`content/conditional-poisson-sampling.ipynb`** — the Jupyter notebook. Only code cells are rendered from here (via `{% notebook %}` directives). Markdown cells in the notebook are stale copies; the .md file is authoritative for all prose.
+
+The build system (`~/projects/blog/main/build.py`) renders the .md file using Python-Markdown with nbconvert for notebook cell inclusions, and a Jinja2 template for the page chrome.
+
+## Scripts
+
+- **`scripts/preview`** — builds the site and serves it at `http://localhost:8000/conditional-poisson-sampling/` with file-watching auto-rebuild.
+- **`scripts/deploy`** — builds, commits `output/`, and pushes to GitHub. The site is served via GitHub Pages from the `main` branch root.
+
+**Site URL:** https://timvieira.github.io/conditional-poisson-sampling/
+
 ## Workflow
 
 - Commit and push after every logical change
+- Run `scripts/deploy` to publish changes to the live site
 - Run tests before committing
 - **Never write citations without verifying them** — check title, authors, year, venue, and URL against the actual publication. Hallucinated references are unacceptable.
