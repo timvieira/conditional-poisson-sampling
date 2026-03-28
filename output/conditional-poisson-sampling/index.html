@@ -3962,7 +3962,7 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
 <p><strong>Guarantee.</strong> With this choice of $r$, the coefficients $c_k(r)$ are proportional to the PMF of $K$, whose mode is at $n \pm 1$.  The PMF of a sum of Bernoullis is log-concave, so it decays exponentially away from the mode.  In practice, this makes the dynamic range $\max_k c_k / c_n$ a modest constant (typically $\approx 1$), ensuring the relative FFT error in $c_n$ is $\mathcal{O}(\varepsilon)$.</p>
 <p><strong>Autograd compatibility.</strong> The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).</p>
 
-<main><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<main><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4013,6 +4013,61 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
     <span class="n">caption</span><span class="o">=</span><span class="s1">'FFT product tree (N=200, n=10): contour radius comparison'</span>
 <span class="p">)</span>
 </pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
+<table style="border-collapse:collapse; font-size:14px; margin:8px 0;">
+<caption style="font-weight:bold; margin-bottom:4px;">FFT product tree (N=200, n=10): contour radius comparison</caption>
+<thead><tr>
+<th style="border-bottom:2px solid #333; padding:6px 12px; text-align:left;">scaling rule</th>
+<th style="border-bottom:2px solid #333; padding:6px 12px; text-align:left;">$r$</th>
+<th style="border-bottom:2px solid #333; padding:6px 12px; text-align:left;">dynamic range</th>
+<th style="border-bottom:2px solid #333; padding:6px 12px; text-align:left;">|$\log Z$ error|</th>
+</tr></thead><tbody>
+<tr>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">$r=1$ (spread=1.0)</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1.00e+00</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1e+16</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">8e+01</td>
+</tr>
+<tr>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">$r=n/W$ (spread=1.0)</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">3.15e-02</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1e+00</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">7e-15</td>
+</tr>
+<tr>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">$r=r^*$ (spread=1.0)</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">3.56e-02</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1e+00</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1e-14</td>
+</tr>
+<tr>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">$r=1$ (spread=3.0)</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1.00e+00</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1e+16</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">2e+02</td>
+</tr>
+<tr>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">$r=n/W$ (spread=3.0)</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">7.43e-04</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">8e+01</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">2e-13</td>
+</tr>
+<tr>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">$r=r^*$ (spread=3.0)</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">3.04e-03</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1e+00</td>
+<td style="padding:4px 12px; border-bottom:1px solid #ddd;">4e-14</td>
+</tr>
+</tbody></table>
 </div>
 </div>
 </div>
