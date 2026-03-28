@@ -3599,19 +3599,21 @@ graph TB
     tipText = tipG.append('text').style('font-size','11px').attr('text-anchor','middle').attr('dy','0.35em');
 
     // Legend — right-aligned, lower area
-    var lgW = 170;
-    var lg = gRoot.append('g').attr('transform','translate('+(width - lgW)+','+(height-38)+')');
-    lg.append('rect').attr('x',-6).attr('y',-4).attr('width',lgW+6).attr('height',38)
+    var lgW = 185, row1Y = 9, row2Y = 27;
+    var lg = gRoot.append('g').attr('transform','translate('+(width - lgW + 5)+','+(height-40)+')');
+    lg.append('rect').attr('x',-6).attr('y',-4).attr('width',lgW).attr('height',42)
       .attr('fill','white').attr('opacity',0.85).attr('rx',3);
-    lg.append('line').attr('x1',0).attr('x2',18).attr('y1',8).attr('y2',8)
+    // Row 1: line + label
+    lg.append('line').attr('x1',0).attr('x2',18).attr('y1',row1Y).attr('y2',row1Y)
       .attr('stroke','#5b9bd5').attr('stroke-width',2);
-    lg.append('foreignObject').attr('x',22).attr('y',-2).attr('width',lgW-22).attr('height',22)
-      .append('xhtml:div').style('font-size','12px')
+    lg.append('foreignObject').attr('x',24).attr('y',row1Y-10).attr('width',lgW-30).attr('height',22)
+      .append('xhtml:div').style('font-size','12px').style('line-height','20px')
       .html('Poisson: $w_i r/(1{+}w_i r)$');
-    lg.append('circle').attr('cx',9).attr('cy',24).attr('r',4.5)
+    // Row 2: dot + label
+    lg.append('circle').attr('cx',9).attr('cy',row2Y).attr('r',4.5)
       .attr('fill','#E91E63').attr('opacity',0.85);
-    lg.append('foreignObject').attr('x',22).attr('y',14).attr('width',lgW-22).attr('height',22)
-      .append('xhtml:div').style('font-size','12px')
+    lg.append('foreignObject').attr('x',24).attr('y',row2Y-10).attr('width',lgW-30).attr('height',22)
+      .append('xhtml:div').style('font-size','12px').style('line-height','20px')
       .html('exact $\\pi_i$');
 
     redraw();
