@@ -954,7 +954,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
 
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0; width: fit-content; min-width: 100%; max-width: none;">
 
-**Interactive backpropagation tree.** This widget shows the backward pass on the same tree structure. The seed $\bar{c}_n = 1/Z$ flows from the root upward through the tree; at each node, the adjoint is cross-correlated with the sibling polynomial. At the leaves, $\pip_i = \w_i \cdot \bar{c}_1^{(i)}$. Drag the weight sliders to see how the adjoints and inclusion probabilities change.
+**Interactive backpropagation tree.** Each node shows the forward polynomial coefficients (<span style="color:#5b9bd5">blue</span>, top) and the adjoint $\bar{c}_k$ (<span style="color:#7b2d8e">purple</span>, bottom).  The seed $\bar{c}_n = 1/Z$ at the root flows upward; at each node, the child's adjoint is the cross-correlation of the parent adjoint with the sibling polynomial.  At the leaves, $\pip_i = \w_i \cdot \bar{c}_1^{(i)}$. Drag the weight sliders to explore.
 
 <div id="bp"></div>
 <script>
@@ -1130,7 +1130,9 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
     var topPad = 10;
     var sepGap = 20;
     var arrowLen = 14;
-    var nodeH = bH + nodePad;
+    var halfH = bH;       // height for each half (primal / dual)
+    var divider = 4;      // gap between primal and dual bars
+    var nodeH = halfH * 2 + divider + nodePad;
 
     // Zone 1: inputs (labels + sliders)
     var inputZoneTop = topPad;
@@ -1190,7 +1192,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
         [nd.left, nd.right].forEach(function(child) {
           if (!child || child.pad) return;
           var x1 = nd.x, y1 = nd.y;
-          var x2 = child.x, y2 = child.y + bH + nodePad;
+          var x2 = child.x, y2 = child.y + nodeH;
           var my = (y1 + y2) / 2;
           svg.append('path')
             .attr('d', 'M'+x1+','+y1+' C'+x1+','+my+' '+x2+','+my+' '+x2+','+y2)
@@ -1201,70 +1203,100 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
       });
     }
 
-    // Global max adjoint for scaling
-    var globalMaxAdj = 0;
+    // Global max for scaling (primal and dual separately)
+    var globalMaxFwd = 0, globalMaxAdj = 0;
     (function walk(nd) {
       if (!nd || nd.pad) return;
+      nd.poly.forEach(function(c) { if (Math.abs(c) > globalMaxFwd) globalMaxFwd = Math.abs(c); });
       if (nd.adj) nd.adj.forEach(function(a) { if (Math.abs(a) > globalMaxAdj) globalMaxAdj = Math.abs(a); });
       if (nd.left) walk(nd.left);
       if (nd.right) walk(nd.right);
     })(tree.root);
+    if (globalMaxFwd === 0) globalMaxFwd = 1;
     if (globalMaxAdj === 0) globalMaxAdj = 1;
 
-    // Draw adjoint bars at each node
+    // Draw primal + dual bars at each node
     for (var li = 0; li < levels.length; li++) {
       levels[li].forEach(function(nd, ni) {
         if (nd.pad) { nodeRefs.push(null); return; }
         var adj = nd.adj || [];
-        var nCoeffs = Math.min(adj.length, n + 1);
+        var coeffs = nd.poly;
+        var nCoeffs = Math.min(Math.max(coeffs.length, adj.length), n + 1);
         if (nCoeffs === 0) { nodeRefs.push(null); return; }
         var boxW = nCoeffs * (bW + bGap) - bGap + nodePad;
+        var boxH = halfH * 2 + divider + nodePad;
         var gx = nd.x - boxW/2;
 
         var g = svg.append('g').attr('transform', 'translate(' + gx + ',' + nd.y + ')');
-        g.append('rect').attr('width', boxW).attr('height', bH + nodePad)
+        g.append('rect').attr('width', boxW).attr('height', boxH)
           .attr('fill', '#f9f9f9').attr('stroke', 'none').attr('rx', 5);
 
-        var clipId = 'bp-clip-' + li + '-' + ni;
-        defs.append('clipPath').attr('id', clipId)
-          .append('rect').attr('width', boxW + 4).attr('height', bH + nodePad + 16)
-          .attr('x', -2).attr('y', -14);
-        g.attr('clip-path', 'url(#' + clipId + ')');
+        // Divider line between primal and dual
+        var divY = nodePad/2 + halfH + divider/2;
+        g.append('line').attr('x1', 4).attr('x2', boxW - 4)
+          .attr('y1', divY).attr('y2', divY)
+          .attr('stroke', '#ddd').attr('stroke-width', 1);
 
-        var cRects = [], cTexts = [];
+        var fwdRects = [], fwdTexts = [], adjRects = [], adjTexts = [];
+        var fwdTop = nodePad/2;
+        var adjTop = nodePad/2 + halfH + divider;
+
         for (var k = 0; k < nCoeffs; k++) {
           var bx = nodePad/2 + k * (bW + bGap);
-          var barFrac = Math.min(1, Math.abs(adj[k]) / globalMaxAdj);
-          var barPx = Math.max(0.5, barFrac * bH);
           var isRoot = (li === levels.length - 1);
-          var isSeed = isRoot && k === n;
-          var col = CA;
-          var by = nodePad/2;
+          var isHighlight = isRoot && k === n;
 
-          g.append('rect').attr('x', bx).attr('y', by)
-            .attr('width', bW).attr('height', bH)
+          // --- Primal (forward) bar ---
+          var fVal = k < coeffs.length ? coeffs[k] : 0;
+          var fFrac = Math.min(1, Math.abs(fVal) / globalMaxFwd);
+          var fPx = Math.max(0.5, fFrac * halfH);
+          var fCol = isHighlight ? CR : CW;
+
+          g.append('rect').attr('x', bx).attr('y', fwdTop)
+            .attr('width', bW).attr('height', halfH)
             .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 2);
-
-          var cr = g.append('rect')
+          var fr = g.append('rect')
             .attr('x', bx + 1).attr('width', bW - 2).attr('rx', 2)
-            .attr('y', by + bH - barPx).attr('height', barPx)
-            .attr('fill', isSeed ? CR : col).attr('opacity', 0.7);
-          cRects.push(cr);
-
-          var ct = g.append('text')
-            .attr('x', bx + bW/2).attr('y', nodePad/2 + bH - barPx - 3)
+            .attr('y', fwdTop + halfH - fPx).attr('height', fPx)
+            .attr('fill', fCol).attr('opacity', 0.7);
+          fwdRects.push(fr);
+          var ft = g.append('text')
+            .attr('x', bx + bW/2).attr('y', fwdTop + halfH - fPx - 3)
             .attr('text-anchor', 'middle')
-            .style('font-size', '9px').style('fill', isSeed ? CR : col)
+            .style('font-size', '8px').style('fill', fCol)
             .style('font-family', "'EB Garamond', serif")
-            .text(fmtAdj(adj[k]));
-          cTexts.push(ct);
+            .text(fmtAdj(fVal));
+          fwdTexts.push(ft);
+
+          // --- Dual (adjoint) bar ---
+          var aVal = k < adj.length ? adj[k] : 0;
+          var aFrac = Math.min(1, Math.abs(aVal) / globalMaxAdj);
+          var aPx = Math.max(0.5, aFrac * halfH);
+          var isSeed = isRoot && k === n;
+          var aCol = isSeed ? CR : CA;
+
+          g.append('rect').attr('x', bx).attr('y', adjTop)
+            .attr('width', bW).attr('height', halfH)
+            .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 2);
+          var ar = g.append('rect')
+            .attr('x', bx + 1).attr('width', bW - 2).attr('rx', 2)
+            .attr('y', adjTop + halfH - aPx).attr('height', aPx)
+            .attr('fill', aCol).attr('opacity', 0.7);
+          adjRects.push(ar);
+          var at2 = g.append('text')
+            .attr('x', bx + bW/2).attr('y', adjTop + halfH - aPx - 3)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '8px').style('fill', aCol)
+            .style('font-family', "'EB Garamond', serif")
+            .text(fmtAdj(aVal));
+          adjTexts.push(at2);
         }
 
-        // Seed label at root
+        // Degree labels at root
         if (li === levels.length - 1) {
           for (var k = 0; k < nCoeffs; k++) {
             var labelX = gx + nodePad/2 + k * (bW + bGap) + bW/2;
-            addMathLabel(svgWrap, labelX, nd.y + bH + 4,
+            addMathLabel(svgWrap, labelX, nd.y + boxH + 2,
               k === n ? '$\\mathbf{' + k + '}$' : '$' + k + '$',
               {anchor:'middle', color: k === n ? CR : '#bbb', fontSize:'9px'});
           }
@@ -1275,7 +1307,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
           nd._barXs.push(gx + nodePad/2 + k * (bW + bGap));
         }
 
-        nodeRefs.push({ cellRects: cRects, cellTexts: cTexts, nCoeffs: nCoeffs });
+        nodeRefs.push({ fwdRects: fwdRects, fwdTexts: fwdTexts, adjRects: adjRects, adjTexts: adjTexts, nCoeffs: nCoeffs });
       });
     }
 
@@ -1373,7 +1405,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
       piLabels.push(pl);
 
       // Arrow from leaf adjoint bar to pi output
-      var leafBot = nd.y + bH + nodePad + 8;
+      var leafBot = nd.y + nodeH + 8;
       svg.append('line')
         .attr('x1', bx + piBarW/2).attr('y1', leafBot)
         .attr('x2', bx + piBarW/2).attr('y2', outputY)
@@ -1426,32 +1458,45 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
     var Z = backprop(newTree, n);
     var newLevels = newTree.levels;
 
-    // Recompute global max adjoint
-    var gMax = 0;
+    // Recompute global maxes
+    var gMaxFwd = 0, gMaxAdj = 0;
     (function walk(nd) {
       if (!nd || nd.pad) return;
-      if (nd.adj) nd.adj.forEach(function(a) { if (Math.abs(a) > gMax) gMax = Math.abs(a); });
+      nd.poly.forEach(function(c) { if (Math.abs(c) > gMaxFwd) gMaxFwd = Math.abs(c); });
+      if (nd.adj) nd.adj.forEach(function(a) { if (Math.abs(a) > gMaxAdj) gMaxAdj = Math.abs(a); });
       if (nd.left) walk(nd.left);
       if (nd.right) walk(nd.right);
     })(newTree.root);
-    if (gMax === 0) gMax = 1;
+    if (gMaxFwd === 0) gMaxFwd = 1;
+    if (gMaxAdj === 0) gMaxAdj = 1;
 
-    // Update node bars
+    var fwdTop = nodePad/2;
+    var adjTop = nodePad/2 + halfH + divider;
+
+    // Update node bars (both primal and dual)
     var ri = 0;
     for (var li = 0; li < newLevels.length; li++) {
       for (var ni = 0; ni < newLevels[li].length; ni++) {
         var ref = nodeRefs[ri++];
         if (!ref) continue;
-        var adj = newLevels[li][ni].adj || [];
+        var nd = newLevels[li][ni];
+        var coeffs = nd.poly;
+        var adj = nd.adj || [];
         var nCoeffs = ref.nCoeffs;
         for (var k = 0; k < nCoeffs; k++) {
-          var val = k < adj.length ? adj[k] : 0;
-          var barFrac = Math.min(1, Math.abs(val) / gMax);
-          var barPx = Math.max(1, barFrac * bH);
-          ref.cellRects[k].attr('y', nodePad/2 + bH - barPx).attr('height', barPx);
-          if (ref.cellTexts[k]) {
-            ref.cellTexts[k].attr('y', nodePad/2 + bH - barPx - 3).text(fmtAdj(val));
-          }
+          // Primal
+          var fVal = k < coeffs.length ? coeffs[k] : 0;
+          var fFrac = Math.min(1, Math.abs(fVal) / gMaxFwd);
+          var fPx = Math.max(1, fFrac * halfH);
+          ref.fwdRects[k].attr('y', fwdTop + halfH - fPx).attr('height', fPx);
+          ref.fwdTexts[k].attr('y', fwdTop + halfH - fPx - 3).text(fmtAdj(fVal));
+
+          // Dual
+          var aVal = k < adj.length ? adj[k] : 0;
+          var aFrac = Math.min(1, Math.abs(aVal) / gMaxAdj);
+          var aPx = Math.max(1, aFrac * halfH);
+          ref.adjRects[k].attr('y', adjTop + halfH - aPx).attr('height', aPx);
+          ref.adjTexts[k].attr('y', adjTop + halfH - aPx - 3).text(fmtAdj(aVal));
         }
       }
     }
