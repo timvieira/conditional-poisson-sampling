@@ -1813,27 +1813,34 @@ details.derivation[open]::details-content {
       </p>
     </header>
     <div class="entry-content" style="view-transition-name: article-body">
-      <p>$$
-\newcommand{\w}{w}
-\newcommand{\bw}{\boldsymbol{w}}
-\newcommand{\W}{W}
-\newcommand{\Z}{Z}
-\newcommand{\Zw}[2]{\binom{#1}{#2}}
-\newcommand{\pip}{\pi}
-\def\btheta{{\boldsymbol{\theta}}}
-\def\bpip{\boldsymbol{\pi}}
-\newcommand{\ba}{\boldsymbol{a}}
-\newcommand{\bb}{\boldsymbol{b}}
-\newcommand{\z}{z}
-\newcommand{\llbracket}{[\![}
-\newcommand{\rrbracket}{]\!]}
-\newcommand{\defeq}{\overset{\small\text{def}}{=}}
-$$</p>
+      <script>
+// Register macros in MathJax config before typesetting
+window.MathJax = window.MathJax || {};
+window.MathJax.tex = window.MathJax.tex || {};
+window.MathJax.tex.macros = Object.assign(window.MathJax.tex.macros || {}, {
+  w: '{w}',
+  bw: '{\\boldsymbol{w}}',
+  W: '{W}',
+  Z: '{Z}',
+  Zw: ['{\\binom{#1}{#2}}', 2],
+  pip: '{\\pi}',
+  btheta: '{{\\boldsymbol{\\theta}}}',
+  bpip: '{\\boldsymbol{\\pi}}',
+  ba: '{\\boldsymbol{a}}',
+  bb: '{\\boldsymbol{b}}',
+  z: '{z}',
+  llbracket: '{[\\![}',
+  rrbracket: '{]\\!]}',
+  defeq: '{\\overset{\\small\\text{def}}{=}}'
+});
+</script>
+
 <div class="margin-note">
 <p><a href="test_identities.py" class="verified" target="_blank">✓</a> = numerically verified—each links to its test case in <a href="test_identities.py" style="color:#999">test_identities.py</a>.</p>
 </div>
 
-<p>Suppose you want to draw a random subset of exactly $n$ items from a universe of $N$ items, where each item $i$ has a positive weight $\w_i$.  The <strong>conditional Poisson distribution</strong> assigns each size-$n$ subset a probability proportional to the product of its weights:<a href="test_identities.py#test_distribution_definition" title="test_distribution_definition, test_Z_is_elementary_symmetric_poly" class="verified" target="_blank">✓</a></p>
+<p>Suppose you want to draw a random subset of exactly $n$ items from a universe of $N$ items, where each item $i$ has a positive weight $\w_i$.<label class="sidenote-number"></label><span class="margin-note">We assume $\w_i \in (0, \infty)$.  This is without loss of generality: items with $\w_i = 0$ are excluded from the universe (they are never selected), and items with $\w_i = \infty$ are deterministically included (reduce $n$ and $N$ by 1 each).  The general case reduces to the finite positive case by preprocessing.</span>
+The <strong>conditional Poisson distribution</strong> assigns each size-$n$ subset a probability proportional to the product of its weights:<a href="test_identities.py#test_distribution_definition" title="test_distribution_definition, test_Z_is_elementary_symmetric_poly" class="verified" target="_blank">✓</a></p>
 <p>$$
 P(S) \propto \mathbf{1}\big[ |S| = n\big] \prod_{i \in S} \w_i
 $$</p>
@@ -2148,7 +2155,7 @@ $$</p>
 <p>The $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the <em>subproduct tree</em> (see <a href="https://doi.org/10.1017/CBO9781139856065">von zur Gathen &amp; Gerhard (2013)</a>, Chapter 10).</p>
 <p><strong>Polynomials as arrays.</strong> Each polynomial is stored as an array of coefficients: <code>[1, 3, 2]</code> represents $1 + 3\z + 2\z^2$.  Multiplying two polynomials is <em>convolution</em> of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving <code>[1, 2]</code> with <code>[1, 3]</code> to get <code>[1, 5, 6]</code>.  Using the fast Fourier transform (FFT), this convolution costs $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.</p>
 <p><strong>Notation.</strong> We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.</p>
-<h3 id="computing-the-normalizing-constant-math112">Computing the Normalizing Constant $\Z$</h3>
+<h3 id="computing-the-normalizing-constant-math116">Computing the Normalizing Constant $\Z$</h3>
 <p>Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.</p>
 <style>
 #content { overflow: visible !important; }
@@ -2726,7 +2733,7 @@ svg text { font-family: 'EB Garamond', serif; }
 <p>$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N), \quad T(1) = \mathcal{O}(1)$$</p>
 <p>which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
 The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be <strong>truncated to degree $n$</strong> without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.</p>
-<h3 id="computing-inclusion-probabilities-math138">Computing Inclusion Probabilities $\bpip$</h3>
+<h3 id="computing-inclusion-probabilities-math142">Computing Inclusion Probabilities $\bpip$</h3>
 <p>The inclusion probability is the gradient of the log-normalizer (an exponential family identity):</p>
 <p>$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$</p>
 <p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running <a href="../evaluating-fx-is-as-fast-as-fx/">backpropagation</a> on the same tree—no new algorithm needed.  By the Baur-Strassen theorem (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">1983</a>), the gradient costs at most a constant factor more than the forward computation.</p>
@@ -3746,7 +3753,7 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
 <h2 id="timing">Timing</h2>
 <p>The tree-based approach scales to moderately large $N$ comfortably.  For comparison, the naive $\mathcal{O}(N^2 n)$ dynamic programming (DP) baseline is also shown.  (The PyTorch FFT implementation in the next section is significantly faster—see below.)</p>
 
-<main><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
+<main><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3755,6 +3762,7 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_fft_prototype</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_pi</span> <span class="k">as</span> <span class="n">fft_pi</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">dp_pi</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""O(N^2 n) DP for inclusion probabilities (baseline)."""</span>
@@ -3778,6 +3786,7 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
     <span class="k">return</span> <span class="n">pi</span>
 
 <span class="n">sizes</span> <span class="o">=</span> <span class="p">[(</span><span class="mi">50</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">40</span><span class="p">),</span> <span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">80</span><span class="p">),</span> <span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="mi">200</span><span class="p">),</span> <span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">400</span><span class="p">),</span> <span class="p">(</span><span class="mi">2000</span><span class="p">,</span> <span class="mi">800</span><span class="p">)]</span>
+<span class="n">Ns</span><span class="p">,</span> <span class="n">dp_t</span><span class="p">,</span> <span class="n">tree_t</span><span class="p">,</span> <span class="n">fft_t</span><span class="p">,</span> <span class="n">samp_t</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[]</span>
 
 <span class="k">for</span> <span class="n">N_t</span><span class="p">,</span> <span class="n">n_t</span> <span class="ow">in</span> <span class="n">sizes</span><span class="p">:</span>
     <span class="n">w_t</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">exponential</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">N_t</span><span class="p">)</span>
@@ -3806,8 +3815,6 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
     <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
     <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">reps</span><span class="p">):</span> <span class="n">fft_pi</span><span class="p">(</span><span class="n">theta_t</span><span class="p">,</span> <span class="n">n_t</span><span class="p">)</span>
     <span class="n">fft_t</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">/</span> <span class="n">reps</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span>
-
-    <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
 
     <span class="c1"># Sampling (10k samples)</span>
     <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
@@ -3844,27 +3851,6 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
 <span class="n">pl</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 <span class="n">pl</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child">
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>
-<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">NameError</span>                                 Traceback (most recent call last)
-Cell <span class="ansi-green-fg">In[12], line 39</span>
-<span class="ansi-green-intense-fg ansi-bold">     37</span>     t0 <span style="color: rgb(98,98,98)">=</span> time<span style="color: rgb(98,98,98)">.</span>perf_counter()
-<span class="ansi-green-intense-fg ansi-bold">     38</span>     <span class="ansi-bold" style="color: rgb(0,135,0)">for</span> _ <span class="ansi-bold" style="color: rgb(175,0,255)">in</span> <span style="color: rgb(0,135,0)">range</span>(dp_reps): dp_pi(w_t, n_t)
-<span class="ansi-green-fg">---&gt; 39</span>     <span class="ansi-yellow-bg">dp_t</span><span style="color: rgb(98,98,98)">.</span>append((time<span style="color: rgb(98,98,98)">.</span>perf_counter() <span style="color: rgb(98,98,98)">-</span> t0) <span style="color: rgb(98,98,98)">/</span> dp_reps <span style="color: rgb(98,98,98)">*</span> <span style="color: rgb(98,98,98)">1000</span>)
-<span class="ansi-green-intense-fg ansi-bold">     40</span> <span class="ansi-bold" style="color: rgb(0,135,0)">else</span>:
-<span class="ansi-green-intense-fg ansi-bold">     41</span>     dp_t<span style="color: rgb(98,98,98)">.</span>append(<span class="ansi-bold" style="color: rgb(0,135,0)">None</span>)
-
-<span class="ansi-red-fg">NameError</span>: name 'dp_t' is not defined</pre>
 </div>
 </div>
 </div>
@@ -4095,95 +4081,49 @@ Cell <span class="ansi-green-fg">In[12], line 39</span>
 <div class="jp-InputArea jp-Cell-inputArea">
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Numerical validation: why the exact choice of r matters</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span><span class="o">,</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_fft_prototype</span><span class="w"> </span><span class="kn">import</span> <span class="n">_find_r</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">conditional_poisson</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConditionalPoisson</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">display_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">html_table</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">dp_pi</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""O(N^2 n) DP for inclusion probabilities (baseline)."""</span>
-    <span class="n">N</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
-    <span class="n">e</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">N</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
-    <span class="n">e</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
-    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
-        <span class="n">e</span><span class="p">[</span><span class="n">m</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">e</span><span class="p">[</span><span class="n">m</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
-        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
-            <span class="n">e</span><span class="p">[</span><span class="n">m</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">e</span><span class="p">[</span><span class="n">m</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">+</span> <span class="n">w</span><span class="p">[</span><span class="n">m</span><span class="p">]</span> <span class="o">*</span> <span class="n">e</span><span class="p">[</span><span class="n">m</span><span class="p">,</span> <span class="n">k</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
-    <span class="n">Z</span> <span class="o">=</span> <span class="n">e</span><span class="p">[</span><span class="n">N</span><span class="p">,</span> <span class="n">n</span><span class="p">]</span>
-    <span class="n">pi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
-        <span class="n">ei</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
-        <span class="n">ei</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
-        <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
-            <span class="k">if</span> <span class="n">m</span> <span class="o">==</span> <span class="n">i</span><span class="p">:</span> <span class="k">continue</span>
-            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">m</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
-                <span class="n">ei</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">+=</span> <span class="n">w</span><span class="p">[</span><span class="n">m</span><span class="p">]</span> <span class="o">*</span> <span class="n">ei</span><span class="p">[</span><span class="n">k</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
-        <span class="n">pi</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">w</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">ei</span><span class="p">[</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">Z</span>
-    <span class="k">return</span> <span class="n">pi</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fft_mul</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">irfft</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">rfft</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">m</span><span class="p">)</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">rfft</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">m</span><span class="p">),</span> <span class="n">n</span><span class="o">=</span><span class="n">m</span><span class="p">)</span>
 
-<span class="n">sizes</span> <span class="o">=</span> <span class="p">[(</span><span class="mi">50</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">40</span><span class="p">),</span> <span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">80</span><span class="p">),</span> <span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="mi">200</span><span class="p">),</span> <span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">400</span><span class="p">),</span> <span class="p">(</span><span class="mi">2000</span><span class="p">,</span> <span class="mi">800</span><span class="p">)]</span>
-<span class="n">Ns</span><span class="p">,</span> <span class="n">dp_t</span><span class="p">,</span> <span class="n">tree_t</span><span class="p">,</span> <span class="n">fft_t</span><span class="p">,</span> <span class="n">samp_t</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[]</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_tree_fft</span><span class="p">(</span><span class="n">w</span><span class="p">):</span>
+    <span class="n">polys</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">wi</span><span class="o">.</span><span class="n">item</span><span class="p">()],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span> <span class="k">for</span> <span class="n">wi</span> <span class="ow">in</span> <span class="n">w</span><span class="p">]</span>
+    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">polys</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">nxt</span> <span class="o">=</span> <span class="p">[</span><span class="n">fft_mul</span><span class="p">(</span><span class="n">polys</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">polys</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">polys</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">polys</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span><span class="p">:</span> <span class="n">nxt</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">polys</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">polys</span> <span class="o">=</span> <span class="n">nxt</span>
+    <span class="k">return</span> <span class="n">polys</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
-<span class="k">for</span> <span class="n">N_t</span><span class="p">,</span> <span class="n">n_t</span> <span class="ow">in</span> <span class="n">sizes</span><span class="p">:</span>
-    <span class="n">w_t</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">exponential</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">N_t</span><span class="p">)</span>
-    <span class="n">theta_t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">w_t</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-    <span class="n">v_t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">N_t</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-    <span class="n">cp_t</span> <span class="o">=</span> <span class="n">ConditionalPoisson</span><span class="o">.</span><span class="n">from_weights</span><span class="p">(</span><span class="n">n_t</span><span class="p">,</span> <span class="n">w_t</span><span class="p">)</span>
-    <span class="n">reps</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">200</span> <span class="o">//</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">N_t</span> <span class="o">//</span> <span class="mi">50</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">test_r</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">log_Z_true</span><span class="p">):</span>
+    <span class="n">poly</span> <span class="o">=</span> <span class="n">build_tree_fft</span><span class="p">(</span><span class="n">w</span> <span class="o">*</span> <span class="n">r</span><span class="p">)</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">poly</span><span class="p">[</span><span class="n">n</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">c</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span> <span class="k">return</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">r</span><span class="si">:</span><span class="s1">.2e</span><span class="si">}</span><span class="s1">'</span><span class="p">,</span> <span class="s1">'—'</span><span class="p">,</span> <span class="s1">'negative coeff'</span><span class="p">)</span>
+    <span class="n">dr</span> <span class="o">=</span> <span class="n">poly</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="o">/</span> <span class="nb">abs</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+    <span class="n">err</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="o">-</span> <span class="n">n</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="o">-</span> <span class="n">log_Z_true</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">r</span><span class="si">:</span><span class="s1">.2e</span><span class="si">}</span><span class="s1">'</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">dr</span><span class="si">:</span><span class="s1">.0e</span><span class="si">}</span><span class="s1">'</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">err</span><span class="si">:</span><span class="s1">.0e</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>
 
-    <span class="c1"># DP baseline (skip for large N)</span>
-    <span class="k">if</span> <span class="n">N_t</span> <span class="o">&lt;=</span> <span class="mi">500</span><span class="p">:</span>
-        <span class="n">dp_reps</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">reps</span> <span class="o">//</span> <span class="mi">3</span><span class="p">)</span>
-        <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dp_reps</span><span class="p">):</span> <span class="n">dp_pi</span><span class="p">(</span><span class="n">w_t</span><span class="p">,</span> <span class="n">n_t</span><span class="p">)</span>
-        <span class="n">dp_t</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">/</span> <span class="n">dp_reps</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">dp_t</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+<span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">seed</span><span class="p">,</span> <span class="n">spread</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">)]:</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+    <span class="n">N_v</span><span class="p">,</span> <span class="n">n_v</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span> <span class="mi">10</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">spread</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">N_v</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">))</span>
+    <span class="n">Z_true</span> <span class="o">=</span> <span class="n">ConditionalPoisson</span><span class="o">.</span><span class="n">from_weights</span><span class="p">(</span><span class="n">n_v</span><span class="p">,</span> <span class="n">w</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span><span class="o">.</span><span class="n">log_normalizer</span>
+    <span class="n">regime</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">'spread=</span><span class="si">{</span><span class="n">spread</span><span class="si">}</span><span class="s1">'</span>
+    <span class="n">r_opt</span> <span class="o">=</span> <span class="n">_find_r</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">n_v</span><span class="p">)</span>
+    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">test_r</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">n_v</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'$r=1$ (</span><span class="si">{</span><span class="n">regime</span><span class="si">}</span><span class="s1">)'</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">Z_true</span><span class="p">))</span>
+    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">test_r</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">n_v</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'$r=n/W$ (</span><span class="si">{</span><span class="n">regime</span><span class="si">}</span><span class="s1">)'</span><span class="p">,</span> <span class="n">n_v</span> <span class="o">/</span> <span class="n">w</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="n">Z_true</span><span class="p">))</span>
+    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">test_r</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">n_v</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'$r=r^*$ (</span><span class="si">{</span><span class="n">regime</span><span class="si">}</span><span class="s1">)'</span><span class="p">,</span> <span class="n">r_opt</span><span class="p">,</span> <span class="n">Z_true</span><span class="p">))</span>
 
-    <span class="c1"># NumPy product tree</span>
-    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span> <span class="n">cp_t</span><span class="o">.</span><span class="n">_cache</span><span class="o">.</span><span class="n">clear</span><span class="p">();</span> <span class="n">cp_t</span><span class="o">.</span><span class="n">pi</span>
-    <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
-    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">reps</span><span class="p">):</span> <span class="n">cp_t</span><span class="o">.</span><span class="n">_cache</span><span class="o">.</span><span class="n">clear</span><span class="p">();</span> <span class="n">cp_t</span><span class="o">.</span><span class="n">pi</span>
-    <span class="n">tree_t</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">/</span> <span class="n">reps</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span>
-
-    <span class="c1"># FFT (PyTorch)</span>
-    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span> <span class="n">fft_pi</span><span class="p">(</span><span class="n">theta_t</span><span class="p">,</span> <span class="n">n_t</span><span class="p">)</span>
-    <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
-    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">reps</span><span class="p">):</span> <span class="n">fft_pi</span><span class="p">(</span><span class="n">theta_t</span><span class="p">,</span> <span class="n">n_t</span><span class="p">)</span>
-    <span class="n">fft_t</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">/</span> <span class="n">reps</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span>
-
-    <span class="c1"># Sampling (10k samples)</span>
-    <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
-    <span class="n">cp_t</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
-    <span class="n">samp_t</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span>
-
-    <span class="n">Ns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">N_t</span><span class="p">)</span>
-
-<span class="n">fig</span><span class="p">,</span> <span class="p">(</span><span class="n">ax1</span><span class="p">,</span> <span class="n">ax2</span><span class="p">)</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
-
-<span class="c1"># Left: computing π — all methods</span>
-<span class="n">dp_ns</span> <span class="o">=</span> <span class="p">[</span><span class="n">N</span> <span class="k">for</span> <span class="n">N</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">Ns</span><span class="p">,</span> <span class="n">dp_t</span><span class="p">)</span> <span class="k">if</span> <span class="n">t</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
-<span class="n">dp_ts</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">dp_t</span> <span class="k">if</span> <span class="n">t</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
-<span class="n">ax1</span><span class="o">.</span><span class="n">loglog</span><span class="p">(</span><span class="n">dp_ns</span><span class="p">,</span> <span class="n">dp_ts</span><span class="p">,</span> <span class="s1">'s--'</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">'#999'</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">'DP baseline $\mathcal</span><span class="si">{O}</span><span class="s1">(N^2 n)$'</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">6</span><span class="p">)</span>
-<span class="n">ax1</span><span class="o">.</span><span class="n">loglog</span><span class="p">(</span><span class="n">Ns</span><span class="p">,</span> <span class="n">tree_t</span><span class="p">,</span> <span class="s1">'o-'</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">'#5b9bd5'</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">'NumPy tree $\mathcal</span><span class="si">{O}</span><span class="s1">(N \log^2 n)$'</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">6</span><span class="p">)</span>
-<span class="n">ax1</span><span class="o">.</span><span class="n">loglog</span><span class="p">(</span><span class="n">Ns</span><span class="p">,</span> <span class="n">fft_t</span><span class="p">,</span> <span class="s1">'^-'</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">'#c0504d'</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">'PyTorch FFT $\mathcal</span><span class="si">{O}</span><span class="s1">(N \log^2 n)$'</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">6</span><span class="p">)</span>
-<span class="n">ax1</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">'$N$'</span><span class="p">)</span>
-<span class="n">ax1</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">'time (ms)'</span><span class="p">)</span>
-<span class="n">ax1</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">)</span>
-<span class="n">ax1</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
-
-<span class="c1"># Right: sampling</span>
-<span class="n">ax2</span><span class="o">.</span><span class="n">loglog</span><span class="p">(</span><span class="n">Ns</span><span class="p">,</span> <span class="n">samp_t</span><span class="p">,</span> <span class="s1">'o-'</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">'#5b9bd5'</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">'product tree (10k samples)'</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">6</span><span class="p">)</span>
-<span class="c1"># Add reference line for O(n log N) per sample × 10k</span>
-<span class="n">ref</span> <span class="o">=</span> <span class="p">[</span><span class="n">Ns</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">Ns</span><span class="p">[</span><span class="mi">0</span><span class="p">])]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">Ns</span><span class="p">)</span>
-<span class="n">ref</span> <span class="o">=</span> <span class="p">[</span><span class="mi">10000</span> <span class="o">*</span> <span class="n">n_t</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">N_t</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">sizes</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">sizes</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]))</span> <span class="o">*</span> <span class="n">samp_t</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="p">(</span><span class="n">N_t</span><span class="p">,</span> <span class="n">n_t</span><span class="p">)</span> <span class="ow">in</span> <span class="n">sizes</span><span class="p">]</span>
-<span class="n">ax2</span><span class="o">.</span><span class="n">loglog</span><span class="p">(</span><span class="n">Ns</span><span class="p">,</span> <span class="n">ref</span><span class="p">,</span> <span class="s1">'--'</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">'#ccc'</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">'$\mathcal</span><span class="si">{O}</span><span class="s1">(n \log N)$ reference'</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">)</span>
-<span class="n">ax2</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">'$N$'</span><span class="p">)</span>
-<span class="n">ax2</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">'time (ms)'</span><span class="p">)</span>
-<span class="n">ax2</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">'Drawing 10k Samples'</span><span class="p">)</span>
-<span class="n">ax2</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">)</span>
-<span class="n">ax2</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
-
-<span class="n">pl</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
-<span class="n">pl</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="n">html_table</span><span class="p">(</span>
+    <span class="p">[</span><span class="s1">'scaling rule'</span><span class="p">,</span> <span class="s1">'$r$'</span><span class="p">,</span> <span class="s1">'dynamic range'</span><span class="p">,</span> <span class="s1">'$|</span><span class="se">\\</span><span class="s1">log Z$ error$|$'</span><span class="p">],</span>
+    <span class="n">rows</span><span class="p">,</span>
+    <span class="n">caption</span><span class="o">=</span><span class="s1">'FFT product tree (N=200, n=10): contour radius comparison'</span>
+<span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -4216,49 +4156,8 @@ $$</p>
 <p>This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.</p>
 <p><strong>Example.</strong> With $N = 100$ items and $n = 5$, set weights proportional to $p(i)$ so that high-probability items are more likely to be selected.  Each sample gives 5 distinct evaluations of $f$; the HT formula reweights them to produce an unbiased estimate of the full sum.</p>
 <p>For more on SWOR-based estimation (including the near-optimal priority sampling scheme), see my earlier post on <a href="../post/2017/07/03/estimating-means-in-a-finite-universe/">estimating means in a finite universe</a>.</p>
-<h2 id="identities-for-math37-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
+<h2 id="identities-for-math36-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
 <p>The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> elementary symmetric polynomial $e_n(\bw)$.  Here are some useful identities.</p>
-<h3 id="parameterizations">Parameterizations</h3>
-<p>The conditional Poisson distribution arises from Poisson sampling—flip $N$ independent coins where coin $i$ lands heads with probability $p_i$, then condition on exactly $n$ heads.  There are two natural parameterizations:</p>
-<table>
-<thead>
-<tr>
-<th></th>
-<th>Probability $p_i$</th>
-<th>Odds $\w_i$</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Parameter</strong></td>
-<td>$\boldsymbol{p} \in [0,1]^N$</td>
-<td>$\bw \in [0,\infty]^N$ where $\w_i \defeq p_i/(1-p_i)$</td>
-</tr>
-<tr>
-<td><strong>Leaf polynomial</strong></td>
-<td>$(1-p_i) + p_i\, \z$</td>
-<td>$1 + \w_i\, \z$</td>
-</tr>
-<tr>
-<td><strong>Generating function</strong></td>
-<td>$\prod_i\big((1-p_i) + p_i \z\big) = \sum_k \Pr[k \text{ heads}]\, \z^k$</td>
-<td>$\prod_i(1 + \w_i \z) = \sum_k \Zw{\bw}{k} \z^k$</td>
-</tr>
-<tr>
-<td><strong>$k$<sup>th</sup> coefficient</strong></td>
-<td>$\Pr[\text{exactly } k \text{ heads}]$</td>
-<td>$\Zw{\bw}{k}$</td>
-</tr>
-</tbody>
-</table>
-<blockquote>
-<p><strong>WLOG: finite positive weights.</strong>  The code requires $\w_i \in (0, \infty)$.  This is without loss of generality: items with $\w_i = 0$ are excluded from the universe (they are never selected), and items with $\w_i = \infty$ are deterministically included (reduce $n$ and $N$ by 1 each).  The general case reduces to the finite positive case by preprocessing.</p>
-</blockquote>
-<p>These are <strong>probability generating functions</strong> (PGFs) for the random variable $K = |S|$ (the number of heads in $N$ independent coin flips): the coefficient of $\z^k$ is the probability (or unnormalized weight) that exactly $k$ items are selected.  The formal variable $\z$ is a bookkeeping device—it "marks" each included item so that the coefficient-extraction operator $\llbracket \cdot \rrbracket(\z^k)$ picks out the contribution from exactly $k$ items.</p>
-<p>The two generating functions are related by factoring out $\prod_i(1-p_i) = 1/\prod_i(1+\w_i)$:</p>
-<p>$$\prod_i\big((1-p_i) + p_i \z\big) = \prod_i(1-p_i) \cdot \prod_i(1 + \w_i \z)$$</p>
-<p>so $\Pr[k \text{ heads}] = \Zw{\bw}{k} / \prod_i(1+\w_i)$.<a href="test_identities.py#test_prob_odds_generating_function_relation" title="test_prob_odds_generating_function_relation" class="verified" target="_blank">✓</a></p>
-<p>The odds parameterization is more convenient for computation (the leaf polynomial $1 + \w_i \z$ is monic), while the probability parameterization is more natural for interpretation (the normalizer is literally $\Pr[n \text{ heads}]$).  The conditional distribution is the same either way—scaling all weights by $\alpha > 0$ doesn't change it.<a href="test_identities.py#test_scaling_invariance" title="test_scaling_invariance" class="verified" target="_blank">✓</a></p>
 <h3 id="differential-identities">Differential Identities</h3>
 <p>The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:</p>
 <p>$$\pip_i \defeq \frac{\partial \log \Z}{\partial \theta_i} = \frac{\w_i \cdot \Zw{\bw^{(-i)}}{n-1}}{\Zw{\bw}{n}}$$
