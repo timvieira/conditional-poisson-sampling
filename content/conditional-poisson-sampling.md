@@ -1589,11 +1589,36 @@ All computations are verified against brute-force enumeration in the [test suite
 
 ## Basic Usage
 
-Now that we've seen how the product tree works under the hood, here's the library interface.  The simplest entry point is `from_weights`: hand it a subset size $n$ and a weight vector $\bw$.
+Now that we've seen how the product tree works under the hood, here's the library interface.
 
-{% notebook conditional-poisson-sampling.ipynb cells[0:1] %}
+```python
+from conditional_poisson import ConditionalPoisson
+import numpy as np
 
-The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="test_identities.py#test_pi_sums_to_n" title="test_pi_sums_to_n" class="verified" target="_blank">✓</a> and each $\pip_i \in [0, 1]$.<a href="test_identities.py#test_pi_in_unit_interval" title="test_pi_in_unit_interval" class="verified" target="_blank">✓</a>  Items with larger weights get higher inclusion probabilities.
+w = np.array([0.68, 1.02, 0.55, 1.63, 0.67, 2.82])
+n = 3
+
+cp = ConditionalPoisson.from_weights(n, w)
+
+cp.log_normalizer       # log Z(w, n)
+cp.pi                   # inclusion probabilities (sum to n)
+cp.sample(10_000)       # draw 10k exact samples
+
+# Inverse problem: find weights from target inclusion probabilities
+cp_fit = ConditionalPoisson.fit(cp.pi, n)
+```
+
+## The Poisson Approximation
+
+The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="test_identities.py#test_pi_sums_to_n" title="test_pi_sums_to_n" class="verified" target="_blank">✓</a> and each $\pip_i \in [0, 1]$.<a href="test_identities.py#test_pi_in_unit_interval" title="test_pi_in_unit_interval" class="verified" target="_blank">✓</a>  Items with larger weights get higher inclusion probabilities, but the relationship is nonlinear—the other weights push back through the size constraint $|S| = n$.
+
+**Poisson approximation.**  If each item were included independently with probability $p_i = \w_i r/(1+\w_i r)$, where $r$ is the **tilting parameter** that makes $\sum_i p_i = n$, we would get
+
+$$\pip_i \;\approx\; \frac{\w_i \, r}{1 + \w_i \, r}.$$
+
+The actual inclusion probabilities (dots in the plot below) are close but not identical—conditioning on $|S|=n$ introduces a correction of $\mathcal{O}(1/N)$ per item ([Hájek, 1964](https://doi.org/10.1214/aoms/1177700375)).  This approximation is the warm start for [fitting](#Fitting-Weights-to-Target-Probabilities): inverting the Poisson relationship gives $\theta_i \approx \log(\pip^*_i / (1 - \pip^*_i))$, which is close enough that the optimizer converges in a few iterations.
+
+<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
 <div id="pi-scatter"></div>
 <script>
@@ -1658,7 +1683,6 @@ The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="tes
   var pi;
   var container = d3.select('#pi-scatter');
 
-  // Controls
   var ctrl = container.append('div')
     .style('font-size','0.9em').style('margin-bottom','6px').style('font-family','inherit');
   ctrl.append('span').html('$N$ = ');
@@ -1677,8 +1701,6 @@ The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="tes
     .style('border','1px solid #ccc').style('border-radius','3px').style('padding','2px 8px')
     .style('cursor','pointer').style('color','#555')
     .on('click', function(){ newWeights(); build(); });
-  ctrl.append('span').style('font-size','0.8em').style('color','#999').style('margin-left','10px')
-    .text('(drag dots to change weights)');
 
   var seed = 42;
   function newWeights() { seed++; w = randExp(mulberry32(seed), N); }
@@ -1700,17 +1722,14 @@ The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="tes
       .style('user-select','none').style('-webkit-user-select','none');
     gRoot = svgEl.append('g').attr('transform','translate('+margin.left+','+margin.top+')');
 
-    // Axes
     xAxisG = gRoot.append('g').attr('transform','translate(0,'+height+')');
     gRoot.append('g').call(d3.axisLeft(y).ticks(5));
 
-    // x-axis label (MathJax via foreignObject)
     gRoot.append('foreignObject')
       .attr('x', width/2 - 40).attr('y', height + 26).attr('width', 80).attr('height', 24)
       .append('xhtml:div').style('text-align','center').style('font-size','14px')
       .html('$w_i$');
 
-    // y-axis label
     var yLabelG = gRoot.append('g')
       .attr('transform','translate(-38,'+height/2+') rotate(-90)');
     yLabelG.append('foreignObject')
@@ -1718,30 +1737,23 @@ The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="tes
       .append('xhtml:div').style('text-align','center').style('font-size','14px')
       .html('$\\pi_i$');
 
-    // Curve
     curvePath = gRoot.append('path')
       .attr('fill','none').attr('stroke','#5b9bd5').attr('stroke-width',2).attr('opacity',0.8);
-
-    // Dots
     dotG = gRoot.append('g');
 
-    // Tooltip
     tipG = gRoot.append('g').style('display','none').style('pointer-events','none');
     tipG.append('rect').attr('rx',3).attr('fill','white').attr('stroke','#ccc').attr('opacity',0.92);
     tipText = tipG.append('text').style('font-size','11px').attr('text-anchor','middle').attr('dy','0.35em');
 
-    // Legend — right-aligned, lower area
     var lgW = 150, row1Y = 9, row2Y = 27;
     var lg = gRoot.append('g').attr('transform','translate('+(width - lgW + 3)+','+(height-40)+')');
     lg.append('rect').attr('x',-4).attr('y',-3).attr('width',lgW-4).attr('height',40)
       .attr('fill','white').attr('opacity',0.85).attr('rx',3);
-    // Row 1: line + label
     lg.append('line').attr('x1',0).attr('x2',18).attr('y1',row1Y).attr('y2',row1Y)
       .attr('stroke','#5b9bd5').attr('stroke-width',2);
     lg.append('foreignObject').attr('x',24).attr('y',row1Y-10).attr('width',lgW-30).attr('height',22)
       .append('xhtml:div').style('font-size','12px').style('line-height','20px')
       .html('Poisson: $w_i r/(1{+}w_i r)$');
-    // Row 2: dot + label
     lg.append('circle').attr('cx',9).attr('cy',row2Y).attr('r',4.5)
       .attr('fill','#E91E63').attr('opacity',0.85);
     lg.append('foreignObject').attr('x',24).attr('y',row2Y-10).attr('width',lgW-30).attr('height',22)
@@ -1749,9 +1761,10 @@ The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="tes
       .html('exact $\\pi_i$');
 
     redraw();
+    var el = container.node();
     if (window.MathJax && MathJax.typesetPromise) {
-      MathJax.typesetClear();
-      MathJax.typesetPromise();
+      MathJax.typesetClear([el]);
+      MathJax.typesetPromise([el]);
     }
   }
 
@@ -1804,13 +1817,7 @@ The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="tes
 })();
 </script>
 
-The blue curve shows the *Poisson approximation*:
-if each item were included independently with probability $p_i = w_i r / (1 +
-w_i r)$ (where $r$ is the tilting parameter that makes $\sum p_i = n$), we would
-get $\pip_i \approx p_i$.  The actual inclusion probabilities (dots) are close
-but not identical—conditioning on $|S| = n$ introduces a correction of $\mathcal{O}(1/N)$ per item ([Hájek, 1964](https://doi.org/10.1214/aoms/1177700375)).
-This approximation is the warm start for [fitting](#Fitting-Weights-to-Target-Probabilities): inverting the Poisson relationship gives
-$\theta_i \approx \log(\pip^*_i / (1 - \pip^*_i))$, which is close enough that the optimizer converges in a few iterations.
+</div>
 
 
 ## Fitting Weights to Target Probabilities
