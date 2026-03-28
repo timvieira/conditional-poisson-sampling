@@ -3961,119 +3961,79 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
 
 <p><strong>Guarantee.</strong> With this choice of $r$, the coefficients $c_k(r)$ are proportional to the PMF of $K$, whose mode is at $n \pm 1$.  The PMF of a sum of Bernoullis is log-concave, so it decays exponentially away from the mode.  In practice, this makes the dynamic range $\max_k c_k / c_n$ a modest constant (typically $\approx 1$), ensuring the relative FFT error in $c_n$ is $\mathcal{O}(\varepsilon)$.</p>
 <p><strong>Autograd compatibility.</strong> The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).</p>
+<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+<p><strong>Numerical validation.</strong> The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$).  With $r=1$ the dynamic range is $\sim 10^{16}$, destroying all precision.  The optimal $r^*$ brings it to $\sim 1$.</p>
+<div id="r-comparison">
+</div>
+<script>
+(function() {
+  // Precomputed data from the Python validation cell
+  var data = [
+    {label:'r=1',   spread:1.0, r:'1.00e+00', dr:1e16, err:8e+01},
+    {label:'r=n/W', spread:1.0, r:'3.15e-02', dr:1e0,  err:7e-15},
+    {label:'r=r*',  spread:1.0, r:'3.56e-02', dr:1e0,  err:1e-14},
+    {label:'r=1',   spread:3.0, r:'1.00e+00', dr:1e16, err:2e+02},
+    {label:'r=n/W', spread:3.0, r:'7.43e-04', dr:8e1,  err:2e-13},
+    {label:'r=r*',  spread:3.0, r:'3.04e-03', dr:1e0,  err:4e-14},
+  ];
 
-<main><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Numerical validation: why the exact choice of r matters</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span><span class="o">,</span><span class="w"> </span><span class="nn">math</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">torch_fft_prototype</span><span class="w"> </span><span class="kn">import</span> <span class="n">_find_r</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">conditional_poisson</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConditionalPoisson</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">display_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">html_table</span>
+  var container = d3.select('#r-comparison');
+  var margin = {top: 8, right: 15, bottom: 25, left: 130};
+  var W = 500, rowH = 22, gap = 12;
+  var groups = [
+    {title: 'spread = 1.0 (mild weights)', rows: data.slice(0,3)},
+    {title: 'spread = 3.0 (heavy tails)',   rows: data.slice(3,6)},
+  ];
+  var totalRows = 6;
+  var H = margin.top + margin.bottom + totalRows * rowH + gap;
+  var width = W - margin.left - margin.right;
 
-<span class="k">def</span><span class="w"> </span><span class="nf">fft_mul</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
-    <span class="n">m</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
-    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">irfft</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">rfft</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">m</span><span class="p">)</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">rfft</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">m</span><span class="p">),</span> <span class="n">n</span><span class="o">=</span><span class="n">m</span><span class="p">)</span>
+  var svg = container.append('svg').attr('width', W).attr('height', H)
+    .style('user-select','none').style('-webkit-user-select','none');
+  var g = svg.append('g').attr('transform','translate('+margin.left+','+margin.top+')');
 
-<span class="k">def</span><span class="w"> </span><span class="nf">build_tree_fft</span><span class="p">(</span><span class="n">w</span><span class="p">):</span>
-    <span class="n">polys</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">wi</span><span class="o">.</span><span class="n">item</span><span class="p">()],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span> <span class="k">for</span> <span class="n">wi</span> <span class="ow">in</span> <span class="n">w</span><span class="p">]</span>
-    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">polys</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="n">nxt</span> <span class="o">=</span> <span class="p">[</span><span class="n">fft_mul</span><span class="p">(</span><span class="n">polys</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">polys</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">polys</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)]</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">polys</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span><span class="p">:</span> <span class="n">nxt</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">polys</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-        <span class="n">polys</span> <span class="o">=</span> <span class="n">nxt</span>
-    <span class="k">return</span> <span class="n">polys</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+  // Log scale for dynamic range
+  var x = d3.scaleLog().domain([1, 1e17]).range([0, width]).clamp(true);
 
-<span class="k">def</span><span class="w"> </span><span class="nf">test_r</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">log_Z_true</span><span class="p">):</span>
-    <span class="n">poly</span> <span class="o">=</span> <span class="n">build_tree_fft</span><span class="p">(</span><span class="n">w</span> <span class="o">*</span> <span class="n">r</span><span class="p">)</span>
-    <span class="n">c</span> <span class="o">=</span> <span class="n">poly</span><span class="p">[</span><span class="n">n</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
-    <span class="k">if</span> <span class="n">c</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span> <span class="k">return</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">r</span><span class="si">:</span><span class="s1">.2e</span><span class="si">}</span><span class="s1">'</span><span class="p">,</span> <span class="s1">'—'</span><span class="p">,</span> <span class="s1">'negative coeff'</span><span class="p">)</span>
-    <span class="n">dr</span> <span class="o">=</span> <span class="n">poly</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="o">/</span> <span class="nb">abs</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
-    <span class="n">err</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="o">-</span> <span class="n">n</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="o">-</span> <span class="n">log_Z_true</span><span class="p">)</span>
-    <span class="k">return</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">r</span><span class="si">:</span><span class="s1">.2e</span><span class="si">}</span><span class="s1">'</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">dr</span><span class="si">:</span><span class="s1">.0e</span><span class="si">}</span><span class="s1">'</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">err</span><span class="si">:</span><span class="s1">.0e</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>
+  // x-axis
+  g.append('g').attr('transform','translate(0,'+(totalRows * rowH + gap)+')')
+    .call(d3.axisBottom(x).ticks(6, '.0e').tickSize(3))
+    .selectAll('text').style('font-size','10px');
+  g.append('text').attr('x', width/2).attr('y', totalRows * rowH + gap + 23)
+    .attr('text-anchor','middle').style('font-size','11px').style('fill','#666')
+    .text('dynamic range (log scale)');
 
-<span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="k">for</span> <span class="n">seed</span><span class="p">,</span> <span class="n">spread</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">)]:</span>
-    <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
-    <span class="n">N_v</span><span class="p">,</span> <span class="n">n_v</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span> <span class="mi">10</span>
-    <span class="n">w</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">spread</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">N_v</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">))</span>
-    <span class="n">Z_true</span> <span class="o">=</span> <span class="n">ConditionalPoisson</span><span class="o">.</span><span class="n">from_weights</span><span class="p">(</span><span class="n">n_v</span><span class="p">,</span> <span class="n">w</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span><span class="o">.</span><span class="n">log_normalizer</span>
-    <span class="n">regime</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">'spread=</span><span class="si">{</span><span class="n">spread</span><span class="si">}</span><span class="s1">'</span>
-    <span class="n">r_opt</span> <span class="o">=</span> <span class="n">_find_r</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">n_v</span><span class="p">)</span>
-    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">test_r</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">n_v</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'$r=1$ (</span><span class="si">{</span><span class="n">regime</span><span class="si">}</span><span class="s1">)'</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">Z_true</span><span class="p">))</span>
-    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">test_r</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">n_v</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'$r=n/W$ (</span><span class="si">{</span><span class="n">regime</span><span class="si">}</span><span class="s1">)'</span><span class="p">,</span> <span class="n">n_v</span> <span class="o">/</span> <span class="n">w</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="n">Z_true</span><span class="p">))</span>
-    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">test_r</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">n_v</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'$r=r^*$ (</span><span class="si">{</span><span class="n">regime</span><span class="si">}</span><span class="s1">)'</span><span class="p">,</span> <span class="n">r_opt</span><span class="p">,</span> <span class="n">Z_true</span><span class="p">))</span>
+  var colors = {'r=1':'#c0504d', 'r=n/W':'#999', 'r=r*':'#5b9bd5'};
+  var yi = 0;
+  groups.forEach(function(grp, gi) {
+    // Group label
+    if (gi > 0) yi += gap / rowH;
+    grp.rows.forEach(function(d, ri) {
+      var yPos = yi * rowH;
+      // Bar
+      var barW = Math.max(2, x(Math.max(1, d.dr)));
+      g.append('rect').attr('x', 0).attr('y', yPos + 2).attr('width', barW).attr('height', rowH - 6)
+        .attr('fill', colors[d.label]).attr('opacity', 0.8).attr('rx', 2);
+      // Label left
+      var labelText = d.label + (ri === 0 ? '  (' + grp.title + ')' : '');
+      g.append('text').attr('x', -6).attr('y', yPos + rowH/2 + 1)
+        .attr('text-anchor','end').attr('dominant-baseline','middle')
+        .style('font-size','12px').style('fill','#333')
+        .text(labelText);
+      // Value on bar
+      var valText = d.dr >= 1e3 ? d.dr.toExponential(0) : d.dr.toFixed(0);
+      var errText = d.err >= 1e-2 ? d.err.toExponential(0) : d.err.toExponential(0);
+      g.append('text').attr('x', barW + 5).attr('y', yPos + rowH/2 + 1)
+        .attr('dominant-baseline','middle')
+        .style('font-size','11px').style('fill','#666')
+        .text('error: ' + errText);
+      yi++;
+    });
+  });
+})();
+</script>
 
-<span class="n">html_table</span><span class="p">(</span>
-    <span class="p">[</span><span class="s1">'scaling rule'</span><span class="p">,</span> <span class="s1">'$r$'</span><span class="p">,</span> <span class="s1">'dynamic range'</span><span class="p">,</span> <span class="s1">'$|</span><span class="se">\\</span><span class="s1">log Z$ error$|$'</span><span class="p">],</span>
-    <span class="n">rows</span><span class="p">,</span>
-    <span class="n">caption</span><span class="o">=</span><span class="s1">'FFT product tree (N=200, n=10): contour radius comparison'</span>
-<span class="p">)</span>
-</pre></div>
 </div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child">
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<table style="border-collapse:collapse; font-size:14px; margin:8px 0;">
-<caption style="font-weight:bold; margin-bottom:4px;">FFT product tree (N=200, n=10): contour radius comparison</caption>
-<thead><tr>
-<th style="border-bottom:2px solid #333; padding:6px 12px; text-align:left;">scaling rule</th>
-<th style="border-bottom:2px solid #333; padding:6px 12px; text-align:left;">$r$</th>
-<th style="border-bottom:2px solid #333; padding:6px 12px; text-align:left;">dynamic range</th>
-<th style="border-bottom:2px solid #333; padding:6px 12px; text-align:left;">|$\log Z$ error|</th>
-</tr></thead><tbody>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">$r=1$ (spread=1.0)</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1.00e+00</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1e+16</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">8e+01</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">$r=n/W$ (spread=1.0)</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">3.15e-02</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1e+00</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">7e-15</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">$r=r^*$ (spread=1.0)</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">3.56e-02</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1e+00</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1e-14</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">$r=1$ (spread=3.0)</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1.00e+00</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1e+16</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">2e+02</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">$r=n/W$ (spread=3.0)</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">7.43e-04</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">8e+01</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">2e-13</td>
-</tr>
-<tr>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">$r=r^*$ (spread=3.0)</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">3.04e-03</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">1e+00</td>
-<td style="padding:4px 12px; border-bottom:1px solid #ddd;">4e-14</td>
-</tr>
-</tbody></table>
-</div>
-</div>
-</div>
-</div>
-</div>
-</main>
 
 <p>The speedup comes from three sources:</p>
 <ol>
@@ -4099,7 +4059,7 @@ $$</p>
 <p>This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.</p>
 <p><strong>Example.</strong> With $N = 100$ items and $n = 5$, set weights proportional to $p(i)$ so that high-probability items are more likely to be selected.  Each sample gives 5 distinct evaluations of $f$; the HT formula reweights them to produce an unbiased estimate of the full sum.</p>
 <p>For more on SWOR-based estimation (including the near-optimal priority sampling scheme), see my earlier post on <a href="../post/2017/07/03/estimating-means-in-a-finite-universe/">estimating means in a finite universe</a>.</p>
-<h2 id="identities-for-math36-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
+<h2 id="identities-for-math123-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
 <p>The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> elementary symmetric polynomial $e_n(\bw)$.  Here are some useful identities.</p>
 <h3 id="differential-identities">Differential Identities</h3>
 <p>The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:</p>
