@@ -3573,7 +3573,8 @@ graph TB
     container.selectAll('.plot-wrap').remove();
     var plotWrap = container.append('div').attr('class','plot-wrap')
       .style('display','flex').style('align-items','center').style('gap','8px');
-    svgEl = plotWrap.append('svg').attr('width', W).attr('height', H);
+    svgEl = plotWrap.append('svg').attr('width', W).attr('height', H)
+      .style('user-select','none').style('-webkit-user-select','none');
     plotWrap.append('div').style('font-size','0.8em').style('color','#999')
       .style('max-width','80px').style('line-height','1.3')
       .text('drag dots to change weights');
