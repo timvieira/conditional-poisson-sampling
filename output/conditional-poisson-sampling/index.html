@@ -1845,6 +1845,7 @@ $$</p>
 <p><strong>Software.</strong> As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python (or any language outside of R's survey-sampling packages).  Existing R implementations—<code>UPmaxentropy</code> in the <a href="https://cran.r-project.org/web/packages/sampling/">sampling</a> package and the <a href="https://cran.r-project.org/web/packages/BalancedSampling/">BalancedSampling</a> package—use either rejection sampling or $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I'm aware of.</p>
 <style>
 /* Tufte-style sidenote numbering */
+article { counter-reset: sidenote-counter; }
 .sidenote-number { counter-increment: sidenote-counter; }
 .sidenote-number::after { content: counter(sidenote-counter); font-size: 0.6em; vertical-align: super; }
 .sidenote-number + .margin-note::before { content: counter(sidenote-counter); font-size: 0.6em; vertical-align: super; }
