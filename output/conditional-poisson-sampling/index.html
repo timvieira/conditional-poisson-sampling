@@ -3745,12 +3745,25 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
 </div>
 </main>
 
+<p>The PyTorch FFT implementation (next section) is faster for three reasons:</p>
+<ol>
+<li>
+<p><strong>FFT-based polynomial multiplication</strong>: $\mathcal{O}(d \log d)$ per multiply instead of $\mathcal{O}(d^2)$, giving $\mathcal{O}(N \log^2 n)$ total with truncation to degree $n$.</p>
+</li>
+<li>
+<p><strong>Batched execution</strong>: all multiplications at each tree level are batched into a single torch operation ($\mathcal{O}(\log N)$ torch calls, not $\mathcal{O}(N)$).</p>
+</li>
+<li>
+<p><strong>Autograd</strong>: the gradient (inclusion probabilities) comes from backpropagation—no hand-coded downward pass needed.</p>
+</li>
+</ol>
+<p>The contour scaling (described below) is essential: without it, FFT precision collapses at $N \gtrsim 1000$.  With it, the implementation achieves machine-epsilon accuracy at all tested sizes ($N$ up to 10,000) and handles extreme weight ranges ($r$ from $10^{-10}$ to $10^{8}$).</p>
 <h2 id="pytorch-implementation-with-contour-scaling">PyTorch Implementation with Contour Scaling</h2>
 <p>The NumPy implementation above uses hand-coded tree traversals with <code>scipy.signal.convolve</code>.  A natural question: can we use PyTorch's autograd to compute the gradient (inclusion probabilities) automatically, given only the forward pass?</p>
 <p>The answer is yes—and it's both simpler and faster.  The key insight is that <strong>computing $\bpip$ is just backpropagation</strong> applied to the upward pass.  The <a href="../evaluating-fx-is-as-fast-as-fx/">Baur-Strassen theorem</a> guarantees that the gradient costs at most a small constant factor more than the forward pass (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">Baur &amp; Strassen, 1983</a> prove $3\times$ for nonscalar operations on polynomials; <a href="https://doi.org/10.1137/1.9780898717761">Griewank &amp; Walther, 2008</a> give $5\times$ for general reverse-mode AD).  <a href="https://doi.org/10.1137/1.9780898717761">Griewank &amp; Walther (2008)</a> show that the numerical stability of the derivatives is inherited from the forward pass—so if we make the forward pass stable, everything else follows.</p>
 <p>The computation is just the product tree: build $\prod_i (1 + \w_i \z)$ bottom-up using polynomial multiplication, then extract $\llbracket \cdot \rrbracket(\z^n)$ and take the log.  In PyTorch, we batch all multiplications at each tree level into a single operation—$\mathcal{O}(\log N)$ torch calls instead of $\mathcal{O}(N)$.</p>
 <h3 id="the-fft-precision-problem-and-weight-rescaling">The FFT Precision Problem and Weight Rescaling</h3>
-<p>Using FFT for the polynomial multiplications gives $\mathcal{O}(N \log^2 n)$ complexity (with truncation to degree $n$).  But naively, FFT introduces rounding errors $\sim \varepsilon \cdot \max_k|c_k|$ per coefficient, where $c_k$ denotes the $k$<sup>th</sup> coefficient of the product polynomial $\prod_i(1 + \w_i \z) = \sum_k c_k \z^k$.  The largest coefficient (near degree $N/2$) can be $\sim 10^{300}$ times larger than $c_n$, the coefficient we need—so FFT noise drowns the signal.</p>
+<p>Using FFT for the polynomial multiplications gives $\mathcal{O}(N \log^2 n)$ complexity (with truncation to degree $n$).  But naively, FFT introduces rounding errors $\approx \varepsilon \cdot \max_k|c_k|$ per coefficient, where $c_k$ denotes the $k$<sup>th</sup> coefficient of the product polynomial $\prod_i(1 + \w_i \z) = \sum_k c_k \z^k$.  The largest coefficient (near degree $N/2$) can be $\approx 10^{300}$ times larger than $c_n$, the coefficient we need—so FFT noise drowns the signal.</p>
 <p><strong>The key identity.</strong>  For any $r > 0$:<a href="test_identities.py#test_contour_scaling" title="test_contour_scaling" class="verified" target="_blank">✓</a></p>
 <p>$$\Zw{\bw}{n} = r^{-n} \cdot \llbracket \textstyle\prod_i(1 + \w_i r\, \z) \rrbracket(\z^n)$$</p>
 <p>This is immediate: each $\z^n$ term in the product picks up a factor of $r$ per item, giving $r^n \cdot \Zw{\bw}{n}$.  The identity says we can rescale all weights by any $r > 0$ and recover the same answer.  In exact arithmetic, $r$ doesn't matter.  In floating-point, it matters enormously: different values of $r$ shift which coefficient is largest, changing the dynamic range and thus the FFT rounding error relative to $c_n$.</p>
@@ -3962,7 +3975,7 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
 <p><strong>Guarantee.</strong> With this choice of $r$, the coefficients $c_k(r)$ are proportional to the PMF of $K$, whose mode is at $n \pm 1$.  The PMF of a sum of Bernoullis is log-concave, so it decays exponentially away from the mode.  In practice, this makes the dynamic range $\max_k c_k / c_n$ a modest constant (typically $\approx 1$), ensuring the relative FFT error in $c_n$ is $\mathcal{O}(\varepsilon)$.</p>
 <p><strong>Autograd compatibility.</strong> The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).</p>
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
-<p><strong>Numerical validation.</strong> The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$).  With $r=1$ the dynamic range is $\sim 10^{16}$, destroying all precision.  The optimal $r^*$ brings it to $\sim 1$.</p>
+<p><strong>Numerical validation.</strong> The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$).  With $r=1$ the dynamic range is $\approx 10^{16}$, destroying all precision.  The optimal $r^*$ brings it to $\approx 1$.</p>
 <div id="r-comparison">
 </div>
 <script>
@@ -4042,19 +4055,6 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
 
 </div>
 
-<p>The speedup comes from three sources:</p>
-<ol>
-<li>
-<p><strong>FFT-based polynomial multiplication</strong>: $\mathcal{O}(d \log d)$ per multiply instead of $\mathcal{O}(d^2)$, giving $\mathcal{O}(N \log^2 n)$ total with truncation to degree $n$.</p>
-</li>
-<li>
-<p><strong>Batched execution</strong>: all multiplications at each tree level are batched into a single torch operation ($\mathcal{O}(\log N)$ torch calls, not $\mathcal{O}(N)$).</p>
-</li>
-<li>
-<p><strong>Autograd</strong>: the gradient (inclusion probabilities) comes from backpropagation—no hand-coded downward pass needed.</p>
-</li>
-</ol>
-<p>The contour scaling is essential: without it, FFT precision collapses at $N \gtrsim 1000$.  With it, the implementation achieves machine-epsilon accuracy at all tested sizes ($N$ up to 10,000) and handles extreme weight ranges ($r$ from $10^{-10}$ to $10^{8}$).</p>
 <p>Code: <a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py"><code>torch_fft_prototype.py</code></a></p>
 <h2 id="application-horvitz-thompson-estimation">Application: Horvitz-Thompson Estimation</h2>
 <p>So far we've built machinery for sampling fixed-size subsets and computing inclusion probabilities.  A natural question: what can you <em>do</em> with this?  One important application is unbiased estimation.</p>
