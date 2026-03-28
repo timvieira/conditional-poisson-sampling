@@ -57,11 +57,15 @@ def watch():
                 return
             if event.event_type not in REBUILD_EVENTS:
                 return
-            path = Path(event.src_path)
+            # For moved events (atomic saves), check the destination path
+            if event.event_type == 'moved':
+                path = Path(event.dest_path)
+            else:
+                path = Path(event.src_path)
             # Only rebuild for content files we care about
             if path.suffix not in WATCH_EXTENSIONS:
                 return
-            if '.ipynb_checkpoints' in event.src_path:
+            if '.ipynb_checkpoints' in str(path):
                 return
 
             # Debounce: schedule a rebuild 0.5s from now, resetting on each event

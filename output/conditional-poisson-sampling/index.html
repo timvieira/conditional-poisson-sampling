@@ -1563,8 +1563,8 @@ a.tag:hover {
 .margin-note {
     float: right;
     clear: right;
-    width: 180px;
-    margin-right: -220px;
+    width: 250px;
+    margin-right: -290px;
     padding: 0.4em 0.6em;
     font-size: 0.75em;
     line-height: 1.3;
@@ -1575,11 +1575,17 @@ a.tag:hover {
     /* On narrow screens, fall back to inline float */
     .margin-note {
         margin-right: 0;
-        max-width: 180px;
+        max-width: 250px;
         margin-left: 1em;
         margin-bottom: 0.5em;
     }
 }
+
+/* Pseudocode blocks */
+.pseudocode { border: 1px solid #ccc; border-radius: 4px; padding: 0.4em 0.8em; margin: 1em 0; background: #fafafa; line-height: 1.0; }
+.pseudocode p { margin: 0.1em 0; }
+.pseudocode p:last-child { margin-bottom: 0; }
+.pseudocode b { font-weight: 700; }
 
 /* Verified-identity pills (✓ footnote markers) */
 a.verified {
@@ -1829,14 +1835,14 @@ $$</p>
 
 <p>Suppose you want to draw a random subset of exactly $n$ items from a universe of $N$ items, where each item $i$ has a positive weight $\w_i$.  The <strong>conditional Poisson distribution</strong> assigns each size-$n$ subset a probability proportional to the product of its weights:<a href="test_identities.py#test_distribution_definition" title="test_distribution_definition, test_Z_is_elementary_symmetric_poly" class="verified" target="_blank">✓</a></p>
 <p>$$
-P(S) \propto \prod_{i \in S} \w_i, \quad |S| = n
+P(S) \propto \mathbf{1}\big[ |S| = n\big] \prod_{i \in S} \w_i
 $$</p>
 <p>The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is a weighted generalization of the binomial coefficient, which recovers $\binom{N}{n} = \Zw{\bw}{n}$ when $\bw = \mathbf{1}^N$.<a href="test_identities.py#test_Z_equals_binomial_when_uniform" title="test_Z_equals_binomial_when_uniform" class="verified" target="_blank">✓</a></p>
-<p><strong>Inclusion probabilities.</strong> The inclusion probability $\pip_i$ is the $P(S)$-weighted column sum of the $i$<sup>th</sup> indicator: $\pip_i \defeq \sum_{S} P(S)\, \mathbf{1}[i \in S]$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$ (the other items "push back" through the size constraint $|S| = n$).</p>
+<p><strong>Inclusion probabilities.</strong> The inclusion probability $\pip_i \defeq \sum_{S} P(S)\, \mathbf{1}[i \in S]$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$, as the other items push back through the size constraint $|S| = n$. Later in this article, we provide an interactive widget for exploring the nonlinear relationship between $\bw$ and $\bpip$.</p>
 <p><strong>Why is this distribution special?</strong> The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, it is the unique <em>maximum-entropy</em> one<a href="test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>—making the fewest assumptions beyond the marginals (<a href="https://doi.org/10.1103/PhysRev.106.620">Jaynes, 1957</a>; <a href="https://academic.oup.com/biomet/article-abstract/81/3/457/256956">Chen, Dempster &amp; Liu, 1994</a>), in the same sense that the Gaussian is max-entropy for given mean and variance.  The log-normalizer $\log \Zw{\bw}{n}$ is convex in $\btheta$, so many properties follow mechanically: inclusion probabilities are the gradient ($\pip_i = \partial \log \Z / \partial \theta_i$) and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the <em>exponential fixed-size design</em> for this reason.</p>
 <p><strong>Relationship to Poisson sampling.</strong> In Poisson sampling,<label class="sidenote-number"></label><span class="margin-note">Named after mathematician <a href="https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson">Siméon Denis Poisson</a>.  Although poisson is the French word for fish, no fishing metaphor is intended.</span> each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_i \mathbf{1}[i \in S]$ is random.  The <em>conditional</em> Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.  The weight $\w_i$ is the <em>odds</em> of the $i$<sup>th</sup> coin: $\w_i \defeq p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a>  (The <a href="#Parameterizations">identities section</a> compares the odds and probability parameterizations.)</p>
 <p><strong>What this post covers.</strong> The computational challenges are: computing $\Zw{\bw}{n}$ and $P(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim P$, and the inverse problem of finding $\bw$ from target $\bpip$.  This post gives efficient algorithms for all four—in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree.  The code is available as a <a href="https://github.com/timvieira/conditional-poisson-sampling">Python library</a>.</p>
-<p><strong>As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python</strong> (or any language outside of R's survey-sampling packages).  Existing R implementations—<code>UPmaxentropy</code> in the <a href="https://cran.r-project.org/web/packages/sampling/">sampling</a> package and the <a href="https://cran.r-project.org/web/packages/BalancedSampling/">BalancedSampling</a> package—use either rejection sampling or $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I'm aware of.</p>
+<p><strong>Software.</strong> As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python (or any language outside of R's survey-sampling packages).  Existing R implementations—<code>UPmaxentropy</code> in the <a href="https://cran.r-project.org/web/packages/sampling/">sampling</a> package and the <a href="https://cran.r-project.org/web/packages/BalancedSampling/">BalancedSampling</a> package—use either rejection sampling or $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I'm aware of.</p>
 <style>
 /* Tufte-style sidenote numbering */
 .sidenote-number { counter-increment: sidenote-counter; }
@@ -2120,15 +2126,15 @@ $$</p>
 
 <h2 id="a-rejection-sampler">A Rejection Sampler</h2>
 <p>Here is a simple rejection sampler that produces exactly the conditional Poisson distribution.  It gives useful intuition for what the distribution <em>is</em>.</p>
-<p>Draw $n$ items i.i.d. from the categorical distribution with probabilities $\propto \w_i$ (with replacement).  Reject unless all $n$ draws are distinct.  The resulting distribution over size-$n$ subsets satisfies $P(S) \propto \prod_{i \in S} \w_i$.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a>  The extra factors ($n!$ and $\W^n$, where $\W \defeq \sum_i \w_i$) are constant across all size-$n$ subsets and cancel upon conditioning.</p>
-<blockquote>
-<p><strong>Bernoulli equivalence.</strong>  The same distribution arises from flipping $N$ independent, nonidentical coins—coin $i$ has heads probability $p_i \defeq \w_i/(1+\w_i)$—and conditioning on exactly $n$ heads.  In this view, $\w_i = p_i/(1-p_i)$ is literally the <em>odds</em> of coin $i$.  This is <em>Poisson sampling</em> conditioned on sample size, hence the name.  (The <a href="#Parameterizations">parameterizations table</a> gives the precise relationship between the odds and probability generating functions.)</p>
-</blockquote>
-<div class="highlight"><pre><span></span><code><span class="nv">Draw</span><span class="w"> </span><span class="nv">n</span><span class="w"> </span><span class="nv">items</span><span class="w"> </span><span class="nv">i</span>.<span class="nv">i</span>.<span class="nv">d</span>.<span class="w"> </span><span class="nv">from</span><span class="w"> </span><span class="nv">Categorical</span><span class="ss">(</span><span class="nv">w</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nv">sum</span><span class="ss">(</span><span class="nv">w</span><span class="ss">))</span>,<span class="w"> </span><span class="nv">with</span><span class="w"> </span><span class="nv">replacement</span>
-<span class="k">If</span><span class="w"> </span><span class="nv">all</span><span class="w"> </span><span class="nv">n</span><span class="w"> </span><span class="nv">draws</span><span class="w"> </span><span class="nv">are</span><span class="w"> </span><span class="nv">distinct</span>,<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nv">the</span><span class="w"> </span><span class="nv">set</span><span class="c1">; otherwise retry</span>
-</code></pre></div>
+<div class="pseudocode">
+<p><b>repeat</b><br>
+$\quad$ Draw $s_1, \ldots, s_n \overset{\text{i.i.d.}}{\sim} \text{Categorical}(\bw / \W)$ where $\W \defeq \sum_i \w_i$<br>
+$\quad$ $S \leftarrow \{s_1, \ldots, s_n\}$<br>
+<b>until</b> $|S| = n$ (all draws are distinct)<br>
+<b>return</b> $S$</p>
+</div>
 
-<p>The acceptance rate is $n! \cdot \Zw{\bw}{n} / \W^n$<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a>, which can be very small when $n$ is not much smaller than $N$.  This sampler works well when $n \ll N$ but becomes impractical otherwise.</p>
+<p>The resulting distribution over size-$n$ subsets is $P(S)$: the extra factors ($n!$ and $\W^n$) are constant across all size-$n$ subsets and cancel upon conditioning.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a><label class="sidenote-number"></label><span class="margin-note"><strong>Poisson sampling equivalence.</strong>  Equivalently, run Poisson sampling—include each item $i$ independently with probability $p_i \defeq \w_i/(1+\w_i)$—and condition on exactly $n$ inclusions.  The weight $\w_i = p_i/(1-p_i)$ is the <em>odds</em> of including item $i$.  (The <a href="#Parameterizations">parameterizations table</a> gives the precise relationship between the odds and probability generating functions.)</span>  The acceptance rate is $n! \cdot \Zw{\bw}{n} / \W^n$<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a>, which can be very small when $n$ is not much smaller than $N$.  This sampler works well when $n \ll N$ but becomes impractical otherwise.</p>
 <p><strong>The gap.</strong> The rejection sampler doesn't give you a way to compute $\Zw{\bw}{n}$, the inclusion probabilities, or gradients for fitting—that's the gap the product tree fills.</p>
 <h2 id="the-polynomial-product-tree">The Polynomial Product Tree</h2>
 <p>The key idea is to encode the sum over all $\binom{N}{n}$ subsets as the coefficient of $\z^n$ in a product of polynomials:</p>
@@ -2138,7 +2144,7 @@ $$</p>
 <p>The $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the <em>subproduct tree</em> (see <a href="https://doi.org/10.1017/CBO9781139856065">von zur Gathen &amp; Gerhard (2013)</a>, Chapter 10).</p>
 <p><strong>Polynomials as arrays.</strong> Each polynomial is stored as an array of coefficients: <code>[1, 3, 2]</code> represents $1 + 3\z + 2\z^2$.  Multiplying two polynomials is <em>convolution</em> of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving <code>[1, 2]</code> with <code>[1, 3]</code> to get <code>[1, 5, 6]</code>.  Using the fast Fourier transform (FFT), this convolution costs $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.</p>
 <p><strong>Notation.</strong> We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.</p>
-<h3 id="computing-the-normalizing-constant-math136">Computing the Normalizing Constant $\Z$</h3>
+<h3 id="computing-the-normalizing-constant-math137">Computing the Normalizing Constant $\Z$</h3>
 <p>Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.</p>
 <p>For example, with $N = 8$ items, the tree has three levels of internal nodes.  At the first level, pairs of leaves are multiplied: $P_{12}(\z) = (1 + \w_1 \z)(1 + \w_2 \z)$, and so on.  At the next level, $P_{1234} = P_{12} \cdot P_{34}$.  The root is $P_{12345678} = P_{1234} \cdot P_{5678}$.</p>
 <p><div class="mermaid">
@@ -2750,7 +2756,7 @@ svg text { font-family: 'EB Garamond', serif; }
 <p>$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N)$$</p>
 <p>which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
 The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be <strong>truncated to degree $n$</strong> without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.</p>
-<h3 id="computing-inclusion-probabilities-math166">Computing Inclusion Probabilities $\bpip$</h3>
+<h3 id="computing-inclusion-probabilities-math167">Computing Inclusion Probabilities $\bpip$</h3>
 <p>The inclusion probability is the gradient of the log-normalizer (an exponential family identity):</p>
 <p>$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$</p>
 <p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running <a href="../evaluating-fx-is-as-fast-as-fx/">backpropagation</a> on the same tree—no new algorithm needed.  By the Baur-Strassen theorem (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">1983</a>), the gradient costs at most a constant factor more than the forward computation.</p>

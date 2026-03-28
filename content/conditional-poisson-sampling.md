@@ -27,12 +27,12 @@ $$
 Suppose you want to draw a random subset of exactly $n$ items from a universe of $N$ items, where each item $i$ has a positive weight $\w_i$.  The **conditional Poisson distribution** assigns each size-$n$ subset a probability proportional to the product of its weights:<a href="test_identities.py#test_distribution_definition" title="test_distribution_definition, test_Z_is_elementary_symmetric_poly" class="verified" target="_blank">✓</a>
 
 $$
-P(S) \propto \prod_{i \in S} \w_i, \quad |S| = n
+P(S) \propto \mathbf{1}\big[ |S| = n\big] \prod_{i \in S} \w_i
 $$
 
 The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is a weighted generalization of the binomial coefficient, which recovers $\binom{N}{n} = \Zw{\bw}{n}$ when $\bw = \mathbf{1}^N$.<a href="test_identities.py#test_Z_equals_binomial_when_uniform" title="test_Z_equals_binomial_when_uniform" class="verified" target="_blank">✓</a>
 
-**Inclusion probabilities.** The inclusion probability $\pip_i$ is the $P(S)$-weighted column sum of the $i$<sup>th</sup> indicator: $\pip_i \defeq \sum_{S} P(S)\, \mathbf{1}[i \in S]$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$ (the other items "push back" through the size constraint $|S| = n$).
+**Inclusion probabilities.** The inclusion probability $\pip_i \defeq \sum_{S} P(S)\, \mathbf{1}[i \in S]$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$, as the other items push back through the size constraint $|S| = n$. Later in this article, we provide an interactive widget for exploring the nonlinear relationship between $\bw$ and $\bpip$.
 
 **Why is this distribution special?** The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, it is the unique *maximum-entropy* one<a href="test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>—making the fewest assumptions beyond the marginals ([Jaynes, 1957](https://doi.org/10.1103/PhysRev.106.620); [Chen, Dempster & Liu, 1994](https://academic.oup.com/biomet/article-abstract/81/3/457/256956)), in the same sense that the Gaussian is max-entropy for given mean and variance.  The log-normalizer $\log \Zw{\bw}{n}$ is convex in $\btheta$, so many properties follow mechanically: inclusion probabilities are the gradient ($\pip_i = \partial \log \Z / \partial \theta_i$) and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the *exponential fixed-size design* for this reason.
 
@@ -40,7 +40,7 @@ The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ 
 
 **What this post covers.** The computational challenges are: computing $\Zw{\bw}{n}$ and $P(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim P$, and the inverse problem of finding $\bw$ from target $\bpip$.  This post gives efficient algorithms for all four—in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree.  The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).
 
-**As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python** (or any language outside of R's survey-sampling packages).  Existing R implementations—`UPmaxentropy` in the [sampling](https://cran.r-project.org/web/packages/sampling/) package and the [BalancedSampling](https://cran.r-project.org/web/packages/BalancedSampling/) package—use either rejection sampling or $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I'm aware of.
+**Software.** As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python (or any language outside of R's survey-sampling packages).  Existing R implementations—`UPmaxentropy` in the [sampling](https://cran.r-project.org/web/packages/sampling/) package and the [BalancedSampling](https://cran.r-project.org/web/packages/BalancedSampling/) package—use either rejection sampling or $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I'm aware of.
 
 
 <style>
@@ -329,17 +329,15 @@ The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ 
 
 Here is a simple rejection sampler that produces exactly the conditional Poisson distribution.  It gives useful intuition for what the distribution *is*.
 
-Draw $n$ items i.i.d. from the categorical distribution with probabilities $\propto \w_i$ (with replacement).  Reject unless all $n$ draws are distinct.  The resulting distribution over size-$n$ subsets satisfies $P(S) \propto \prod_{i \in S} \w_i$.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a>  The extra factors ($n!$ and $\W^n$, where $\W \defeq \sum_i \w_i$) are constant across all size-$n$ subsets and cancel upon conditioning.
+<div class="pseudocode">
+<b>repeat</b><br>
+$\quad$ Draw $s_1, \ldots, s_n \overset{\text{i.i.d.}}{\sim} \text{Categorical}(\bw / \W)$ where $\W \defeq \sum_i \w_i$<br>
+$\quad$ $S \leftarrow \{s_1, \ldots, s_n\}$<br>
+<b>until</b> $|S| = n$ (all draws are distinct)<br>
+<b>return</b> $S$
+</div>
 
-> **Bernoulli equivalence.**  The same distribution arises from flipping $N$ independent, nonidentical coins—coin $i$ has heads probability $p_i \defeq \w_i/(1+\w_i)$—and conditioning on exactly $n$ heads.  In this view, $\w_i = p_i/(1-p_i)$ is literally the *odds* of coin $i$.  This is *Poisson sampling* conditioned on sample size, hence the name.  (The [parameterizations table](#Parameterizations) gives the precise relationship between the odds and probability generating functions.)
-
-```
-Draw n items i.i.d. from Categorical(w / sum(w)), with replacement
-If all n draws are distinct, return the set; otherwise retry
-```
-
-
-The acceptance rate is $n! \cdot \Zw{\bw}{n} / \W^n$<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a>, which can be very small when $n$ is not much smaller than $N$.  This sampler works well when $n \ll N$ but becomes impractical otherwise.
+The resulting distribution over size-$n$ subsets is $P(S)$: the extra factors ($n!$ and $\W^n$) are constant across all size-$n$ subsets and cancel upon conditioning.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a><label class="sidenote-number"></label><span class="margin-note">**Poisson sampling equivalence.**  Equivalently, run Poisson sampling—include each item $i$ independently with probability $p_i \defeq \w_i/(1+\w_i)$—and condition on exactly $n$ inclusions.  The weight $\w_i = p_i/(1-p_i)$ is the *odds* of including item $i$.  (The [parameterizations table](#Parameterizations) gives the precise relationship between the odds and probability generating functions.)</span>  The acceptance rate is $n! \cdot \Zw{\bw}{n} / \W^n$<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a>, which can be very small when $n$ is not much smaller than $N$.  This sampler works well when $n \ll N$ but becomes impractical otherwise.
 
 **The gap.** The rejection sampler doesn't give you a way to compute $\Zw{\bw}{n}$, the inclusion probabilities, or gradients for fitting—that's the gap the product tree fills.
 
