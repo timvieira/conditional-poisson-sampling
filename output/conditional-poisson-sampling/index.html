@@ -1578,16 +1578,19 @@ a.tag:hover {
     border-left: 2px solid #ddd;
 }
 @media only screen and (max-width: 1060px) {
-    /* Not enough room for margin; collapse to toggleable footnote */
+    /* Standalone margin notes (no sidenote number): show inline */
     .margin-note {
-        display: none;
+        float: none;
         width: auto;
+        margin: 0.5em 0;
+    }
+    /* Numbered sidenotes: hide until clicked */
+    .sidenote-number + .margin-note {
+        display: none;
         max-width: 100%;
-        margin: 0.3em 0 0.5em 0;
         padding: 0.4em 0.8em;
         background: #f8f8f8;
         border-radius: 4px;
-        border-left: 2px solid #ddd;
     }
     .sidenote-number { cursor: pointer; }
     .sidenote-number.active + .margin-note {
