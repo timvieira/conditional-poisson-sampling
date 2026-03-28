@@ -1585,11 +1585,11 @@ All computations are verified against brute-force enumeration in the [test suite
 
 Now that we've seen how the product tree works under the hood, here's the library interface.  The simplest entry point is `from_weights`: hand it a subset size $n$ and a weight vector $\bw$.
 
-{% notebook conditional-poisson-sampling.ipynb cells[15:16] %}
+{% notebook conditional-poisson-sampling.ipynb cells[0:1] %}
 
 The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="test_identities.py#test_pi_sums_to_n" title="test_pi_sums_to_n" class="verified" target="_blank">✓</a> and each $\pip_i \in [0, 1]$.<a href="test_identities.py#test_pi_in_unit_interval" title="test_pi_in_unit_interval" class="verified" target="_blank">✓</a>  Items with larger weights get higher inclusion probabilities.
 
-{% notebook conditional-poisson-sampling.ipynb cells[17:18] %}
+{% notebook conditional-poisson-sampling.ipynb cells[1:2] %}
 
 The blue curve shows the *Poisson approximation*: if each item were included independently with probability $p_i = w_i r / (1 + w_i r)$ (where $r$ is the tilting parameter that makes $\sum p_i = n$), we would get $\pip_i \approx p_i$.  The actual inclusion probabilities (dots) are close but not identical—conditioning on $|S| = n$ introduces a correction of $\mathcal{O}(1/N)$ per item ([Hájek, 1964](https://doi.org/10.1214/aoms/1177700375)).  This approximation is the warm start for [fitting](#Fitting-Weights-to-Target-Probabilities): inverting the Poisson relationship gives $\theta_i \approx \log(\pip^*_i / (1 - \pip^*_i))$, which is close enough that the optimizer converges in a few iterations.
 
@@ -1598,11 +1598,11 @@ The blue curve shows the *Poisson approximation*: if each item were included ind
 
 Drawing samples works by walking a binary tree top-down, splitting a "quota" of $n$ items between the left and right subtrees at each node.  Each split is exact (not approximate),<a href="test_identities.py#test_sampling_distribution" title="test_sampling_distribution" class="verified" target="_blank">✓</a> and the tree is built once and cached, so subsequent samples are cheap.
 
-{% notebook conditional-poisson-sampling.ipynb cells[20:21] %}
+{% notebook conditional-poisson-sampling.ipynb cells[2:3] %}
 
 Let's verify that the empirical inclusion frequencies match the exact $\bpip$ values.
 
-{% notebook conditional-poisson-sampling.ipynb cells[22:23] %}
+{% notebook conditional-poisson-sampling.ipynb cells[3:4] %}
 
 ## Fitting Weights to Target Probabilities
 
@@ -1638,13 +1638,13 @@ where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size an
 
 </details>
 
-{% notebook conditional-poisson-sampling.ipynb cells[25:26] %}
+{% notebook conditional-poisson-sampling.ipynb cells[4:5] %}
 
 ## Timing
 
 The tree-based approach scales to moderately large $N$ comfortably.  For comparison, the naive $\mathcal{O}(N^2 n)$ dynamic programming (DP) baseline is also shown.  (The PyTorch FFT implementation in the next section is significantly faster—see below.)
 
-{% notebook conditional-poisson-sampling.ipynb cells[27:28] %}
+{% notebook conditional-poisson-sampling.ipynb cells[5:6] %}
 
 ## PyTorch Implementation with Contour Scaling
 
@@ -1879,7 +1879,7 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
 **Autograd compatibility.** The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).
 
 
-{% notebook conditional-poisson-sampling.ipynb cells[29:30] %}
+{% notebook conditional-poisson-sampling.ipynb cells[6:7] %}
 
 The speedup comes from three sources:
 
