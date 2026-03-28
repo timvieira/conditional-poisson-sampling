@@ -1102,6 +1102,207 @@ $$\sum_i \frac{\w_i \cdot r}{1 + \w_i \cdot r} = n$$
 
 This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's method converges in a few iterations.  A simpler heuristic, $r = n / \W$ (where $\W \defeq \sum_i \w_i$), linearizes $\w_i r / (1 + \w_i r) \approx \w_i r$ and works for mild weights but breaks down with heavy tails.
 
+<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+
+**Contour diagram.** The generating function $f(\z) = \prod_i(1 + \w_i \z)$ has zeros at $\z = -1/\w_i$ on the negative real axis.  Extracting the $n$<sup>th</sup> coefficient via FFT is equivalent to sampling $f$ at equally-spaced points on the circle $|\z| = r$.  Drag the circle to change $r$ and see how the coefficient bar chart shifts its peak toward degree $n$.
+
+<div id="contour-diagram"></div>
+<script>
+(function() {
+  var W = 500, H = 280, barW = 500, barH = 100;
+  var weights = [1.5, 3.2, 0.8, 4.5, 2.0, 0.3, 5.1, 1.8];
+  var N = weights.length, n = 3;
+  var zeros = weights.map(function(w){ return -1/w; });
+
+  // Compute optimal r via Newton's method
+  function solveR(target) {
+    var lr = 0;
+    for (var i = 0; i < 50; i++) {
+      var r = Math.exp(lr);
+      var s = 0, ds = 0;
+      for (var j = 0; j < N; j++) {
+        var p = weights[j]*r/(1+weights[j]*r);
+        s += p; ds += p*(1-p);
+      }
+      lr += (target - s) / ds;
+    }
+    return Math.exp(lr);
+  }
+  var rOpt = solveR(n);
+  var r = rOpt;
+
+  // Compute coefficients c_k(r) = Z(w,k) * r^k
+  function coeffs(r) {
+    var poly = [1];
+    for (var i = 0; i < N; i++) {
+      var next = new Array(poly.length + 1).fill(0);
+      for (var j = 0; j < poly.length; j++) {
+        next[j] += poly[j];
+        next[j+1] += poly[j] * weights[i] * r;
+      }
+      poly = next;
+    }
+    return poly;
+  }
+
+  var root = d3.select('#contour-diagram');
+
+  // Complex plane
+  var svg = root.append('svg').attr('width', W).attr('height', H)
+    .style('display','block').style('margin','0 auto 8px auto');
+
+  var cx = W * 0.5, cy = H * 0.5;
+  var minZero = Math.min.apply(null, zeros);  // most negative zero
+  var viewLeft = minZero * 1.3;
+  var viewRight = -viewLeft * 0.5;
+  var pxPerUnit = W / (viewRight - viewLeft);
+
+  function toX(v) { return cx + v * pxPerUnit; }
+  function toY(v) { return cy - v * pxPerUnit; }
+
+  // Axes
+  svg.append('line').attr('x1',0).attr('x2',W).attr('y1',cy).attr('y2',cy)
+    .attr('stroke','#ccc').attr('stroke-width',1);
+  svg.append('line').attr('x1',toX(0)).attr('x2',toX(0)).attr('y1',0).attr('y2',H)
+    .attr('stroke','#ccc').attr('stroke-width',1);
+  svg.append('text').attr('x',W-8).attr('y',cy-6).attr('text-anchor','end')
+    .style('font-size','12px').style('fill','#999').style('font-family',"'EB Garamond', serif").text('Re');
+  svg.append('text').attr('x',toX(0)+8).attr('y',14)
+    .style('font-size','12px').style('fill','#999').style('font-family',"'EB Garamond', serif").text('Im');
+
+  // Contour circle
+  var contour = svg.append('circle')
+    .attr('cx', toX(0)).attr('cy', cy)
+    .attr('fill','rgba(90,155,213,0.08)').attr('stroke','#4a90d9').attr('stroke-width',2)
+    .attr('stroke-dasharray','6,3');
+
+  // Zeros on negative real axis
+  zeros.forEach(function(z, i) {
+    svg.append('circle').attr('cx', toX(z)).attr('cy', cy).attr('r', 5)
+      .attr('fill','none').attr('stroke','#c0504d').attr('stroke-width',2);
+  });
+
+  // Zero labels
+  svg.append('text').attr('x', toX(zeros[0])).attr('y', cy + 20)
+    .attr('text-anchor','middle')
+    .style('font-size','11px').style('fill','#c0504d').style('font-family',"'EB Garamond', serif")
+    .text('zeros: −1/wᵢ');
+
+  // Pole at origin
+  svg.append('text').attr('x', toX(0)-3).attr('y', cy-3).attr('text-anchor','end')
+    .style('font-size','16px').style('fill','#333').text('×');
+
+  // r label
+  var rLabel = svg.append('text')
+    .attr('text-anchor','start')
+    .style('font-size','13px').style('fill','#4a90d9').style('font-family',"'EB Garamond', serif");
+
+  // r* label
+  var rStarLabel = svg.append('text')
+    .attr('text-anchor','start')
+    .style('font-size','11px').style('fill','#999').style('font-family',"'EB Garamond', serif");
+
+  // FFT sample points on the circle
+  var nFFT = 16;
+  var dots = svg.selectAll('.fft-dot').data(d3.range(nFFT)).enter()
+    .append('circle').attr('class','fft-dot').attr('r',2.5)
+    .attr('fill','#4a90d9').attr('opacity',0.5);
+
+  // Bar chart for coefficients
+  var barSvg = root.append('svg').attr('width', barW).attr('height', barH + 30)
+    .style('display','block').style('margin','0 auto');
+
+  var barG = barSvg.append('g').attr('transform','translate(40,5)');
+  var bw = (barW - 80) / (N + 1);
+  var bars = barG.selectAll('.coeff-bar').data(d3.range(N+1)).enter()
+    .append('rect').attr('class','coeff-bar')
+    .attr('x', function(d){ return d * bw; })
+    .attr('width', bw - 2).attr('fill', function(d){ return d === n ? '#c0504d' : '#4a90d9'; })
+    .attr('opacity', function(d){ return d === n ? 0.9 : 0.5; });
+
+  var barLabels = barG.selectAll('.coeff-label').data(d3.range(N+1)).enter()
+    .append('text').attr('class','coeff-label')
+    .attr('x', function(d){ return d * bw + (bw-2)/2; })
+    .attr('text-anchor','middle')
+    .style('font-size','10px').style('fill','#666').style('font-family',"'EB Garamond', serif");
+
+  // k axis labels
+  barG.selectAll('.k-label').data(d3.range(N+1)).enter()
+    .append('text').attr('class','k-label')
+    .attr('x', function(d){ return d * bw + (bw-2)/2; })
+    .attr('text-anchor','middle')
+    .style('font-size','11px').style('fill','#333').style('font-family',"'EB Garamond', serif")
+    .text(function(d){ return d; });
+
+  barSvg.append('text').attr('x', barW/2).attr('y', barH + 26)
+    .attr('text-anchor','middle')
+    .style('font-size','12px').style('fill','#666').style('font-family',"'EB Garamond', serif")
+    .text('degree k');
+
+  var dynLabel = barSvg.append('text').attr('x', barW - 10).attr('y', 16)
+    .attr('text-anchor','end')
+    .style('font-size','11px').style('fill','#999').style('font-family',"'EB Garamond', serif");
+
+  function update() {
+    var rPx = r * pxPerUnit;
+    contour.attr('r', rPx);
+
+    // FFT sample points
+    dots.attr('cx', function(d){ return toX(r * Math.cos(2*Math.PI*d/nFFT)); })
+        .attr('cy', function(d){ return toY(r * Math.sin(2*Math.PI*d/nFFT)); });
+
+    // r label on the circle
+    rLabel.attr('x', toX(r) + 6).attr('y', cy - 4)
+      .text('r = ' + r.toFixed(2));
+
+    // r* tick mark
+    var rOptPx = toX(rOpt);
+    rStarLabel.attr('x', rOptPx + 4).attr('y', cy + 24)
+      .text('r* = ' + rOpt.toFixed(2));
+
+    // Update bar chart
+    var c = coeffs(r);
+    var maxC = Math.max.apply(null, c);
+    var barMax = barH - 10;
+
+    bars.attr('y', function(d){ return barMax - (c[d]/maxC) * barMax + 5; })
+        .attr('height', function(d){ return (c[d]/maxC) * barMax; });
+
+    barLabels.attr('y', function(d){ return barMax - (c[d]/maxC) * barMax; })
+      .text(function(d){ var v = c[d]/maxC; return v > 0.05 ? v.toFixed(2) : ''; });
+
+    // k axis
+    barG.selectAll('.k-label').attr('y', barMax + 16);
+
+    // Dynamic range
+    var dynRange = maxC / Math.max(c[n], 1e-300);
+    dynLabel.text('max/cₙ = ' + (dynRange < 100 ? dynRange.toFixed(1) : dynRange.toExponential(1)));
+  }
+
+  // Drag on the contour circle to change r
+  var dragR = d3.drag().on('drag', function(event) {
+    var dx = event.x - toX(0), dy = event.y - cy;
+    r = Math.max(0.05, Math.sqrt(dx*dx + dy*dy) / pxPerUnit);
+    update();
+  });
+  contour.call(dragR).style('cursor','ew-resize');
+
+  // Also add an invisible larger drag target
+  svg.append('circle').attr('cx',toX(0)).attr('cy',cy)
+    .attr('r', W/2).attr('fill','transparent').attr('pointer-events','all')
+    .style('cursor','ew-resize')
+    .call(d3.drag().on('drag', function(event) {
+      var dx = event.x - toX(0), dy = event.y - cy;
+      r = Math.max(0.05, Math.sqrt(dx*dx + dy*dy) / pxPerUnit);
+      update();
+    }));
+
+  update();
+})();
+</script>
+
+</div>
+
 **Guarantee.** With this choice of $r$, the coefficients $c_k(r)$ are proportional to the PMF of $K$, whose mode is at $n \pm 1$.  The PMF of a sum of Bernoullis is log-concave, so it decays exponentially away from the mode.  In practice, this makes the dynamic range $\max_k c_k / c_n$ a modest constant (typically $\approx 1$), ensuring the relative FFT error in $c_n$ is $\mathcal{O}(\varepsilon)$.
 
 
