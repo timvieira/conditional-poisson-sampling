@@ -325,9 +325,9 @@ The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ 
 
 </div>
 
-## A Rejection Sampler
+## An Equivalent Construction
 
-Here is a simple rejection sampler that produces exactly the conditional Poisson distribution.  It gives useful intuition for what the distribution *is*.
+The following construction makes the conditional Poisson distribution concrete.  Draw $n$ items independently from the categorical distribution over weights, and keep only the samples where all draws are distinct:
 
 <div class="pseudocode">
 <b>repeat</b><br>
@@ -337,9 +337,7 @@ $\quad$ $S \leftarrow \{s_1, \ldots, s_n\}$<br>
 <b>return</b> $S$
 </div>
 
-The resulting distribution over size-$n$ subsets is $P(S)$: the extra factors ($n!$ and $\W^n$) are constant across all size-$n$ subsets and cancel upon conditioning.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a><label class="sidenote-number"></label><span class="margin-note">**Poisson sampling equivalence.**  Equivalently, run Poisson sampling—include each item $i$ independently with probability $p_i \defeq \w_i/(1+\w_i)$—and condition on exactly $n$ inclusions.  The weight $\w_i = p_i/(1-p_i)$ is the *odds* of including item $i$.  (The [parameterizations table](#Parameterizations) gives the precise relationship between the odds and probability generating functions.)</span>  The acceptance rate is $n! \cdot \Zw{\bw}{n} / \W^n$<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a>, which can be very small when $n$ is not much smaller than $N$.  This sampler works well when $n \ll N$ but becomes impractical otherwise.
-
-**The gap.** The rejection sampler doesn't give you a way to compute $\Zw{\bw}{n}$, the inclusion probabilities, or gradients for fitting—that's the gap the product tree fills.
+The resulting distribution over size-$n$ subsets is exactly $P(S)$: the extra factors ($n!$ and $\W^n$) are constant across all size-$n$ subsets and cancel upon conditioning.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a><label class="sidenote-number"></label><span class="margin-note">**Poisson sampling equivalence.**  Equivalently, run Poisson sampling—include each item $i$ independently with probability $p_i \defeq \w_i/(1+\w_i)$—and condition on exactly $n$ inclusions.  The weight $\w_i = p_i/(1-p_i)$ is the *odds* of including item $i$.  (The [parameterizations table](#Parameterizations) gives the precise relationship between the odds and probability generating functions.)</span>  The acceptance probability of this construction is $n! \cdot \Zw{\bw}{n} / \W^n$<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a>—note that it involves the normalizing constant $\Zw{\bw}{n}$, which we have not yet shown how to compute.  This is not meant as a practical sampling algorithm; it simply establishes what the distribution *is*.
 
 
 ## The Polynomial Product Tree
@@ -359,42 +357,6 @@ The $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing const
 ### Computing the Normalizing Constant $\Z$
 
 Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.
-
-For example, with $N = 8$ items, the tree has three levels of internal nodes.  At the first level, pairs of leaves are multiplied: $P_{12}(\z) = (1 + \w_1 \z)(1 + \w_2 \z)$, and so on.  At the next level, $P_{1234} = P_{12} \cdot P_{34}$.  The root is $P_{12345678} = P_{1234} \cdot P_{5678}$.
-
-```mermaid
-graph BT
-    L1["$$(1 + w_1 z)$$"] --> N12["$$P_{12} = P_1 \cdot P_2$$"]
-    L2["$$(1 + w_2 z)$$"] --> N12
-    L3["$$(1 + w_3 z)$$"] --> N34["$$P_{34} = P_3 \cdot P_4$$"]
-    L4["$$(1 + w_4 z)$$"] --> N34
-    L5["$$(1 + w_5 z)$$"] --> N56["$$P_{56} = P_5 \cdot P_6$$"]
-    L6["$$(1 + w_6 z)$$"] --> N56
-    L7["$$(1 + w_7 z)$$"] --> N78["$$P_{78} = P_7 \cdot P_8$$"]
-    L8["$$(1 + w_8 z)$$"] --> N78
-    N12 --> N1234["$$P_{1\text{-}4} = P_{12} \cdot P_{34}$$"]
-    N34 --> N1234
-    N56 --> N5678["$$P_{5\text{-}8} = P_{56} \cdot P_{78}$$"]
-    N78 --> N5678
-    N1234 --> ROOT["$$\text{root: } P_{1\text{-}8}$$"]
-    N5678 --> ROOT
-
-    style ROOT fill:#4a90d9,color:#fff
-    style N1234 fill:#4a90d9,color:#fff
-    style N5678 fill:#4a90d9,color:#fff
-    style N12 fill:#4a90d9,color:#fff
-    style N34 fill:#4a90d9,color:#fff
-    style N56 fill:#4a90d9,color:#fff
-    style N78 fill:#4a90d9,color:#fff
-    style L1 fill:#e0e0e0,color:#000
-    style L2 fill:#e0e0e0,color:#000
-    style L3 fill:#e0e0e0,color:#000
-    style L4 fill:#e0e0e0,color:#000
-    style L5 fill:#e0e0e0,color:#000
-    style L6 fill:#e0e0e0,color:#000
-    style L7 fill:#e0e0e0,color:#000
-    style L8 fill:#e0e0e0,color:#000
-```
 
 <style>
 #content { overflow: visible !important; }
@@ -972,7 +934,7 @@ svg text { font-family: 'EB Garamond', serif; }
 
 **Complexity.** At each level of the tree, the total size of the polynomials being multiplied is $\mathcal{O}(N)$, and each multiplication is done via FFT in $\mathcal{O}(d \log d)$ time where $d$ is the degree. The recurrence is
 
-$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N)$$
+$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N), \quad T(1) = \mathcal{O}(1)$$
 
 which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
 The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be **truncated to degree $n$** without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.
