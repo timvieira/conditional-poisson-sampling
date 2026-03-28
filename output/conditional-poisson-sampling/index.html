@@ -1758,14 +1758,14 @@ details.derivation[open]::details-content {
   <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({startOnLoad: false});
+    mermaid.initialize({startOnLoad: false, math: {enabled: true}});
     // 1) Render Mermaid first (its built-in KaTeX handles $$ in labels)
     await mermaid.run({querySelector: '.mermaid'});
     // 2) Remove mermaid SVGs temporarily, typeset page with MathJax, restore
     if (window.MathJax && MathJax.startup) {
       await MathJax.startup.promise;
       const saved = [];
-      document.querySelectorAll('.jp-Mermaid').forEach(el => {
+      document.querySelectorAll('.mermaid').forEach(el => {
         saved.push({el, parent: el.parentNode, next: el.nextSibling});
         el.remove();
       });
@@ -2159,19 +2159,19 @@ $$</p>
 <p>For example, with $N = 8$ items, the tree has three levels of internal nodes.  At the first level, pairs of leaves are multiplied: $P_{12}(\z) = (1 + \w_1 \z)(1 + \w_2 \z)$, and so on.  At the next level, $P_{1234} = P_{12} \cdot P_{34}$.  The root is $P_{12345678} = P_{1234} \cdot P_{5678}$.</p>
 <p><div class="mermaid">
 graph BT
-    L1[" MATH1 "] --> N12[" MATH2 "]
-    L2[" MATH3 "] --> N12
-    L3[" MATH4 "] --> N34[" MATH5 "]
-    L4[" MATH6 "] --> N34
-    L5[" MATH7 "] --> N56[" MATH8 "]
-    L6[" MATH9 "] --> N56
-    L7[" MATH10 "] --> N78[" MATH11 "]
-    L8[" MATH12 "] --> N78
-    N12 --> N1234[" MATH13 "]
+    L1["$$(1 + w_1 z)$$"] --> N12["$$P_{12} = P_1 \cdot P_2$$"]
+    L2["$$(1 + w_2 z)$$"] --> N12
+    L3["$$(1 + w_3 z)$$"] --> N34["$$P_{34} = P_3 \cdot P_4$$"]
+    L4["$$(1 + w_4 z)$$"] --> N34
+    L5["$$(1 + w_5 z)$$"] --> N56["$$P_{56} = P_5 \cdot P_6$$"]
+    L6["$$(1 + w_6 z)$$"] --> N56
+    L7["$$(1 + w_7 z)$$"] --> N78["$$P_{78} = P_7 \cdot P_8$$"]
+    L8["$$(1 + w_8 z)$$"] --> N78
+    N12 --> N1234["$$P_{1\text{-}4} = P_{12} \cdot P_{34}$$"]
     N34 --> N1234
-    N56 --> N5678[" MATH14 "]
+    N56 --> N5678["$$P_{5\text{-}8} = P_{56} \cdot P_{78}$$"]
     N78 --> N5678
-    N1234 --> ROOT[" MATH15 "]
+    N1234 --> ROOT["$$\text{root: } P_{1\text{-}8}$$"]
     N5678 --> ROOT
 
     style ROOT fill:#4a90d9,color:#fff
@@ -2776,20 +2776,20 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
 <p>Sampling reuses the product tree (no gradient computation needed).  Starting at the root with a quota of $k = n$ items to select, we walk top-down: at each internal node, randomly split the quota between the left and right subtrees.  The probability of assigning $j$ items to the left is proportional to $\llbracket P_L \rrbracket(\z^j) \cdot \llbracket P_R \rrbracket(\z^{k-j})$.  This is exact, not approximate—it follows from the <strong>weighted Vandermonde identity</strong>: $\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$, which says the number of ways to choose $k$ items from $A \cup B$ is the convolution of the two groups' counts.  Each term in the sum is the conditional probability of a particular left/right split.  At the leaves, quota 1 means "include this item"; quota 0 means "exclude."</p>
 <p><div class="mermaid">
 graph TB
-    ROOT[" MATH18 "] -->|" MATH19 "| LEFT[" MATH20 "]
-    ROOT -->|" MATH21 "| RIGHT[" MATH22 "]
-    LEFT -->|" MATH23 "| LL[" MATH24 "]
-    LEFT -->|" MATH25 "| LR[" MATH26 "]
-    RIGHT -->|" MATH27 "| RL[" MATH28 "]
-    RIGHT -->|" MATH29 "| RR[" MATH30 "]
-    LL --> L1[" MATH31 "]
-    LL --> L2[" MATH32 "]
-    LR --> L3[" MATH33 "]
-    LR --> L4[" MATH34 "]
-    RL --> L5[" MATH35 "]
-    RL --> L6[" MATH36 "]
-    RR --> L7[" MATH37 "]
-    RR --> L8[" MATH38 "]
+    ROOT["$$\text{quota} = n$$"] -->|"$$j_1 \text{ items}$$"| LEFT["$$\text{quota} = j_1$$"]
+    ROOT -->|"$$n - j_1 \text{ items}$$"| RIGHT["$$\text{quota} = n - j_1$$"]
+    LEFT -->|"$$j_2$$"| LL["$$\text{quota} = j_2$$"]
+    LEFT -->|"$$j_1 - j_2$$"| LR["$$\text{quota} = j_1 - j_2$$"]
+    RIGHT -->|"$$j_3$$"| RL["$$\text{quota} = j_3$$"]
+    RIGHT -->|"$$n - j_1 - j_3$$"| RR["$$\text{quota} = n - j_1 - j_3$$"]
+    LL --> L1["$$0 \text{ or } 1$$"]
+    LL --> L2["$$0 \text{ or } 1$$"]
+    LR --> L3["$$0 \text{ or } 1$$"]
+    LR --> L4["$$0 \text{ or } 1$$"]
+    RL --> L5["$$0 \text{ or } 1$$"]
+    RL --> L6["$$0 \text{ or } 1$$"]
+    RR --> L7["$$0 \text{ or } 1$$"]
+    RR --> L8["$$0 \text{ or } 1$$"]
 
     style ROOT fill:#4a90d9,color:#fff
     style LEFT fill:#4a90d9,color:#fff
