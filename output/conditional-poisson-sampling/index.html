@@ -1756,6 +1756,7 @@ details.derivation[open]::details-content {
         inlineMath: [['$', '$']],
         displayMath: [['$$', '$$']],
         processEscapes: true,
+        macros: {"W": "W", "Z": "Z", "Zw": ["\\binom{#1}{#2}", 2], "ba": "\\boldsymbol{a}", "bb": "\\boldsymbol{b}", "bpip": "\\boldsymbol{\\pi}", "btheta": "{\\boldsymbol{\\theta}}", "bw": "\\boldsymbol{w}", "defeq": "\\overset{\\small\\text{def}}{=}", "llbracket": "[\\![", "pip": "\\pi", "rrbracket": "]\\!]", "w": "w", "z": "z"},
       },
       chtml: {
         scale: 1,
@@ -1813,29 +1814,7 @@ details.derivation[open]::details-content {
       </p>
     </header>
     <div class="entry-content" style="view-transition-name: article-body">
-      <script>
-// Register macros in MathJax config before typesetting
-window.MathJax = window.MathJax || {};
-window.MathJax.tex = window.MathJax.tex || {};
-window.MathJax.tex.macros = Object.assign(window.MathJax.tex.macros || {}, {
-  w: '{w}',
-  bw: '{\\boldsymbol{w}}',
-  W: '{W}',
-  Z: '{Z}',
-  Zw: ['{\\binom{#1}{#2}}', 2],
-  pip: '{\\pi}',
-  btheta: '{{\\boldsymbol{\\theta}}}',
-  bpip: '{\\boldsymbol{\\pi}}',
-  ba: '{\\boldsymbol{a}}',
-  bb: '{\\boldsymbol{b}}',
-  z: '{z}',
-  llbracket: '{[\\![}',
-  rrbracket: '{]\\!]}',
-  defeq: '{\\overset{\\small\\text{def}}{=}}'
-});
-</script>
-
-<div class="margin-note">
+      <div class="margin-note">
 <p><a href="test_identities.py" class="verified" target="_blank">✓</a> = numerically verified—each links to its test case in <a href="test_identities.py" style="color:#999">test_identities.py</a>.</p>
 </div>
 
