@@ -1578,12 +1578,20 @@ a.tag:hover {
     border-left: 2px solid #ddd;
 }
 @media only screen and (max-width: 1060px) {
-    /* Not enough room for margin notes; show inline */
+    /* Not enough room for margin; collapse to toggleable footnote */
     .margin-note {
-        float: none;
+        display: none;
         width: auto;
-        max-width: 90%;
-        margin: 0.5em 0 0.5em 2em;
+        max-width: 100%;
+        margin: 0.3em 0 0.5em 0;
+        padding: 0.4em 0.8em;
+        background: #f8f8f8;
+        border-radius: 4px;
+        border-left: 2px solid #ddd;
+    }
+    .sidenote-number { cursor: pointer; }
+    .sidenote-number.active + .margin-note {
+        display: block;
     }
 }
 
@@ -1987,5 +1995,13 @@ details.derivation[open]::details-content {
     })();
   </script>
   
+<script>
+// Toggle sidenotes on narrow screens
+document.querySelectorAll('.sidenote-number').forEach(function(el) {
+  el.addEventListener('click', function() {
+    el.classList.toggle('active');
+  });
+});
+</script>
 </body>
 </html>
