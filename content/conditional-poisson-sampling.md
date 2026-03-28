@@ -1038,6 +1038,8 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
   var mobile = window.innerWidth < 600;
   var bW = mobile ? 22 : 28;
   var bH = mobile ? 50 : 70;
+  var halfH = bH;
+  var divider = 4;
   var sliderH = bH;
   var bGap = 4;
   var nodePad = 12;
@@ -1130,8 +1132,6 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
     var topPad = 10;
     var sepGap = 20;
     var arrowLen = 14;
-    var halfH = bH;       // height for each half (primal / dual)
-    var divider = 4;      // gap between primal and dual bars
     var nodeH = halfH * 2 + divider + nodePad;
 
     // Zone 1: inputs (labels + sliders)
