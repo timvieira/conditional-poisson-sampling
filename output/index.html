@@ -1736,6 +1736,14 @@ details.derivation[open]::details-content {
     opacity: 1;
 }
 
+details.derivation.draft {
+    background-color: #f3edf7;
+    border-color: #c9a0dc;
+}
+details.derivation.draft > summary::before {
+    border-color: transparent transparent transparent #8b5cf6;
+}
+
 /* Page transition */
 @view-transition { navigation: auto; }
 ::view-transition-old(main-content) {

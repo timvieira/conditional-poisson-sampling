@@ -1736,6 +1736,14 @@ details.derivation[open]::details-content {
     opacity: 1;
 }
 
+details.derivation.draft {
+    background-color: #f3edf7;
+    border-color: #c9a0dc;
+}
+details.derivation.draft > summary::before {
+    border-color: transparent transparent transparent #8b5cf6;
+}
+
 /* Page transition */
 @view-transition { navigation: auto; }
 ::view-transition-old(main-content) {
@@ -2151,7 +2159,7 @@ $$</p>
 <p>The $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the <em>subproduct tree</em> (see <a href="https://doi.org/10.1017/CBO9781139856065">von zur Gathen &amp; Gerhard (2013)</a>, Chapter 10).</p>
 <p><strong>Polynomials as arrays.</strong> Each polynomial is stored as an array of coefficients: <code>[1, 3, 2]</code> represents $1 + 3\z + 2\z^2$.  Multiplying two polynomials is <em>convolution</em> of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving <code>[1, 2]</code> with <code>[1, 3]</code> to get <code>[1, 5, 6]</code>.  Using the fast Fourier transform (FFT), this convolution costs $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.</p>
 <p><strong>Notation.</strong> We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.</p>
-<h3 id="computing-the-normalizing-constant-math120">Computing the Normalizing Constant $\Z$</h3>
+<h3 id="computing-the-normalizing-constant-math128">Computing the Normalizing Constant $\Z$</h3>
 <p>Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.</p>
 <style>
 #content { overflow: visible !important; }
@@ -2729,7 +2737,7 @@ svg text { font-family: 'EB Garamond', serif; }
 <p>$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N), \quad T(1) = \mathcal{O}(1)$$</p>
 <p>which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
 The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be <strong>truncated to degree $n$</strong> without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.</p>
-<h3 id="computing-inclusion-probabilities-math146">Computing Inclusion Probabilities $\bpip$</h3>
+<h3 id="computing-inclusion-probabilities-math154">Computing Inclusion Probabilities $\bpip$</h3>
 <p>The inclusion probability is the gradient of the log-normalizer (an exponential family identity):</p>
 <p>$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$</p>
 <p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running <a href="../evaluating-fx-is-as-fast-as-fx/">backpropagation</a> on the same tree—no new algorithm needed.  By the Baur-Strassen theorem (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">1983</a>), the gradient costs at most a constant factor more than the forward computation.</p>
@@ -3585,6 +3593,57 @@ graph TB
 <p>so the Poisson approximation is essentially exact for large $N$.  <a href="https://arxiv.org/abs/1207.5654">Boistard, Lopuhaä &amp; Ruiz-Gazen (2012)</a> give the explicit correction:</p>
 <p>$$\pip_i = p_i\Big(1 - d^{-1}(p_i - \bar{p})(1 - p_i) + \mathcal{O}(d^{-2})\Big)$$</p>
 <p>where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size and $\bar{p} \defeq d^{-1}\sum_i p_i^2(1-p_i)$.  Under the regularity condition $\limsup N/d < \infty$ (which holds whenever the $p_i$ are bounded away from 0 and 1), $d = \Theta(N)$ and the error is $\mathcal{O}(1/N)$ per item.</p>
+<p>The correction has a natural interpretation: when $p_i > \bar{p}$ (item $i$ has higher-than-average inclusion probability), conditioning on $|S| = n$ forces the other items to "make room," so $\pip_i > p_i$.  The factor $(1 - p_i)$ modulates this—items already near certain inclusion have less room to adjust.  The denominator $d = \text{Var}(K)$ measures how much slack the system has for redistribution.</p>
+<details class="derivation draft">
+<summary><b>Derivation sketch</b> (Boistard, Lopuhaä & Ruiz-Gazen, 2012)
+</summary>
+
+**Step 1: Bayes reduction.**  Let $I_1, \ldots, I_N$ be independent Bernoulli variables with $P(I_i = 1) = p_i$, and let $K \defeq \sum_i I_i$ be the (random) Poisson sample size.  The conditional inclusion probability is
+
+$$\pip_i = P(I_i = 1 \mid K = n) = p_i \cdot \frac{P(K = n \mid I_i = 1)}{P(K = n)}.$$
+
+So the entire problem reduces to computing a ratio of Poisson-binomial probabilities.
+
+**Step 2: Edgeworth expansion.**  Since $K$ is a sum of $N$ independent (but non-identical) Bernoullis with variance $d = \sum_i p_i(1-p_i)$, the local probability $P(K = n)$ has an Edgeworth expansion around the Gaussian approximation.  Writing $x = (K - n)/\sqrt{d}$, the expansion is
+
+$$P(K = n) = \frac{1}{\sqrt{2\pi d}}\Big(1 + \sum_{j=1}^{s} P_j(0)\, d^{-j/2} + \mathcal{O}(d^{-(s+1)/2})\Big)$$
+
+where the $P_j$ are polynomials in Hermite polynomials and normalized cumulants $S_m \defeq \kappa_m / d^{m-1}$.  Crucially, $S_m = \mathcal{O}(1)$ (since each cumulant $\kappa_m$ of a sum of Bernoullis satisfies $\kappa_m = \mathcal{O}(d)$).  Odd-order Hermite polynomials vanish at $x = 0$ (we are evaluating at the mean), so only even powers of $d^{-1/2}$ survive:
+
+$$P(K = n) = \frac{1}{\sqrt{2\pi d}}\Big(1 + c_1\, d^{-1} + \mathcal{O}(d^{-2})\Big)$$
+
+where $c_1$ is an explicit constant depending on $\kappa_3$ and $\kappa_4$.
+
+**Step 3: Conditional expansion.**  Conditioning on $I_i = 1$ removes item $i$ from the sum.  Define $\tilde{K} = K - I_i$, so $\tilde{K} = n - 1$ given $K = n$ and $I_i = 1$.  The conditional sum $\tilde{K}$ has mean $n - p_i$, variance $d - p_i(1-p_i)$, and its expansion is centered at $\tilde{x} = (n - 1 - (n - p_i))/\sqrt{d - p_i(1-p_i)} = (p_i - 1)/\sqrt{d - p_i(1-p_i)}$, which is $\mathcal{O}(d^{-1/2})$.
+
+Expanding around $\tilde{x} = 0$ introduces additional $d^{-1/2}$ corrections from the Gaussian density $\phi(\tilde{x}) = \phi(0)(1 - \tilde{x}^2/2 + \cdots)$ and from the shifted Edgeworth polynomials $P_j(\tilde{x})$.  The result is
+
+$$P(K = n \mid I_i = 1) = \frac{1}{\sqrt{2\pi d}}\Big(1 + c_2\, d^{-1} + \mathcal{O}(d^{-2})\Big)$$
+
+where $c_2$ depends on $i$ through $p_i$.
+
+**Step 4: Ratio.**  Taking the ratio:
+
+$$\frac{P(K = n \mid I_i = 1)}{P(K = n)} = \frac{1 + c_2\, d^{-1} + \mathcal{O}(d^{-2})}{1 + c_1\, d^{-1} + \mathcal{O}(d^{-2})} = 1 + (c_2 - c_1)\, d^{-1} + \mathcal{O}(d^{-2}).$$
+
+The explicit computation of $c_2 - c_1$ (carried out in detail in Boistard et al., Section 4) yields
+
+$$c_2 - c_1 = -(p_i - \bar{p})(1 - p_i)$$
+
+and therefore
+
+$$\pip_i = p_i\Big(1 - d^{-1}(p_i - \bar{p})(1 - p_i) + \mathcal{O}(d^{-2})\Big).$$
+
+**Regularity condition.**  The expansion requires $d \to \infty$, which holds under $\limsup N/d < \infty$—equivalently, the $p_i$ don't all concentrate near 0 or 1.  Under this condition, $d = \Theta(N)$ and all $\mathcal{O}(d^{-1})$ terms are $\mathcal{O}(1/N)$.
+
+**Higher-order inclusion probabilities.**  The same technique extends to joint inclusion probabilities $\pip_{i_1, \ldots, i_k} = P(I_{i_1} = \cdots = I_{i_k} = 1 \mid K = n)$ by conditioning on $k$ items simultaneously.  The result (Theorem 1 in Boistard et al.) is
+
+$$\pip_{i_1, \ldots, i_k} = \prod_{j=1}^{k} p_{i_j} \cdot \Big(1 + a\, d^{-1} + \mathcal{O}(d^{-2})\Big)$$
+
+where $a$ is an explicit polynomial in the $p_{i_j}$ and the population summaries $\bar{p}$, $d$.
+
+</details>
+
 <p><strong>Inverting the approximation.</strong>  Since $p_i = \w_i r/(1+\w_i r)$, we can invert: $\w_i = p_i / (r(1 - p_i))$, giving $\theta_i = \log \w_i = \log(p_i/(1-p_i)) - \log r$.  If we want inclusion probabilities $\bpip^*$ and treat $\pip^*_i \approx p_i$, the initialization $\theta_i^{(0)} = \log(\pip^*_i / (1 - \pip^*_i))$ (i.e., the logit of the target) is off by at most $\mathcal{O}(1/N)$—a good warm start for the <a href="#Fitting-Weights-to-Target-Probabilities">fitting</a> optimizer.</p>
 <h2 id="fitting-weights-to-target-probabilities">Fitting Weights to Target Probabilities</h2>
 <p>A common use case: you know the inclusion probabilities you <em>want</em> and need to find weights that produce them.<a href="test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a></p>
