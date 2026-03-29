@@ -3662,13 +3662,11 @@ So the entire quality of the Poisson approximation is controlled by a single qua
 
 $$|\pip_i - p_i| \;\leq\; \frac{p_i(1 - p_i)}{d}$$
 
-where $d = \sum_j p_j(1-p_j) = \text{Var}(K)$.  Numerically, the ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ never exceeds $0.5$.  The bound appears to be tight in the regime where $d$ is small (few items contribute variance) and some $p_i$ are far from the population mean.
+where $d = \sum_j p_j(1-p_j) = \text{Var}(K)$.  Numerically, the ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ never exceeds $0.8$ across $>10^6$ random instances (the supremum may be $1/2$, but we have not proved this).  The bound is tightest when $d$ is small and some $p_i$ are near $0$ or $1$.
 
 **Proof sketch (incomplete).**  From the exact formula, the bound $|\pip_i - p_i| \leq p_i(1-p_i)/d$ is equivalent to:
 
 $$\frac{|1 - R_i|}{p_i + (1-p_i)\, R_i} \leq \frac{1}{d}.$$
-
-When $R_i \leq 1$ (i.e., $\pip_i \geq p_i$), the LHS $\leq (1-R_i)/p_i$, so it suffices to show $1 - R_i \leq p_i/d$.  When $R_i \geq 1$, the LHS $\leq (R_i - 1)/((1-p_i)R_i)$, so it suffices to show $R_i - 1 \leq (1-p_i)R_i/d$.
 
 The Poisson-binomial PMF is **log-concave** (as a convolution of log-concave Bernoulli PMFs), so the ratio $R_i = P(\tilde{K}=n)/P(\tilde{K}=n{-}1)$ is controlled by the distance from $n$ to the mode of $\tilde{K}$, which is at $\lfloor n - p_i \rfloor$ or $\lceil n - p_i \rceil$.  The missing step is a sharp bound on consecutive Poisson-binomial ratios in terms of the variance—this appears to require a refinement of the local central limit theorem with explicit constants.
 
