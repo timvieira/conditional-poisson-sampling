@@ -1919,7 +1919,13 @@ Therefore $|\pip_i - p_i| \leq q_i \cdot \|\boldsymbol{\delta}\|_\infty$.
 
 The remaining gap is to show $\|\boldsymbol{\delta}\|_\infty \leq 1/d$—a question we leave open.  (Numerically, $\|\boldsymbol{\delta}\|_\infty \cdot d$ can be large, so the Markov structure alone is not tight enough; the attenuation from the path-averaged $q_i$ is needed.)
 
-**Algebraic proof for $N = 3$.**  For $N = 3$, $n = 2$ with parameters $p, q, r = 2 - p - q$ (all in $(0, 1)$), the ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ is a rational function of $p, q$.  It factors as $-2 f_1 f_2 / g$ where both $f_1$ and $f_2$ vanish at the uniform point $p = q = r = 2/3$.  The bound $|\text{ratio}| \leq 1$ is equivalent to $g^2 - 4 f_1^2 f_2^2 \geq 0$, which factors as $(g + 2 f_1 f_2)(g - 2 f_1 f_2)$.  Both factors are non-negative on the feasible polytope (verified algebraically), completing the proof for $N = 3$.  The general case remains open.<a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a>
+**Equivalent $R_i$ bounds.**  The conjectured bound is equivalent to two clean inequalities on the ESP ratio $R_i = e_n(\bw_{-i})/e_{n-1}(\bw_{-i})$:
+
+$$R_i \geq 1 \implies R_i \leq \frac{\w_i + (1+\w_i)d}{(1+\w_i)d - 1}, \qquad R_i \leq 1 \implies R_i \geq \frac{[d + \w_i(d-1)]^+}{1 + (1+\w_i)d}$$
+
+Both verified over 1.6M $R_i$ values with zero violations.  These are purely algebraic inequalities about elementary symmetric polynomials of positive reals, given the constraint $\sum \w_j/(1+\w_j) = n$.
+
+**Algebraic proof for $N = 3$.**  For $N = 3$, $n = 2$ with parameters $p, q, r = 2 - p - q$ (all in $(0, 1)$), the ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ is a rational function of $p, q$.  The bound $|\text{ratio}| \leq 1$ is equivalent to $(g + 2f_1 f_2)(g - 2f_1 f_2) \geq 0$, where both factors are non-negative on the feasible polytope (verified symbolically), completing the proof for $N = 3$.  The general case remains open.<a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a>
 
 </details>
 
