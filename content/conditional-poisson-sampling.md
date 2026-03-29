@@ -1616,9 +1616,11 @@ The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="tes
 
 $$\pip_i \;\approx\; \frac{\w_i \, r}{1 + \w_i \, r}.$$
 
-The actual inclusion probabilities (dots in the plot below) are close but not identical—conditioning on $|S|=n$ introduces a correction of $\mathcal{O}(1/N)$ per item ([Hájek, 1964](https://doi.org/10.1214/aoms/1177700375)).  This approximation is the warm start for [fitting](#Fitting-Weights-to-Target-Probabilities): inverting the Poisson relationship gives $\theta_i \approx \log(\pip^*_i / (1 - \pip^*_i))$, which is close enough that the optimizer converges in a few iterations.
+The actual inclusion probabilities are close but not identical—conditioning on $|S|=n$ introduces a correction of $\mathcal{O}(1/N)$ per item (see [Hájek's bound](#Hájek's-approximation) below).
 
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+
+**Weights vs. inclusion probabilities.** The curve shows the Poisson approximation $p_i = w_i r/(1+w_i r)$; the dots show the exact $\pip_i$ (computed via the product tree).  Drag any dot horizontally to change its weight and see both update.  Use the controls to change $N$ and $n$ or resample weights.
 
 <div id="pi-scatter"></div>
 <script>
@@ -1819,6 +1821,108 @@ The actual inclusion probabilities (dots in the plot below) are close but not id
 
 </div>
 
+**Hájek's approximation.**  [Hájek (1964, Theorem 5.2)](https://doi.org/10.1214/aoms/1177700375) showed that the conditional inclusion probabilities satisfy
+
+$$\pip_i = p_i + \mathcal{O}(1/N)$$
+
+so the Poisson approximation is essentially exact for large $N$.  [Boistard, Lopuhaä & Ruiz-Gazen (2012)](https://arxiv.org/abs/1207.5654) give the explicit correction:
+
+$$\pip_i = p_i\Big(1 - d^{-1}(p_i - \bar{p})(1 - p_i) + \mathcal{O}(d^{-2})\Big)$$
+
+where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size and $\bar{p} \defeq d^{-1}\sum_i p_i^2(1-p_i)$.  Under the regularity condition $\limsup N/d < \infty$ (which holds whenever the $p_i$ are bounded away from 0 and 1), $d = \Theta(N)$ and the error is $\mathcal{O}(1/N)$ per item.
+
+The correction has a natural interpretation: when $p_i > \bar{p}$ (item $i$ has higher-than-average inclusion probability), conditioning on $|S| = n$ forces the other items to "make room," so $\pip_i > p_i$.  The factor $(1 - p_i)$ modulates this—items already near certain inclusion have less room to adjust.  The denominator $d = \text{Var}(K)$ measures how much slack the system has for redistribution.
+
+<details class="derivation draft">
+<summary><b>Derivation sketch</b> (Boistard, Lopuhaä & Ruiz-Gazen, 2012)</summary>
+
+**Step 1: Bayes reduction.**  Let $I_1, \ldots, I_N$ be independent Bernoulli variables with $P(I_i = 1) = p_i$, and let $K \defeq \sum_i I_i$ be the (random) Poisson sample size.  The conditional inclusion probability is
+
+$$\pip_i = P(I_i = 1 \mid K = n) = p_i \cdot \frac{P(K = n \mid I_i = 1)}{P(K = n)}.$$
+
+So the entire problem reduces to computing a ratio of Poisson-binomial probabilities.
+
+**Step 2: Edgeworth expansion.**  Since $K$ is a sum of $N$ independent (but non-identical) Bernoullis with variance $d = \sum_i p_i(1-p_i)$, the local probability $P(K = n)$ has an Edgeworth expansion around the Gaussian approximation.  Writing $x = (K - n)/\sqrt{d}$, the expansion is
+
+$$P(K = n) = \frac{1}{\sqrt{2\pi d}}\Big(1 + \sum_{j=1}^{s} P_j(0)\, d^{-j/2} + \mathcal{O}(d^{-(s+1)/2})\Big)$$
+
+where the $P_j$ are polynomials in Hermite polynomials and normalized cumulants $S_m \defeq \kappa_m / d^{m-1}$.  Crucially, $S_m = \mathcal{O}(1)$ (since each cumulant $\kappa_m$ of a sum of Bernoullis satisfies $\kappa_m = \mathcal{O}(d)$).  Odd-order Hermite polynomials vanish at $x = 0$ (we are evaluating at the mean), so only even powers of $d^{-1/2}$ survive:
+
+$$P(K = n) = \frac{1}{\sqrt{2\pi d}}\Big(1 + c_1\, d^{-1} + \mathcal{O}(d^{-2})\Big)$$
+
+where $c_1$ is an explicit constant depending on $\kappa_3$ and $\kappa_4$.
+
+**Step 3: Conditional expansion.**  Conditioning on $I_i = 1$ removes item $i$ from the sum.  Define $\tilde{K} = K - I_i$, so $\tilde{K} = n - 1$ given $K = n$ and $I_i = 1$.  The conditional sum $\tilde{K}$ has mean $n - p_i$, variance $d - p_i(1-p_i)$, and its expansion is centered at $\tilde{x} = (n - 1 - (n - p_i))/\sqrt{d - p_i(1-p_i)} = (p_i - 1)/\sqrt{d - p_i(1-p_i)}$, which is $\mathcal{O}(d^{-1/2})$.
+
+Expanding around $\tilde{x} = 0$ introduces additional $d^{-1/2}$ corrections from the Gaussian density $\phi(\tilde{x}) = \phi(0)(1 - \tilde{x}^2/2 + \cdots)$ and from the shifted Edgeworth polynomials $P_j(\tilde{x})$.  The result is
+
+$$P(K = n \mid I_i = 1) = \frac{1}{\sqrt{2\pi d}}\Big(1 + c_2\, d^{-1} + \mathcal{O}(d^{-2})\Big)$$
+
+where $c_2$ depends on $i$ through $p_i$.
+
+**Step 4: Ratio.**  Taking the ratio:
+
+$$\frac{P(K = n \mid I_i = 1)}{P(K = n)} = \frac{1 + c_2\, d^{-1} + \mathcal{O}(d^{-2})}{1 + c_1\, d^{-1} + \mathcal{O}(d^{-2})} = 1 + (c_2 - c_1)\, d^{-1} + \mathcal{O}(d^{-2}).$$
+
+The explicit computation of $c_2 - c_1$ (carried out in detail in Boistard et al., Section 4) yields
+
+$$c_2 - c_1 = -(p_i - \bar{p})(1 - p_i)$$
+
+and therefore
+
+$$\pip_i = p_i\Big(1 - d^{-1}(p_i - \bar{p})(1 - p_i) + \mathcal{O}(d^{-2})\Big).$$
+
+**Regularity condition.**  The expansion requires $d \to \infty$, which holds under $\limsup N/d < \infty$—equivalently, the $p_i$ don't all concentrate near 0 or 1.  Under this condition, $d = \Theta(N)$ and all $\mathcal{O}(d^{-1})$ terms are $\mathcal{O}(1/N)$.
+
+**Higher-order inclusion probabilities.**  The same technique extends to joint inclusion probabilities $\pip_{i_1, \ldots, i_k} = P(I_{i_1} = \cdots = I_{i_k} = 1 \mid K = n)$ by conditioning on $k$ items simultaneously.  The result (Theorem 1 in Boistard et al.) is
+
+$$\pip_{i_1, \ldots, i_k} = \prod_{j=1}^{k} p_{i_j} \cdot \Big(1 + a\, d^{-1} + \mathcal{O}(d^{-2})\Big)$$
+
+where $a$ is an explicit polynomial in the $p_{i_j}$ and the population summaries $\bar{p}$, $d$.
+
+</details>
+
+<details class="derivation draft">
+<summary><b>Non-asymptotic bound</b> (no hidden constants)</summary>
+
+The Boistard et al. expansion has an $\mathcal{O}(d^{-2})$ remainder with unspecified constants.  Can we do better?  The Bayes formula gives an exact expression with no remainder at all:
+
+$$\frac{\pip_i}{p_i} = \frac{1}{p_i + (1 - p_i)\, R_i}, \qquad R_i \defeq \frac{P(\tilde{K} = n)}{P(\tilde{K} = n-1)}$$
+
+where $\tilde{K} \defeq \sum_{j \neq i} I_j$.  This is exact—no approximation.  Rearranging:
+
+$$\pip_i - p_i = \frac{p_i(1-p_i)(1 - R_i)}{p_i + (1 - p_i)\, R_i}.$$
+
+So the entire quality of the Poisson approximation is controlled by a single quantity: $R_i$, the ratio of consecutive probabilities of a Poisson-binomial distribution.
+
+**Conjecture** (verified numerically for $N \leq 200$, $n \leq N$, across $>10^6$ random instances with weight spreads up to $e^{12}$):
+
+$$|\pip_i - p_i| \;\leq\; \frac{p_i(1 - p_i)}{d}$$
+
+where $d = \sum_j p_j(1-p_j) = \text{Var}(K)$.  Numerically, the ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ never exceeds $0.8$ across $>10^6$ random instances (the supremum may be $1/2$, but we have not proved this).  The bound is tightest when $d$ is small and some $p_i$ are near $0$ or $1$.
+
+**Toward a proof.**  Define $h(\btheta) \defeq \log P(K = n \mid \btheta)$ where $\theta_i = \log \w_i$.  Then $\pip_i - p_i = \partial h / \partial \theta_i$ (the gradient of the log-probability), and $h$ is concave in $\btheta$ (since $\log e_n$ is concave in $\log \bw$).
+
+The Hessian $H(\btheta) = \nabla^2 h$ has a key structural property: the matrix $-H$ is **entry-wise non-negative** (since $-H_{ij} = -\text{Cov}(I_i, I_j \mid K=n)$ for $i \neq j$, and CPS is negatively associated), with **row sums exactly $p_i(1-p_i)$** (since $\sum_j \text{Cov}(I_i, I_j \mid K=n) = \text{Cov}(I_i, K \mid K=n) = 0$).
+
+Therefore $M(\btheta) \defeq D^{-1}(-H)$ is a **row-stochastic (Markov) matrix**, where $D = \text{diag}(p_i(1-p_i))$.  This holds at every $\btheta$, not just the current one.
+
+Let $\btheta^*$ be the global maximum of $h$ (where $\bpip(\btheta^*) = \mathbf{p}(\btheta^*)$, i.e., the approximation is exact).  By the mean value theorem:
+
+$$\bpip - \mathbf{p} = \nabla h(\btheta) = \underbrace{\left(\int_0^1 H(\btheta^* + t(\btheta - \btheta^*))\, dt\right)}_{\displaystyle A} (\btheta - \btheta^*)$$
+
+The integrated matrix $-A$ is entry-wise non-negative with row sums $q_i \defeq \int_0^1 p_i(1-p_i)(\btheta^* + t\boldsymbol{\delta})\, dt$, so $D_q^{-1}(-A)$ is row-stochastic.  Writing $\boldsymbol{\delta} = \btheta - \btheta^*$:
+
+$$\frac{\pip_i - p_i}{q_i} = \big[D_q^{-1}(-A)\big]_i \cdot (-\boldsymbol{\delta}) = \text{convex combination of } (-\delta_j).$$
+
+Therefore $|\pip_i - p_i| \leq q_i \cdot \|\boldsymbol{\delta}\|_\infty$.
+
+The remaining gap is to show $\|\boldsymbol{\delta}\|_\infty \leq 1/d$ (where $\boldsymbol{\delta}$ can be taken perpendicular to $\mathbf{1}$, since shifting all $\theta_i$ by a constant doesn't change $\bpip - \mathbf{p}$).  This requires bounding how far the current weights are from the MLE in the $\ell^\infty$ norm—a question we leave open.<a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a>
+
+</details>
+
+**Inverting the approximation.**  Since $p_i = \w_i r/(1+\w_i r)$, we can invert: $\w_i = p_i / (r(1 - p_i))$, giving $\theta_i = \log \w_i = \log(p_i/(1-p_i)) - \log r$.  If we want inclusion probabilities $\bpip^*$ and treat $\pip^*_i \approx p_i$, the initialization $\theta_i^{(0)} = \log(\pip^*_i / (1 - \pip^*_i))$ (i.e., the logit of the target) is off by at most $\mathcal{O}(1/N)$—a good warm start for the [fitting](#Fitting-Weights-to-Target-Probabilities) optimizer.
+
 
 ## Fitting Weights to Target Probabilities
 
@@ -1835,25 +1939,7 @@ This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function)
 
 **Gradient.**  $\nabla_{\btheta} L(\btheta) = \bpip^* - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpip^*$ exactly, so the gradient is zero.  Each evaluation of $L$ and $\nabla L$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
 
-**Optimizer.**  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The warm start $\theta_i^{(0)} = \log(\bpip^*_i / (1 - \bpip^*_i))$ has initialization error $\mathcal{O}(1/N)$ per item ([Hájek, 1964, Theorem 5.2](https://doi.org/10.1214/aoms/1177700375)), so the optimizer starts close to the solution.
-
-
-<details class="derivation">
-<summary><b>Warm start: why logit(π*) is a good initialization</b></summary>
-
-The optimizer is initialized at $\theta_i^{(0)} = \log(\pip^*_i / (1 - \pip^*_i))$, i.e., the log-odds of the target inclusion probabilities.  This is the exact solution in the *unconditional* Poisson case: if we flip independent coins with $p_i = \pip^*_i$, the odds are $\w_i \defeq p_i/(1-p_i)$ and the expected sample size is $\sum \pip^*_i = n$.  Conditioning on the sample size being exactly $n$ perturbs the inclusion probabilities, but the perturbation is small.
-
-Hájek (1964, Theorem 5.2) showed that under standard regularity conditions, the conditional Poisson inclusion probabilities satisfy
-
-$$\pip_i = p_i + \mathcal{O}(1/N)$$
-
-where $p_i \defeq \w_i/(1+\w_i)$ are the unconditional Poisson probabilities.  [Boistard, Lopuhaä & Ruiz-Gazen (2012)](https://arxiv.org/abs/1207.5654) give the explicit correction term:
-
-$$\pip_i = p_i\Big(1 - d^{-1}(p_i - \bar{p})(1 - p_i) + \mathcal{O}(d^{-2})\Big)$$
-
-where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size and $\bar{p} \defeq d^{-1}\sum_i p_i^2(1-p_i)$.  Under the regularity condition $\limsup N/d < \infty$ (which holds whenever the $p_i$ are bounded away from 0 and 1), we have $d = \Theta(N)$, so the initialization error is $\mathcal{O}(1/N)$—essentially exact for large $N$, and a good starting point for Newton's method at any $N$.
-
-</details>
+**Optimizer.**  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The [Poisson approximation](#The-Poisson-Approximation) provides a warm start: $\theta_i^{(0)} = \text{logit}(\pip^*_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.
 
 {% notebook conditional-poisson-sampling.ipynb cells[4:5] %}
 

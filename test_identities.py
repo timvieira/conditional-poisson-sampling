@@ -757,6 +757,38 @@ def test_boundary_sampling_respects_zero_inf():
 
 
 # ===========================================================================
+# Non-asymptotic Poisson approximation bound
+# ===========================================================================
+
+def test_poisson_approximation_bound():
+    """Non-asymptotic: |pi_i - p_i| <= p_i(1-p_i) / d for all i."""
+    from scipy.optimize import brentq
+    rng = np.random.default_rng(0)
+    for _ in range(500):
+        N = rng.integers(3, 50)
+        n = rng.integers(1, N)
+        w = np.exp(rng.uniform(-5, 5, N))
+        cp = ConditionalPoisson.from_weights(n, w)
+        pi = cp.pi
+        def f(logr):
+            r = np.exp(logr)
+            return np.sum(w * r / (1 + w * r)) - n
+        logr = brentq(f, -100, 100)
+        r = np.exp(logr)
+        p = w * r / (1 + w * r)
+        d = np.sum(p * (1 - p))
+        for i in range(N):
+            if p[i] < 1e-12 or p[i] > 1 - 1e-12:
+                continue
+            bound = p[i] * (1 - p[i]) / d
+            err = abs(pi[i] - p[i])
+            assert err <= bound * (1 + 1e-9) + 1e-14, (
+                f"Bound violated: |pi[{i}]-p[{i}]|={err:.2e} > p(1-p)/d={bound:.2e} "
+                f"(N={N}, n={n}, d={d:.3f})"
+            )
+
+
+# ===========================================================================
 # Runner
 # ===========================================================================
 
