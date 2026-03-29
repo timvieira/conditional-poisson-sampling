@@ -3664,11 +3664,13 @@ $$|\pip_i - p_i| \;\leq\; \frac{p_i(1 - p_i)}{d}$$
 
 where $d = \sum_j p_j(1-p_j) = \text{Var}(K)$.  Numerically, the ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ never exceeds $0.8$ across $>10^6$ random instances (the supremum may be $1/2$, but we have not proved this).  The bound is tightest when $d$ is small and some $p_i$ are near $0$ or $1$.
 
-**Proof sketch (incomplete).**  From the exact formula, the bound $|\pip_i - p_i| \leq p_i(1-p_i)/d$ is equivalent to:
+**Toward a proof.**  From the exact formula, the bound is equivalent to $|1 - R_i| / (p_i + (1-p_i) R_i) \leq 1/d$.  An equivalent and numerically tighter statement is
 
-$$\frac{|1 - R_i|}{p_i + (1-p_i)\, R_i} \leq \frac{1}{d}.$$
+$$|\log R_i| \leq \frac{1}{d}$$
 
-The Poisson-binomial PMF is **log-concave** (as a convolution of log-concave Bernoulli PMFs), so the ratio $R_i = P(\tilde{K}=n)/P(\tilde{K}=n{-}1)$ is controlled by the distance from $n$ to the mode of $\tilde{K}$, which is at $\lfloor n - p_i \rfloor$ or $\lceil n - p_i \rceil$.  The missing step is a sharp bound on consecutive Poisson-binomial ratios in terms of the variance—this appears to require a refinement of the local central limit theorem with explicit constants.
+(verified to $\leq 0.7/d$ numerically), which implies the original bound since $|1 - R_i| \leq |\log R_i| \cdot \max(R_i, 1)$ and the denominator $p_i + (1-p_i)R_i \geq \max(p_i, (1-p_i)R_i)$.
+
+The Poisson-binomial PMF is **log-concave** (as a convolution of log-concave Bernoulli PMFs), so $\log R_i = \log P(\tilde{K}=n) - \log P(\tilde{K}=n{-}1)$ is a single step of a concave sequence.  The Gaussian approximation gives $\log R_i \approx -(2p_i - 1)/(2\tilde{d})$ where $\tilde{d} = d - p_i(1-p_i)$.  Making this non-asymptotic requires a local CLT for the Poisson-binomial with an explicit constant—known to exist (Petrov, 1975) but not assembled into a self-contained proof here.  We leave the full proof as an open problem.
 
 </details>
 
