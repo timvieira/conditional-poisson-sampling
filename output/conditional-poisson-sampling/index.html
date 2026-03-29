@@ -2159,7 +2159,7 @@ $$</p>
 <p>The $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the <em>subproduct tree</em> (see <a href="https://doi.org/10.1017/CBO9781139856065">von zur Gathen &amp; Gerhard (2013)</a>, Chapter 10).</p>
 <p><strong>Polynomials as arrays.</strong> Each polynomial is stored as an array of coefficients: <code>[1, 3, 2]</code> represents $1 + 3\z + 2\z^2$.  Multiplying two polynomials is <em>convolution</em> of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving <code>[1, 2]</code> with <code>[1, 3]</code> to get <code>[1, 5, 6]</code>.  Using the fast Fourier transform (FFT), this convolution costs $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.</p>
 <p><strong>Notation.</strong> We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.</p>
-<h3 id="computing-the-normalizing-constant-math133">Computing the Normalizing Constant $\Z$</h3>
+<h3 id="computing-the-normalizing-constant-math134">Computing the Normalizing Constant $\Z$</h3>
 <p>Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.</p>
 <style>
 #content { overflow: visible !important; }
@@ -2737,7 +2737,7 @@ svg text { font-family: 'EB Garamond', serif; }
 <p>$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N), \quad T(1) = \mathcal{O}(1)$$</p>
 <p>which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
 The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be <strong>truncated to degree $n$</strong> without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.</p>
-<h3 id="computing-inclusion-probabilities-math159">Computing Inclusion Probabilities $\bpip$</h3>
+<h3 id="computing-inclusion-probabilities-math160">Computing Inclusion Probabilities $\bpip$</h3>
 <p>The inclusion probability is the gradient of the log-normalizer (an exponential family identity):</p>
 <p>$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$</p>
 <p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running <a href="../evaluating-fx-is-as-fast-as-fx/">backpropagation</a> on the same tree—no new algorithm needed.  By the Baur-Strassen theorem (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">1983</a>), the gradient costs at most a constant factor more than the forward computation.</p>
@@ -3682,7 +3682,13 @@ Therefore $|\pip_i - p_i| \leq q_i \cdot \|\boldsymbol{\delta}\|_\infty$.
 
 The remaining gap is to show $\|\boldsymbol{\delta}\|_\infty \leq 1/d$—a question we leave open.  (Numerically, $\|\boldsymbol{\delta}\|_\infty \cdot d$ can be large, so the Markov structure alone is not tight enough; the attenuation from the path-averaged $q_i$ is needed.)
 
-**Algebraic proof for $N = 3$.**  For $N = 3$, $n = 2$ with parameters $p, q, r = 2 - p - q$ (all in $(0, 1)$), the ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ is a rational function of $p, q$.  It factors as $-2 f_1 f_2 / g$ where both $f_1$ and $f_2$ vanish at the uniform point $p = q = r = 2/3$.  The bound $|\text{ratio}| \leq 1$ is equivalent to $g^2 - 4 f_1^2 f_2^2 \geq 0$, which factors as $(g + 2 f_1 f_2)(g - 2 f_1 f_2)$.  Both factors are non-negative on the feasible polytope (verified algebraically), completing the proof for $N = 3$.  The general case remains open.<a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a>
+**Equivalent $R_i$ bounds.**  The conjectured bound is equivalent to two clean inequalities on the ESP ratio $R_i = e_n(\bw_{-i})/e_{n-1}(\bw_{-i})$:
+
+$$R_i \geq 1 \implies R_i \leq \frac{\w_i + (1+\w_i)d}{(1+\w_i)d - 1}, \qquad R_i \leq 1 \implies R_i \geq \frac{[d + \w_i(d-1)]^+}{1 + (1+\w_i)d}$$
+
+Both verified over 1.6M $R_i$ values with zero violations.  These are purely algebraic inequalities about elementary symmetric polynomials of positive reals, given the constraint $\sum \w_j/(1+\w_j) = n$.
+
+**Algebraic proof for $N = 3$.**  For $N = 3$, $n = 2$ with parameters $p, q, r = 2 - p - q$ (all in $(0, 1)$), the ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ is a rational function of $p, q$.  The bound $|\text{ratio}| \leq 1$ is equivalent to $(g + 2f_1 f_2)(g - 2f_1 f_2) \geq 0$, where both factors are non-negative on the feasible polytope (verified symbolically), completing the proof for $N = 3$.  The general case remains open.<a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a>
 
 </details>
 
