@@ -3377,14 +3377,9 @@ graph TB
 <p>The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="test_identities.py#test_pi_sums_to_n" title="test_pi_sums_to_n" class="verified" target="_blank">✓</a> and each $\pip_i \in [0, 1]$.<a href="test_identities.py#test_pi_in_unit_interval" title="test_pi_in_unit_interval" class="verified" target="_blank">✓</a>  Items with larger weights get higher inclusion probabilities, but the relationship is nonlinear—the other weights push back through the size constraint $|S| = n$.</p>
 <p><strong>Poisson approximation.</strong>  If each item were included independently with probability $p_i = \w_i r/(1+\w_i r)$, where $r$ is the <strong>tilting parameter</strong> that makes $\sum_i p_i = n$, we would get</p>
 <p>$$\pip_i \;\approx\; \frac{\w_i \, r}{1 + \w_i \, r}.$$</p>
-<p>The actual inclusion probabilities (dots in the plot below) are close but not identical—conditioning on $|S|=n$ introduces a correction.</p>
-<p><strong>Hájek's approximation.</strong>  <a href="https://doi.org/10.1214/aoms/1177700375">Hájek (1964, Theorem 5.2)</a> showed that the conditional inclusion probabilities satisfy</p>
-<p>$$\pip_i = p_i + \mathcal{O}(1/N)$$</p>
-<p>so the Poisson approximation is essentially exact for large $N$.  <a href="https://arxiv.org/abs/1207.5654">Boistard, Lopuhaä &amp; Ruiz-Gazen (2012)</a> give the explicit correction:</p>
-<p>$$\pip_i = p_i\Big(1 - d^{-1}(p_i - \bar{p})(1 - p_i) + \mathcal{O}(d^{-2})\Big)$$</p>
-<p>where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size and $\bar{p} \defeq d^{-1}\sum_i p_i^2(1-p_i)$.  Under the regularity condition $\limsup N/d < \infty$ (which holds whenever the $p_i$ are bounded away from 0 and 1), $d = \Theta(N)$ and the error is $\mathcal{O}(1/N)$ per item.</p>
-<p><strong>Inverting the approximation.</strong>  Since $p_i = \w_i r/(1+\w_i r)$, we can invert: $\w_i = p_i / (r(1 - p_i))$, giving $\theta_i = \log \w_i = \log(p_i/(1-p_i)) - \log r$.  If we want inclusion probabilities $\bpip^*$ and treat $\pip^*_i \approx p_i$, the initialization $\theta_i^{(0)} = \log(\pip^*_i / (1 - \pip^*_i))$ (i.e., the logit of the target) is off by at most $\mathcal{O}(1/N)$—a good warm start for the <a href="#Fitting-Weights-to-Target-Probabilities">fitting</a> optimizer.</p>
+<p>The actual inclusion probabilities are close but not identical—conditioning on $|S|=n$ introduces a correction of $\mathcal{O}(1/N)$ per item (see <a href="#Hájek's-approximation">Hájek's bound</a> below).</p>
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+<p><strong>Weights vs. inclusion probabilities.</strong> The curve shows the Poisson approximation $p_i = w_i r/(1+w_i r)$; the dots show the exact $\pip_i$ (computed via the product tree).  Drag any dot horizontally to change its weight and see both update.  Use the controls to change $N$ and $n$ or resample weights.</p>
 <div id="pi-scatter">
 </div>
 <script>
@@ -3585,6 +3580,12 @@ graph TB
 
 </div>
 
+<p><strong>Hájek's approximation.</strong>  <a href="https://doi.org/10.1214/aoms/1177700375">Hájek (1964, Theorem 5.2)</a> showed that the conditional inclusion probabilities satisfy</p>
+<p>$$\pip_i = p_i + \mathcal{O}(1/N)$$</p>
+<p>so the Poisson approximation is essentially exact for large $N$.  <a href="https://arxiv.org/abs/1207.5654">Boistard, Lopuhaä &amp; Ruiz-Gazen (2012)</a> give the explicit correction:</p>
+<p>$$\pip_i = p_i\Big(1 - d^{-1}(p_i - \bar{p})(1 - p_i) + \mathcal{O}(d^{-2})\Big)$$</p>
+<p>where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size and $\bar{p} \defeq d^{-1}\sum_i p_i^2(1-p_i)$.  Under the regularity condition $\limsup N/d < \infty$ (which holds whenever the $p_i$ are bounded away from 0 and 1), $d = \Theta(N)$ and the error is $\mathcal{O}(1/N)$ per item.</p>
+<p><strong>Inverting the approximation.</strong>  Since $p_i = \w_i r/(1+\w_i r)$, we can invert: $\w_i = p_i / (r(1 - p_i))$, giving $\theta_i = \log \w_i = \log(p_i/(1-p_i)) - \log r$.  If we want inclusion probabilities $\bpip^*$ and treat $\pip^*_i \approx p_i$, the initialization $\theta_i^{(0)} = \log(\pip^*_i / (1 - \pip^*_i))$ (i.e., the logit of the target) is off by at most $\mathcal{O}(1/N)$—a good warm start for the <a href="#Fitting-Weights-to-Target-Probabilities">fitting</a> optimizer.</p>
 <h2 id="fitting-weights-to-target-probabilities">Fitting Weights to Target Probabilities</h2>
 <p>A common use case: you know the inclusion probabilities you <em>want</em> and need to find weights that produce them.<a href="test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a></p>
 <p><strong>Objective.</strong><label class="sidenote-number"></label><span class="margin-note">@CLAUDE: the explanation of the objective doesn't make much sense still.  Should the objective be maximize entropy subject to the inclusion probability constraint?  I suppose the objective that we have may be the dual of that (per the usual exponential family duality).<br/><b>claude</b>: Yes, exactly. The primal is: maximize $H(P)$ subject to $\mathbb{E}_P[\mathbf{1}[i \in S]] = \pip^*_i$. The dual (Lagrangian) is $L(\btheta) = \bpip^{*\top}\btheta - \log Z(\btheta)$, where the $\theta_i$ are Lagrange multipliers. This is standard exponential-family duality—maximizing the dual recovers the max-entropy distribution with the prescribed marginals. The current prose jumps straight to the dual without motivating it from the primal; you might want to add a sentence like "This is the dual of the max-entropy problem: find the distribution over size-$n$ subsets with maximum entropy subject to inclusion probabilities $\bpip^*$."</span>
