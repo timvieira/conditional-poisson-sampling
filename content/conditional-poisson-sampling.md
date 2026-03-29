@@ -1899,7 +1899,7 @@ So the entire quality of the Poisson approximation is controlled by a single qua
 
 $$|\pip_i - p_i| \;\leq\; \frac{p_i(1 - p_i)}{d}$$
 
-where $d = \sum_j p_j(1-p_j) = \text{Var}(K)$.  Numerically, the ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ never exceeds $0.8$ across $>10^6$ random instances (the supremum may be $1/2$, but we have not proved this).  The bound is tightest when $d$ is small and some $p_i$ are near $0$ or $1$.
+where $d = \sum_j p_j(1-p_j) = \text{Var}(K)$.  Numerically, the ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ grows slowly with $N$ (from $\approx 0.38$ at $N=3$ to $\approx 0.58$ at $N=29$) and appears to converge to a constant strictly less than $1$, verified across $>10^6$ random instances.  The bound is tightest when $d$ is small and some $p_i$ are near $0$ or $1$.
 
 **Toward a proof.**  Define $h(\btheta) \defeq \log P(K = n \mid \btheta)$ where $\theta_i = \log \w_i$.  Then $\pip_i - p_i = \partial h / \partial \theta_i$ (the gradient of the log-probability), and $h$ is concave in $\btheta$ (since $\log e_n$ is concave in $\log \bw$).
 
@@ -1917,7 +1917,9 @@ $$\frac{\pip_i - p_i}{q_i} = \big[D_q^{-1}(-A)\big]_i \cdot (-\boldsymbol{\delta
 
 Therefore $|\pip_i - p_i| \leq q_i \cdot \|\boldsymbol{\delta}\|_\infty$.
 
-The remaining gap is to show $\|\boldsymbol{\delta}\|_\infty \leq 1/d$ (where $\boldsymbol{\delta}$ can be taken perpendicular to $\mathbf{1}$, since shifting all $\theta_i$ by a constant doesn't change $\bpip - \mathbf{p}$).  This requires bounding how far the current weights are from the MLE in the $\ell^\infty$ norm—a question we leave open.<a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a>
+The remaining gap is to show $\|\boldsymbol{\delta}\|_\infty \leq 1/d$—a question we leave open.  (Numerically, $\|\boldsymbol{\delta}\|_\infty \cdot d$ can be large, so the Markov structure alone is not tight enough; the attenuation from the path-averaged $q_i$ is needed.)
+
+**Algebraic proof for $N = 3$.**  For $N = 3$, $n = 2$ with parameters $p, q, r = 2 - p - q$ (all in $(0, 1)$), the ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ is a rational function of $p, q$.  It factors as $-2 f_1 f_2 / g$ where both $f_1$ and $f_2$ vanish at the uniform point $p = q = r = 2/3$.  The bound $|\text{ratio}| \leq 1$ is equivalent to $g^2 - 4 f_1^2 f_2^2 \geq 0$, which factors as $(g + 2 f_1 f_2)(g - 2 f_1 f_2)$.  Both factors are non-negative on the feasible polytope (verified algebraically), completing the proof for $N = 3$.  The general case remains open.<a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a>
 
 </details>
 
