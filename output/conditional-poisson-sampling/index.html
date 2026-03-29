@@ -2159,7 +2159,7 @@ $$</p>
 <p>The $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the <em>subproduct tree</em> (see <a href="https://doi.org/10.1017/CBO9781139856065">von zur Gathen &amp; Gerhard (2013)</a>, Chapter 10).</p>
 <p><strong>Polynomials as arrays.</strong> Each polynomial is stored as an array of coefficients: <code>[1, 3, 2]</code> represents $1 + 3\z + 2\z^2$.  Multiplying two polynomials is <em>convolution</em> of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving <code>[1, 2]</code> with <code>[1, 3]</code> to get <code>[1, 5, 6]</code>.  Using the fast Fourier transform (FFT), this convolution costs $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.</p>
 <p><strong>Notation.</strong> We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.</p>
-<h3 id="computing-the-normalizing-constant-math131">Computing the Normalizing Constant $\Z$</h3>
+<h3 id="computing-the-normalizing-constant-math133">Computing the Normalizing Constant $\Z$</h3>
 <p>Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.</p>
 <style>
 #content { overflow: visible !important; }
@@ -2737,7 +2737,7 @@ svg text { font-family: 'EB Garamond', serif; }
 <p>$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N), \quad T(1) = \mathcal{O}(1)$$</p>
 <p>which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
 The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be <strong>truncated to degree $n$</strong> without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.</p>
-<h3 id="computing-inclusion-probabilities-math157">Computing Inclusion Probabilities $\bpip$</h3>
+<h3 id="computing-inclusion-probabilities-math159">Computing Inclusion Probabilities $\bpip$</h3>
 <p>The inclusion probability is the gradient of the log-normalizer (an exponential family identity):</p>
 <p>$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$</p>
 <p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running <a href="../evaluating-fx-is-as-fast-as-fx/">backpropagation</a> on the same tree—no new algorithm needed.  By the Baur-Strassen theorem (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">1983</a>), the gradient costs at most a constant factor more than the forward computation.</p>
@@ -3664,14 +3664,23 @@ $$|\pip_i - p_i| \;\leq\; \frac{p_i(1 - p_i)}{d}$$
 
 where $d = \sum_j p_j(1-p_j) = \text{Var}(K)$.  Numerically, the ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ never exceeds $0.8$ across $>10^6$ random instances (the supremum may be $1/2$, but we have not proved this).  The bound is tightest when $d$ is small and some $p_i$ are near $0$ or $1$.
 
-**Toward a proof.**  From the exact formula, the bound is equivalent to $|1 - R_i| / (p_i + (1-p_i) R_i) \leq 1/d$.  Note that bounding $|1 - R_i| \leq 1/d$ alone is NOT sufficient (numerically, $|1-R_i| \cdot d$ can reach $\approx 2$); the denominator $p_i + (1-p_i)R_i$ is essential and provides additional attenuation precisely when $R_i$ is large.
+**Toward a proof.**  Define $h(\btheta) \defeq \log P(K = n \mid \btheta)$ where $\theta_i = \log \w_i$.  Then $\pip_i - p_i = \partial h / \partial \theta_i$ (the gradient of the log-probability), and $h$ is concave in $\btheta$ (since $\log e_n$ is concave in $\log \bw$).
 
-The Gaussian approximation gives $R_i \approx \exp(-(2p_i-1)/(2\tilde{d}))$ where $\tilde{d} = d - p_i(1-p_i)$, so $|1-R_i| \approx |2p_i - 1|/(2\tilde{d}) \leq 1/(2\tilde{d})$—correct to leading order.  Extracting a non-asymptotic bound requires either:
+The Hessian $H(\btheta) = \nabla^2 h$ has a key structural property: the matrix $-H$ is **entry-wise non-negative** (since $-H_{ij} = -\text{Cov}(I_i, I_j \mid K=n)$ for $i \neq j$, and CPS is negatively associated), with **row sums exactly $p_i(1-p_i)$** (since $\sum_j \text{Cov}(I_i, I_j \mid K=n) = \text{Cov}(I_i, K \mid K=n) = 0$).
 
-1. An explicit constant in the Poisson-binomial local CLT (Petrov, 1975; Roos, 2000), applied via the Edgeworth expansion as in Boistard et al. but carrying the $d^{-2}$ remainder explicitly, or
-2. A direct algebraic inequality: for a real-rooted polynomial $\prod(1 + w_j z)$ with $\sum w_j/(1+w_j) = n$, show that the ESP ratio $e_n(w_{-i})/e_{n-1}(w_{-i})$ satisfies the bound. The deletion-contraction identity $n \cdot e_n(w_{-i}) = \sum_{j \neq i} w_j \cdot e_{n-1}(w_{-i,-j})$ gives a recursive formula for $R_i$ but the recursion does not close without additional structure.
+Therefore $M(\btheta) \defeq D^{-1}(-H)$ is a **row-stochastic (Markov) matrix**, where $D = \text{diag}(p_i(1-p_i))$.  This holds at every $\btheta$, not just the current one.
 
-We leave the full proof as an open problem.<a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a>
+Let $\btheta^*$ be the global maximum of $h$ (where $\bpip(\btheta^*) = \mathbf{p}(\btheta^*)$, i.e., the approximation is exact).  By the mean value theorem:
+
+$$\bpip - \mathbf{p} = \nabla h(\btheta) = \underbrace{\left(\int_0^1 H(\btheta^* + t(\btheta - \btheta^*))\, dt\right)}_{\displaystyle A} (\btheta - \btheta^*)$$
+
+The integrated matrix $-A$ is entry-wise non-negative with row sums $q_i \defeq \int_0^1 p_i(1-p_i)(\btheta^* + t\boldsymbol{\delta})\, dt$, so $D_q^{-1}(-A)$ is row-stochastic.  Writing $\boldsymbol{\delta} = \btheta - \btheta^*$:
+
+$$\frac{\pip_i - p_i}{q_i} = \big[D_q^{-1}(-A)\big]_i \cdot (-\boldsymbol{\delta}) = \text{convex combination of } (-\delta_j).$$
+
+Therefore $|\pip_i - p_i| \leq q_i \cdot \|\boldsymbol{\delta}\|_\infty$.
+
+The remaining gap is to show $\|\boldsymbol{\delta}\|_\infty \leq 1/d$ (where $\boldsymbol{\delta}$ can be taken perpendicular to $\mathbf{1}$, since shifting all $\theta_i$ by a constant doesn't change $\bpip - \mathbf{p}$).  This requires bounding how far the current weights are from the MLE in the $\ell^\infty$ norm—a question we leave open.<a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a>
 
 </details>
 
