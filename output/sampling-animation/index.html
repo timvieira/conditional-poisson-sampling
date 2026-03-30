@@ -66,26 +66,7 @@ MathJax = {
   .back-link a { color: #5b9bd5; text-decoration: none; }
   .back-link a:hover { text-decoration: underline; }
 
-  /* Weight sliders */
-  #weight-sliders {
-    display: flex; gap: 0; margin-top: 2px;
-    align-items: flex-start;
-  }
-  .wslider {
-    display: flex; flex-direction: column; align-items: center;
-    gap: 1px;
-  }
-  .wslider label {
-    font-size: 9px; color: #d4a24e; white-space: nowrap;
-  }
-  .wslider input[type=range] {
-    width: 46px; height: 14px;
-    accent-color: #d4a24e;
-    cursor: pointer;
-  }
-  .wslider .wval {
-    font-size: 8px; color: #999;
-  }
+  /* Weight sliders are SVG-based — no extra CSS needed */
 </style>
 </head>
 <body>
@@ -112,7 +93,6 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 </div>
 
 <div id="anim-container" style="position: relative; overflow: visible;"></div>
-<div id="weight-sliders"></div>
 <div id="status-bar"></div>
 <div id="result-bar"></div>
 </div>
@@ -135,6 +115,8 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   var nodeW = 44, nodeH = 28;
   var pmfBarW = 6, pmfBarH = 20, pmfGap = 2;
   var vGap = 90;
+  var sliderH = 50, sliderW, maxW = 3.0;
+  var sliderFills = [], sliderLabels = [];
 
   // ── State ──
   var tree, flatNodes, treeDepth;
@@ -265,7 +247,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         nd.y = li * vGap + 36;
       }
     }
-    return { svgW: totalW + 40, svgH: treeDepth * vGap + 46 };
+    return { svgW: totalW + 40, svgH: treeDepth * vGap + 46 + sliderH + 28 };
   }
 
   // ── Drawing ──
@@ -360,46 +342,82 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     return String(nn).split('').map(function(d) { return digits[+d]; }).join('');
   }
 
-  // ── Weight sliders ──
+  // ── SVG Weight sliders (vertical bars with d3 drag) ──
   function buildSliders() {
-    var cont = d3.select('#weight-sliders');
-    cont.selectAll('*').remove();
+    sliderFills = []; sliderLabels = [];
+    sliderW = nodeW - 10;
 
     var leafLevel = tree.levels[tree.levels.length - 1];
-    var hSpacing = nodeW + 14;
+    leafLevel.forEach(function(nd) {
+      if (nd.pad || !nd.items.length) return;
+      var idx = nd.items[0];
+      (function(idx) {
+        var sx = nd.x - sliderW / 2;
+        var sy = nd.y + nodeH / 2 + pmfBarH + 10;
 
-    for (var i = 0; i < N; i++) {
-      var div = cont.append('div').attr('class', 'wslider')
-        .style('width', hSpacing + 'px');
+        var sg = svg.append('g').attr('class', 'weight-slider');
 
-      div.append('label').text('w' + subscript(i + 1));
+        // Label above
+        sg.append('text')
+          .attr('x', nd.x).attr('y', sy - 2)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '9px').style('fill', CI)
+          .text('w' + subscript(idx + 1));
 
-      var inp = div.append('input')
-        .attr('type', 'range')
-        .attr('min', '0.05').attr('max', '3.0').attr('step', '0.05')
-        .attr('value', w[i])
-        .attr('data-idx', i);
+        // Track
+        sg.append('rect')
+          .attr('x', sx + 1).attr('y', sy)
+          .attr('width', sliderW - 2).attr('height', sliderH)
+          .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
 
-      var valSpan = div.append('span').attr('class', 'wval')
-        .text(w[i].toFixed(2));
+        // Fill
+        var frac = Math.min(w[idx] / maxW, 1);
+        var sf = sg.append('rect')
+          .attr('x', sx + 2).attr('width', sliderW - 4).attr('rx', 1)
+          .attr('y', sy + sliderH - frac * sliderH).attr('height', frac * sliderH)
+          .attr('fill', CI).attr('opacity', 0.8)
+          .style('pointer-events', 'none');
+        sliderFills.push(sf);
 
-      inp.on('input', (function(idx, valEl) {
-        return function() {
-          var v = +this.value;
-          w[idx] = v;
-          valEl.text(v.toFixed(2));
-          onWeightsChanged();
-        };
-      })(i, valSpan));
-    }
+        // Value label
+        var sl = sg.append('text')
+          .attr('x', nd.x).attr('y', sy + sliderH - frac * sliderH - 2)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '9px').style('fill', CI)
+          .style('pointer-events', 'none')
+          .text(w[idx].toFixed(2));
+        sliderLabels.push(sl);
+
+        // Drag target (wider for touch)
+        sg.append('rect')
+          .attr('x', sx - 4).attr('y', sy - 2)
+          .attr('width', sliderW + 8).attr('height', sliderH + 4)
+          .attr('fill', 'transparent').attr('cursor', 'ns-resize')
+          .style('touch-action', 'none')
+          .call(d3.drag().on('drag', function(event) {
+            var frac = (sy + sliderH - event.y) / sliderH;
+            frac = Math.max(0.02, Math.min(1.0, frac));
+            w[idx] = frac * maxW;
+            // Update this slider visually
+            sf.attr('y', sy + sliderH - frac * sliderH).attr('height', frac * sliderH);
+            sl.attr('y', sy + sliderH - frac * sliderH - 2).text(w[idx].toFixed(2));
+          }).on('end', function() {
+            onWeightsChanged();
+          }));
+      })(idx);
+    });
   }
 
   function syncSliders() {
-    d3.select('#weight-sliders').selectAll('input[type=range]').each(function() {
-      var idx = +d3.select(this).attr('data-idx');
-      d3.select(this).property('value', w[idx]);
-      d3.select(this.parentNode).select('.wval').text(w[idx].toFixed(2));
-    });
+    for (var i = 0; i < sliderFills.length && i < N; i++) {
+      var leafLevel = tree.levels[tree.levels.length - 1];
+      var nd = leafLevel[i];
+      if (!nd || nd.pad) continue;
+      var sy = nd.y + nodeH / 2 + pmfBarH + 10;
+      var frac = Math.min(w[i] / maxW, 1);
+      sliderFills[i].attr('y', sy + sliderH - frac * sliderH).attr('height', frac * sliderH);
+      sliderLabels[i].attr('y', sy + sliderH - frac * sliderH - 2).text(w[i].toFixed(2));
+    }
   }
 
   function onWeightsChanged() {
