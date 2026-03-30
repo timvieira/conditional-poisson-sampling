@@ -34,7 +34,7 @@ MathJax = {
   }
   .widget-box p.desc { margin-bottom: 12px; font-size: 0.95em; line-height: 1.5; }
   #controls {
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center; gap: 8px;
     margin-bottom: 8px; font-size: 0.9em;
     flex-wrap: wrap;
   }
@@ -50,6 +50,8 @@ MathJax = {
     background: #fff;
   }
   #controls button:hover { background: #f0f0f0; }
+  #controls button:disabled { opacity: 0.35; cursor: default; }
+  #controls button:disabled:hover { background: #fff; }
   #controls button.active { background: #5b9bd5; color: #fff; border-color: #5b9bd5; }
   #status-bar {
     font-size: 0.82em; color: #666; margin-top: 4px;
@@ -64,7 +66,26 @@ MathJax = {
   .back-link a { color: #5b9bd5; text-decoration: none; }
   .back-link a:hover { text-decoration: underline; }
 
-  /* Split distribution — rendered in SVG, no overlay needed */
+  /* Weight sliders */
+  #weight-sliders {
+    display: flex; gap: 0; margin-top: 2px;
+    align-items: flex-start;
+  }
+  .wslider {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 1px;
+  }
+  .wslider label {
+    font-size: 9px; color: #d4a24e; white-space: nowrap;
+  }
+  .wslider input[type=range] {
+    width: 46px; height: 14px;
+    accent-color: #d4a24e;
+    cursor: pointer;
+  }
+  .wslider .wval {
+    font-size: 8px; color: #999;
+  }
 </style>
 </head>
 <body>
@@ -84,13 +105,14 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 <div id="controls">
   <span>$N$ = </span><input type="number" id="inp-N" min="2" max="16" value="8">
   <span>&ensp;$n$ = </span><input type="number" id="inp-n" min="0" max="8" value="3">
-  <button id="btn-step">Step</button>
+  <button id="btn-back" disabled>&laquo; Back</button>
+  <button id="btn-step">Step &raquo;</button>
   <button id="btn-play">Play</button>
-  <button id="btn-reset">New Sample</button>
   <button id="btn-weights">Resample Weights</button>
 </div>
 
 <div id="anim-container" style="position: relative; overflow: visible;"></div>
+<div id="weight-sliders"></div>
 <div id="status-bar"></div>
 <div id="result-bar"></div>
 </div>
@@ -101,23 +123,24 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   var CW = '#5b9bd5', CR = '#c0504d', CI = '#d4a24e';
   var CS = '#4caf50';   // selected green
   var CX = '#ccc';      // excluded gray
-  var FONT = "'EB Garamond', serif";
 
   var N = 8, n = 3;
   var w = [];
   var dur = 500;
   var pauseDur = 400;
-  var splitStagger = 600; // delay between sequential split panels
+  var splitStagger = 600;
 
   // ── Layout ──
   var ballR = 6;
   var nodeW = 44, nodeH = 28;
   var pmfBarW = 6, pmfBarH = 20, pmfGap = 2;
-  var vGap = 90;  // more vertical space for PMF histograms
+  var vGap = 90;
 
   // ── State ──
   var tree, flatNodes, treeDepth;
   var animState = null;
+  var history = [];       // stack of snapshots for back-stepping
+  var animating = false;  // true while ball animation is in flight
   var playing = false;
   var playTimer = null;
 
@@ -156,9 +179,9 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     return { root: allLevels[0][0], levels: allLevels };
   }
 
-  function randomWeights(N) {
+  function randomWeights(NN) {
     var ww = [];
-    for (var i = 0; i < N; i++) ww.push(0.3 + Math.random() * 2.2);
+    for (var i = 0; i < NN; i++) ww.push(0.3 + Math.random() * 2.2);
     return ww;
   }
 
@@ -186,12 +209,28 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     return probs.length - 1;
   }
 
-  // Normalize polynomial to a PMF (probabilities summing to 1)
   function polyToPMF(poly) {
     var total = 0;
     for (var i = 0; i < poly.length; i++) total += poly[i];
     if (total === 0) return poly.slice();
     return poly.map(function(v) { return v / total; });
+  }
+
+  // ── Snapshots for back-stepping ──
+  function snapshot() {
+    return {
+      level: animState.level,
+      quotas: Object.assign({}, animState.quotas),
+      splits: Object.assign({}, animState.splits),
+      done: animState.done
+    };
+  }
+
+  function restoreSnapshot(snap) {
+    animState.level = snap.level;
+    animState.quotas = Object.assign({}, snap.quotas);
+    animState.splits = Object.assign({}, snap.splits);
+    animState.done = snap.done;
   }
 
   // ── Layout ──
@@ -280,30 +319,18 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         .attr('rx', 4)
         .attr('fill', '#f9f9f9').attr('stroke', '#e0e0e0').attr('stroke-width', 1);
 
-      // Leaf label: compact subscript only
-      if (nd.leaf && nd.items.length === 1) {
-        var idx = nd.items[0];
-        g.append('text')
-          .attr('class', 'leaf-weight')
-          .attr('x', nodeW / 2)
-          .attr('y', nodeH + 12)
-          .attr('text-anchor', 'middle')
-          .style('font-size', '9px')
-          .style('fill', CI)
-          .text('w' + subscript(idx + 1));
-      }
-
-      // Forward-pass PMF histogram below internal nodes
-      if (!nd.leaf) {
+      // PMF histogram for ALL non-pad nodes (leaves get a 2-bar [1, w_i] histogram)
+      if (!nd.pad) {
         drawPMF(g, nd);
       }
     });
 
+    buildSliders();
     resetAnimState();
     renderState();
   }
 
-  // Draw a small PMF bar chart below an internal node
+  // Draw a small PMF bar chart below a node
   function drawPMF(g, nd) {
     var pmf = polyToPMF(nd.poly);
     var maxP = Math.max.apply(null, pmf);
@@ -324,15 +351,63 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         .attr('height', h)
         .attr('rx', 1)
         .attr('fill', CW)
-        .attr('opacity', 0.4);
+        .attr('opacity', 0.25);
     }
   }
 
-  function subscript(n) {
+  function subscript(nn) {
     var digits = '₀₁₂₃₄₅₆₇₈₉';
-    return String(n).split('').map(function(d) { return digits[+d]; }).join('');
+    return String(nn).split('').map(function(d) { return digits[+d]; }).join('');
   }
 
+  // ── Weight sliders ──
+  function buildSliders() {
+    var cont = d3.select('#weight-sliders');
+    cont.selectAll('*').remove();
+
+    var leafLevel = tree.levels[tree.levels.length - 1];
+    var hSpacing = nodeW + 14;
+
+    for (var i = 0; i < N; i++) {
+      var div = cont.append('div').attr('class', 'wslider')
+        .style('width', hSpacing + 'px');
+
+      div.append('label').text('w' + subscript(i + 1));
+
+      var inp = div.append('input')
+        .attr('type', 'range')
+        .attr('min', '0.05').attr('max', '3.0').attr('step', '0.05')
+        .attr('value', w[i])
+        .attr('data-idx', i);
+
+      var valSpan = div.append('span').attr('class', 'wval')
+        .text(w[i].toFixed(2));
+
+      inp.on('input', (function(idx, valEl) {
+        return function() {
+          var v = +this.value;
+          w[idx] = v;
+          valEl.text(v.toFixed(2));
+          onWeightsChanged();
+        };
+      })(i, valSpan));
+    }
+  }
+
+  function syncSliders() {
+    d3.select('#weight-sliders').selectAll('input[type=range]').each(function() {
+      var idx = +d3.select(this).attr('data-idx');
+      d3.select(this).property('value', w[idx]);
+      d3.select(this.parentNode).select('.wval').text(w[idx].toFixed(2));
+    });
+  }
+
+  function onWeightsChanged() {
+    stopPlaying();
+    draw();
+  }
+
+  // ── State ──
   function resetAnimState() {
     animState = {
       level: -1,
@@ -341,13 +416,48 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       done: false
     };
     animState.quotas[tree.root.id] = n;
-    d3.select('#status-bar').html('Press <b>Step</b> to advance one level, or <b>Play</b> to animate.');
+    history = [];
+    animating = false;
+    updateStatusBar();
     d3.select('#result-bar').html('');
-    svg.selectAll('.split-overlay').remove();
+    updateButtons();
+  }
+
+  function updateStatusBar() {
+    if (animState.done) {
+      d3.select('#status-bar').html('<b>Done!</b> All leaves assigned.');
+    } else if (animState.level < 0) {
+      d3.select('#status-bar').html('Press <b>Step</b> to advance one level, or <b>Play</b> to animate.');
+    } else {
+      // Build status from splits at current level
+      var levels = tree.levels;
+      var currentLevel = levels[animState.level];
+      var parts = [];
+      currentLevel.forEach(function(nd) {
+        if (nd.pad || nd.leaf) return;
+        var split = animState.splits[nd.id];
+        if (!split || split.k === 0) return;
+        parts.push('{' + nd.items.map(function(i){return i+1;}).join(',') + '}: ' + split.k + ' \u2192 ' + split.j + ' | ' + (split.k - split.j));
+      });
+      if (parts.length > 0) {
+        d3.select('#status-bar').html('<b>Level ' + animState.level + '</b> \u2014 ' + parts.join(' &ensp;\u00b7&ensp; '));
+      }
+    }
+  }
+
+  function updateButtons() {
+    d3.select('#btn-back').property('disabled', history.length === 0 || animating);
+
+    var stepBtn = d3.select('#btn-step');
+    if (animState.done) {
+      stepBtn.text('Reset').property('disabled', false);
+    } else {
+      stepBtn.text('Step \u00bb').property('disabled', animating);
+    }
   }
 
   function renderState() {
-    // Node colors
+    // Node colors & PMF highlights
     flatNodes.forEach(function(nd) {
       var g = svg.select('[data-id="'+nd.id+'"]');
       var q = animState.quotas[nd.id];
@@ -371,23 +481,21 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         rect.attr('fill', '#f9f9f9').attr('stroke', '#e0e0e0').attr('stroke-width', 1);
       }
 
-      // Highlight the PMF bar corresponding to the quota
-      if (!nd.leaf && q !== undefined) {
-        highlightPMFBar(g, nd, q);
-      }
+      // PMF bar highlighting
+      highlightPMFBar(g, nd, q);
     });
 
     // Remove old quota visuals
     svg.selectAll('.quota-ball').remove();
     svg.selectAll('.quota-num').remove();
     svg.selectAll('.leaf-icon').remove();
+    svg.selectAll('.split-overlay').remove();
 
     // Draw quota balls
     flatNodes.forEach(function(nd) {
       var q = animState.quotas[nd.id];
       if (q === undefined) return;
       if (animState.done && nd.leaf) {
-        // Show checkmark or X
         var g = svg.select('[data-id="'+nd.id+'"]');
         if (q === 1) {
           g.append('text')
@@ -407,7 +515,6 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         return;
       }
       if (q <= 0) return;
-
       drawStaticBalls(nd, q);
     });
 
@@ -441,22 +548,26 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         '<span style="color:'+CS+'; font-weight:bold;">Sample:</span> $S = \\{' + selected.join(', ') + '\\}$'
       );
       typesetMath();
+    } else {
+      d3.select('#result-bar').html('');
     }
+
+    updateButtons();
   }
 
   // Highlight the k-th bar in a node's PMF histogram
-  function highlightPMFBar(g, nd, k) {
+  function highlightPMFBar(g, nd, q) {
     var pmfG = g.select('.pmf-hist');
     if (pmfG.empty()) return;
     var pmf = polyToPMF(nd.poly);
 
-    // Reset all bars to default
-    pmfG.selectAll('rect').attr('fill', CW).attr('opacity', 0.4);
+    // Reset all bars to dim default
+    pmfG.selectAll('rect').attr('fill', CW).attr('opacity', 0.25);
 
-    // Highlight the sampled bar
-    if (k >= 0 && k < pmf.length) {
+    // If this node has a quota assigned, highlight that bar
+    if (q !== undefined && q >= 0 && q < pmf.length) {
       pmfG.selectAll('rect').each(function(d, i) {
-        if (i === k) {
+        if (i === q) {
           d3.select(this).attr('fill', CR).attr('opacity', 0.85);
         }
       });
@@ -467,13 +578,16 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   function doStep(callback) {
     if (animState.done) { stopPlaying(); if (callback) callback(); return; }
 
+    // Save snapshot before mutating
+    history.push(snapshot());
+
     animState.level++;
     var levels = tree.levels;
 
     if (animState.level >= levels.length) {
       animState.done = true;
       renderState();
-      d3.select('#status-bar').html('<b>Done!</b> All leaves assigned.');
+      updateStatusBar();
       stopPlaying();
       if (callback) callback();
       return;
@@ -498,7 +612,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       if (animState.level >= levels.length - 1) {
         animState.done = true;
         renderState();
-        d3.select('#status-bar').html('<b>Done!</b> All leaves assigned.');
+        updateStatusBar();
         stopPlaying();
         if (callback) callback();
         return;
@@ -507,7 +621,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       return;
     }
 
-    // Pre-compute all splits (so state is consistent) but animate sequentially
+    // Pre-compute all splits
     activeNodes.forEach(function(nd) {
       var k = animState.quotas[nd.id];
       var probs = splitDist(nd.left, nd.right, k);
@@ -517,20 +631,33 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       animState.quotas[nd.right.id] = k - j;
     });
 
+    animating = true;
+    updateButtons();
+
     // Animate nodes one at a time within this level
     animateNodesSequentially(activeNodes, 0, function() {
       svg.selectAll('.split-overlay').remove();
+      animating = false;
       renderState();
+      updateStatusBar();
       // Check if leaves are next
       var nextLi = animState.level + 1;
       if (nextLi < levels.length && levels[nextLi].every(function(nd) { return nd.leaf || nd.pad; })) {
         animState.done = true;
         renderState();
-        d3.select('#status-bar').html('<b>Done!</b> All leaves assigned.');
+        updateStatusBar();
         stopPlaying();
       }
       if (callback) callback();
     });
+  }
+
+  function doBack() {
+    if (history.length === 0 || animating) return;
+    stopPlaying();
+    restoreSnapshot(history.pop());
+    renderState();
+    updateStatusBar();
   }
 
   function animateNodesSequentially(nodes, idx, callback) {
@@ -543,31 +670,24 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     var split = animState.splits[nd.id];
     var k = split.k, j = split.j;
 
-    // Update status bar for this node
-    var statusParts = [];
-    for (var i = 0; i <= idx; i++) {
-      var s = animState.splits[nodes[i].id];
-      statusParts.push('{' + nodes[i].items.map(function(ii){return ii+1;}).join(',') + '}: ' + s.k + ' \u2192 ' + s.j + ' | ' + (s.k-s.j));
-    }
-    d3.select('#status-bar').html(
-      '<b>Level ' + animState.level + '</b> \u2014 ' + statusParts.join(' &ensp;\u00b7&ensp; ')
-    );
-
-    // Show split panel for this node (only if k > 1, since k=1 is deterministic)
+    // Show split panel for this node (only if k > 1)
     if (k > 1) {
-      showSingleSplitPanel(nd);
+      showSplitOverlay(nd);
     }
 
     // Animate balls for this single node
     animateBallSplit([nd], function() {
-      // Draw static balls for the children that just received quota
-      // so they're visible during the stagger delay
+      // Draw static balls for children so they're visible during stagger
       [nd.left, nd.right].forEach(function(child) {
         if (!child || child.pad) return;
         var cq = animState.quotas[child.id];
         if (cq !== undefined && cq > 0) drawStaticBalls(child, cq);
+        // Also highlight child's PMF bar
+        if (!child.pad) {
+          var cg = svg.select('[data-id="'+child.id+'"]');
+          highlightPMFBar(cg, child, cq);
+        }
       });
-      // Brief pause, then next node
       setTimeout(function() {
         animateNodesSequentially(nodes, idx + 1, callback);
       }, k > 1 ? splitStagger : 150);
@@ -577,11 +697,10 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   function animateBallSplit(nodes, callback) {
     var totalAnim = 0, doneAnim = 0;
 
-    // Remove existing balls
     svg.selectAll('.quota-ball').remove();
     svg.selectAll('.quota-num').remove();
 
-    // Re-draw balls for all nodes that have quotas but aren't being animated
+    // Redraw static balls for non-animated nodes
     flatNodes.forEach(function(nd) {
       var q = animState.quotas[nd.id];
       if (q === undefined || q <= 0) return;
@@ -593,7 +712,6 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       });
       if (isAnimChild) return;
       if (animState.done && nd.leaf) return;
-
       drawStaticBalls(nd, q);
     });
 
@@ -678,27 +796,24 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     }
   }
 
-  function showSingleSplitPanel(nd) {
-    // Remove previous split overlays from SVG
+  function showSplitOverlay(nd) {
     svg.selectAll('.split-overlay').remove();
 
     var split = animState.splits[nd.id];
     if (!split || split.k === 0) return;
     var probs = split.probs, j = split.j, k = split.k;
 
-    // Draw the split distribution as SVG bars, centered below the node
     var barW = 10, barH = 30, gap = 3;
     var nBars = probs.length;
     var totalW = nBars * (barW + gap) - gap;
     var cx = nd.x;
-    var cy = nd.y + nodeH / 2 + 8;  // just below the node box
+    var cy = nd.y + nodeH / 2 + 8;
 
     var g = svg.append('g')
       .attr('class', 'split-overlay')
       .attr('transform', 'translate(' + (cx - totalW / 2) + ',' + cy + ')')
       .attr('opacity', 0);
 
-    // Background
     g.append('rect')
       .attr('x', -6).attr('y', -4)
       .attr('width', totalW + 12).attr('height', barH + 22)
@@ -714,7 +829,6 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       var h = Math.max(1, probs[jj] / maxP * barH);
       var bx = jj * (barW + gap);
 
-      // Bar
       g.append('rect')
         .attr('x', bx).attr('y', barH - h)
         .attr('width', barW).attr('height', h)
@@ -722,7 +836,6 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         .attr('fill', isSampled ? CR : CW)
         .attr('opacity', isSampled ? 0.9 : 0.4);
 
-      // Label below bar
       g.append('text')
         .attr('x', bx + barW / 2).attr('y', barH + 11)
         .attr('text-anchor', 'middle')
@@ -732,7 +845,6 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         .text(jj);
     }
 
-    // Fade in
     g.transition().duration(200).attr('opacity', 1);
   }
 
@@ -760,9 +872,19 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     });
   }
 
+  d3.select('#btn-back').on('click', function() {
+    doBack();
+  });
+
   d3.select('#btn-step').on('click', function() {
     stopPlaying();
-    doStep();
+    if (animState.done) {
+      // Reset
+      resetAnimState();
+      renderState();
+    } else {
+      doStep();
+    }
   });
 
   d3.select('#btn-play').on('click', function() {
@@ -773,17 +895,10 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     playStep();
   });
 
-  d3.select('#btn-reset').on('click', function() {
-    stopPlaying();
-    svg.selectAll('.split-overlay').remove();
-    tree = buildTree(w, n);
-    layoutTree();
-    draw();
-  });
-
   d3.select('#btn-weights').on('click', function() {
     stopPlaying();
     initWeights();
+    syncSliders();
     draw();
   });
 
