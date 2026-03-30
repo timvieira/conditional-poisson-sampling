@@ -1,0 +1,20 @@
+{
+  "name": "conditional-poisson-sampling",
+  "version": "1.0.0",
+  "description": "Sample random subsets of exactly $n$ items from a universe of $N$ items, where each item has a weight $w_i \\ge 0$ (including $w_i = \\infty$ for forced inclusion). The probability of drawing subset $S$ is proportional to $\\prod_{i \\in S} w_i$.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:33701/git/timvieira/conditional-poisson-sampling"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "d3": "^7.9.0",
+    "puppeteer-core": "^24.40.0"
+  }
+}
