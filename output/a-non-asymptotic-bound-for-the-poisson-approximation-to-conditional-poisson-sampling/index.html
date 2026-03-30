@@ -1850,15 +1850,7 @@ details.derivation.draft > summary::before {
 <p><strong>Conjecture.</strong><a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a>  For all $N \geq 2$, $1 \leq n < N$, positive weights $\w_1, \ldots, \w_N$, and all items $i$:</p>
 <p>$$|\pip_i - p_i| \;\leq\; \frac{p_i(1 - p_i)}{d}$$</p>
 <p>where $d \defeq \sum_j p_j(1-p_j) = \text{Var}(K)$ is the variance of the Poisson sample size $K = \sum_j I_j$.</p>
-<p><strong>Numerical evidence.</strong> The ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ has been computed across $>10^6$ random instances with $N$ up to $200$ and weight spreads up to $e^{12}$.  It grows slowly with $N$—from $\approx 0.38$ at $N = 3$ to $\approx 0.71$ at $N = 34$.  No violation has been found.</p>
-<h2 id="the-extremal-family">The Extremal Family</h2>
-<p>The worst case has a clean structure: <strong>one outlier item with $p_0 \to 0$ among $N-1$ identical items with $p_j = q$</strong>.  For this family, the $N-1$ uniform items have $e_k = \binom{N-1}{k} w_q^k$, giving</p>
-<p>$$R_0 = \frac{w_q(N-n)}{n}, \qquad \pip_0 = \frac{w_0}{R_0 + w_0}.$$</p>
-<p>As $\epsilon = p_0 \to 0$:</p>
-<p>$$\frac{|\pip_0 - p_0| \cdot d}{p_0(1-p_0)} \;\to\; \frac{n(N{-}1{-}n)}{(N{-}n)(N{-}1)}.$$</p>
-<p>Maximizing over $n$: the critical point is $n^* = N - \sqrt{N}$, giving</p>
-<p>$$\sup_n \frac{n(N{-}1{-}n)}{(N{-}n)(N{-}1)} = \frac{(\sqrt{N}-1)^2}{N-1} = \frac{\sqrt{N}-1}{\sqrt{N}+1} \;\to\; 1 \text{ as } N \to \infty.$$</p>
-<p>So the <strong>tight constant is exactly 1</strong> and the bound $p_i(1-p_i)/d$ is asymptotically sharp.  The gap closes as $\mathcal{O}(1/\sqrt{N})$.</p>
+<p><strong>Numerical evidence.</strong> The ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ has been computed across $>10^6$ random instances with $N$ up to $200$ and weight spreads up to $e^{12}$.  It grows slowly with $N$—from $\approx 0.38$ at $N = 3$ to $\approx 0.58$ at $N = 29$—and appears to converge to a constant strictly less than $1$.  No violation has been found.</p>
 <h2 id="asymptotic-results-known">Asymptotic Results (Known)</h2>
 <p><a href="https://doi.org/10.1214/aoms/1177700375">Hájek (1964, Theorem 5.2)</a> showed $\pip_i = p_i + \mathcal{O}(1/N)$.  <a href="https://arxiv.org/abs/1207.5654">Boistard, Lopuhaä &amp; Ruiz-Gazen (2012)</a> gave the explicit first-order correction:</p>
 <p>$$\pip_i = p_i\Big(1 - d^{-1}(p_i - \bar{p})(1 - p_i) + \mathcal{O}(d^{-2})\Big)$$</p>
@@ -1915,7 +1907,7 @@ where $a$ is an explicit polynomial in the $p_{i_j}$ and the population summarie
 <p>$$\pip_i - p_i = \frac{p_i(1-p_i)(1 - R_i)}{p_i + (1 - p_i)\, R_i}.$$</p>
 <p>The entire quality of the Poisson approximation is controlled by $R_i$, the ratio of consecutive Poisson-binomial probabilities.  The conjecture is equivalent to:</p>
 <p>$$(1 + \w_i)\,|1 - R_i|\, d \;\leq\; R_i + \w_i.$$</p>
-<h2 id="equivalent-math116-bounds">Equivalent $R_i$ Bounds</h2>
+<h2 id="equivalent-math104-bounds">Equivalent $R_i$ Bounds</h2>
 <p>The bound is equivalent to two clean inequalities on the ESP ratio $R_i = e_n(\bw_{-i})/e_{n-1}(\bw_{-i})$:</p>
 <p>$$R_i \geq 1 \implies R_i \leq \frac{\w_i + (1+\w_i)d}{(1+\w_i)d - 1}, \qquad R_i \leq 1 \implies R_i \geq \frac{[d + \w_i(d-1)]^+}{1 + (1+\w_i)d}$$</p>
 <p>Both verified over 1.6M $R_i$ values with zero violations.  These are purely algebraic inequalities about elementary symmetric polynomials of positive reals, given the constraint $\sum \w_j/(1+\w_j) = n$.</p>
@@ -1929,7 +1921,7 @@ where $a$ is an explicit polynomial in the $p_{i_j}$ and the population summarie
 <p>$$\frac{\pip_i - p_i}{q_i} = \big[D_q^{-1}(-A)\big]_i \cdot (-\boldsymbol{\delta}) = \text{convex combination of } (-\delta_j).$$</p>
 <p>Therefore $|\pip_i - p_i| \leq q_i \cdot \|\boldsymbol{\delta}\|_\infty$.</p>
 <p><strong>Gap.</strong> Numerically, $\|\boldsymbol{\delta}\|_\infty \cdot d$ can be large (up to $\sim 10^4$), so this bound is too loose.  The Markov structure is real but the $\ell^\infty$ norm is the wrong quantity—the bound holds because items with large $|\delta_j|$ have small $q_i$, a cancellation not captured by the product $q_i \cdot \|\boldsymbol{\delta}\|_\infty$.</p>
-<h2 id="proof-attempt-2-algebraic-verification-for-small-math150">Proof Attempt 2: Algebraic Verification for Small $N$</h2>
+<h2 id="proof-attempt-2-algebraic-verification-for-small-math138">Proof Attempt 2: Algebraic Verification for Small $N$</h2>
 <p>For fixed $N$, the bound reduces to a polynomial nonnegativity condition.  Writing the ratio as $\text{numer}/\text{denom}$, the bound $|\text{ratio}| \leq 1$ is equivalent to</p>
 <p>$$(\text{denom} + \text{numer})(\text{denom} - \text{numer}) \geq 0$$</p>
 <p>on the feasible polytope $\{p_j \in (0,1) : \sum p_j = n\}$.</p>
