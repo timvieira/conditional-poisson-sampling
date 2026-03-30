@@ -121,6 +121,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   // ── State ──
   var tree, flatNodes, treeDepth;
   var animState = null;
+  var uniforms = {};      // pre-drawn U[0,1] per node id — common random numbers
   var history = [];       // stack of snapshots for back-stepping
   var animating = false;  // true while ball animation is in flight
   var playing = false;
@@ -182,13 +183,22 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     return probs;
   }
 
-  function sampleCategorical(probs) {
-    var u = Math.random(), cum = 0;
+  function sampleWithU(probs, u) {
+    var cum = 0;
     for (var j = 0; j < probs.length; j++) {
       cum += probs[j];
       if (u < cum) return j;
     }
     return probs.length - 1;
+  }
+
+  // Ensure every internal node has a pre-drawn uniform
+  function ensureUniforms() {
+    flatNodes.forEach(function(nd) {
+      if (!nd.leaf && !nd.pad && uniforms[nd.id] === undefined) {
+        uniforms[nd.id] = Math.random();
+      }
+    });
   }
 
   function polyToPMF(poly) {
@@ -422,11 +432,111 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 
   function onWeightsChanged() {
     stopPlaying();
-    draw();
+    // Remember how far we'd progressed
+    var prevLevel = animState ? animState.level : -1;
+    var wasDone = animState ? animState.done : false;
+
+    // Rebuild tree with new weights (new polynomials) but keep uniforms
+    tree = buildTree(w, n);
+    layoutTree();
+
+    // Redraw everything (nodes, edges, sliders, PMF histograms)
+    container.selectAll('*').remove();
+    var dims = layoutTree();
+    svg = container.append('svg')
+      .attr('width', dims.svgW)
+      .attr('height', dims.svgH)
+      .style('display', 'block')
+      .style('user-select', 'none')
+      .style('overflow', 'visible');
+
+    var levels = tree.levels;
+    for (var li = 0; li < levels.length - 1; li++) {
+      levels[li].forEach(function(nd) {
+        [nd.left, nd.right].forEach(function(child) {
+          if (!child || child.pad) return;
+          var x1 = nd.x, y1 = nd.y + nodeH / 2;
+          var x2 = child.x, y2 = child.y - nodeH / 2;
+          var my = (y1 + y2) / 2;
+          svg.append('path')
+            .attr('class', 'tree-edge')
+            .attr('data-parent', nd.id)
+            .attr('data-child', child.id)
+            .attr('d', 'M'+x1+','+y1+' C'+x1+','+my+' '+x2+','+my+' '+x2+','+y2)
+            .attr('fill', 'none')
+            .attr('stroke', '#ddd')
+            .attr('stroke-width', 1.5);
+        });
+      });
+    }
+    flatNodes.forEach(function(nd) {
+      var g = svg.append('g')
+        .attr('class', 'tree-node')
+        .attr('data-id', nd.id)
+        .attr('transform', 'translate('+(nd.x - nodeW/2)+','+(nd.y - nodeH/2)+')');
+      g.append('rect')
+        .attr('class', 'node-box')
+        .attr('width', nodeW).attr('height', nodeH)
+        .attr('rx', 4)
+        .attr('fill', '#f9f9f9').attr('stroke', '#e0e0e0').attr('stroke-width', 1);
+      if (!nd.pad) drawPMF(g, nd);
+    });
+    buildSliders();
+    ensureUniforms();
+
+    // Replay splits from root down to prevLevel using same uniforms
+    animState = {
+      level: -1,
+      quotas: {},
+      splits: {},
+      done: false
+    };
+    animState.quotas[tree.root.id] = n;
+    history = [];
+
+    var targetLevel = wasDone ? levels.length - 1 : prevLevel;
+    for (var li = 0; li <= targetLevel && li < levels.length; li++) {
+      animState.level = li;
+      var currentLevel = levels[li];
+
+      currentLevel.forEach(function(nd) {
+        if (nd.pad || nd.leaf) return;
+        var q = animState.quotas[nd.id];
+        if (q === 0) {
+          if (nd.left && !nd.left.pad) animState.quotas[nd.left.id] = 0;
+          if (nd.right && !nd.right.pad) animState.quotas[nd.right.id] = 0;
+        }
+      });
+
+      var activeNodes = currentLevel.filter(function(nd) {
+        return !nd.pad && !nd.leaf && animState.quotas[nd.id] > 0;
+      });
+
+      activeNodes.forEach(function(nd) {
+        var k = animState.quotas[nd.id];
+        var probs = splitDist(nd.left, nd.right, k);
+        var u = uniforms[nd.id];
+        var j = sampleWithU(probs, u);
+        animState.splits[nd.id] = { probs: probs, j: j, k: k, u: u };
+        animState.quotas[nd.left.id] = j;
+        animState.quotas[nd.right.id] = k - j;
+      });
+
+      // Check if leaves are done
+      var nextLi = li + 1;
+      if (nextLi < levels.length && levels[nextLi].every(function(nd) { return nd.leaf || nd.pad; })) {
+        if (wasDone || li === targetLevel) {
+          animState.done = true;
+        }
+      }
+    }
+
+    renderState();
+    updateStatusBar();
   }
 
   // ── State ──
-  function resetAnimState() {
+  function resetAnimState(keepUniforms) {
     animState = {
       level: -1,
       quotas: {},
@@ -436,6 +546,10 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     animState.quotas[tree.root.id] = n;
     history = [];
     animating = false;
+    if (!keepUniforms) {
+      uniforms = {};
+      ensureUniforms();
+    }
     updateStatusBar();
     d3.select('#result-bar').html('');
     updateButtons();
@@ -639,12 +753,13 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       return;
     }
 
-    // Pre-compute all splits
+    // Pre-compute all splits using stored uniforms
     activeNodes.forEach(function(nd) {
       var k = animState.quotas[nd.id];
       var probs = splitDist(nd.left, nd.right, k);
-      var j = sampleCategorical(probs);
-      animState.splits[nd.id] = { probs: probs, j: j, k: k };
+      var u = uniforms[nd.id];
+      var j = sampleWithU(probs, u);
+      animState.splits[nd.id] = { probs: probs, j: j, k: k, u: u };
       animState.quotas[nd.left.id] = j;
       animState.quotas[nd.right.id] = k - j;
     });
@@ -692,6 +807,20 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     if (k > 1) {
       showSplitOverlay(nd);
     }
+
+    // Highlight edges for this node's children immediately
+    svg.selectAll('.tree-edge').each(function() {
+      var edge = d3.select(this);
+      if (edge.attr('data-parent') === nd.id) {
+        var cid = edge.attr('data-child');
+        var childQ = animState.quotas[cid];
+        if (childQ !== undefined && childQ > 0) {
+          edge.attr('stroke', CW).attr('stroke-width', 2.5).attr('opacity', 0.8);
+        } else if (childQ === 0) {
+          edge.attr('stroke', '#ddd').attr('stroke-width', 1).attr('opacity', 0.4);
+        }
+      }
+    });
 
     // Animate balls for this single node
     animateBallSplit([nd], function() {
@@ -897,8 +1026,8 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   d3.select('#btn-step').on('click', function() {
     stopPlaying();
     if (animState.done) {
-      // Reset
-      resetAnimState();
+      // Fresh sample with new uniforms
+      resetAnimState(false);
       renderState();
     } else {
       doStep();
@@ -907,7 +1036,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 
   d3.select('#btn-play').on('click', function() {
     if (playing) { stopPlaying(); return; }
-    if (animState.done) { resetAnimState(); renderState(); }
+    if (animState.done) { resetAnimState(false); renderState(); }
     playing = true;
     d3.select('#btn-play').text('Pause').classed('active', true);
     playStep();
@@ -916,7 +1045,6 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   d3.select('#btn-weights').on('click', function() {
     stopPlaying();
     initWeights();
-    syncSliders();
     draw();
   });
 
