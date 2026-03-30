@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sampling Animation — Conditional Poisson Distribution</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+MathJax = {
+  tex: { inlineMath: [['$','$']], macros: {} },
+  svg: { fontCache: 'global' },
+  startup: { typeset: true }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'EB Garamond', 'Georgia', serif;
+    background: #fff;
+    color: #333;
+    padding: 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.6em; margin-bottom: 4px; font-weight: normal; }
+  .subtitle { font-size: 0.95em; color: #888; margin-bottom: 16px; }
+  .widget-box {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+  .widget-box p.desc { margin-bottom: 12px; font-size: 0.95em; line-height: 1.5; }
+  #controls {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 8px; font-size: 0.9em;
+    flex-wrap: wrap;
+  }
+  #controls input[type=number] {
+    width: 44px; padding: 2px 4px;
+    font-family: inherit; font-size: inherit;
+    border: 1px solid #ccc; border-radius: 3px;
+  }
+  #controls button {
+    font-family: inherit; font-size: 0.85em;
+    border: 1px solid #ccc; border-radius: 3px;
+    padding: 3px 10px; cursor: pointer; color: #555;
+    background: #fff;
+  }
+  #controls button:hover { background: #f0f0f0; }
+  #controls button.active { background: #5b9bd5; color: #fff; border-color: #5b9bd5; }
+  #status-bar {
+    font-size: 0.82em; color: #666; margin-top: 4px;
+    min-height: 1.4em; line-height: 1.5;
+  }
+  #result-bar {
+    margin-top: 6px; font-size: 1em; min-height: 1.6em;
+    padding: 4px 0;
+  }
+  svg text { font-family: 'EB Garamond', 'Georgia', serif; }
+  .back-link { font-size: 0.85em; margin-bottom: 12px; }
+  .back-link a { color: #5b9bd5; text-decoration: none; }
+  .back-link a:hover { text-decoration: underline; }
+
+  /* Split distribution panel */
+  .split-info {
+    position: absolute;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 8px 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    font-size: 0.82em;
+    pointer-events: none;
+    z-index: 10;
+    white-space: nowrap;
+  }
+  .split-info .eq { color: #777; margin-bottom: 5px; font-size: 0.9em; }
+  .split-info .split-bars {
+    display: flex; align-items: flex-end; gap: 2px;
+    height: 44px; margin-bottom: 2px;
+  }
+  .split-info .split-col {
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+    min-width: 26px;
+  }
+  .split-info .split-fill {
+    width: 20px; border-radius: 2px; min-height: 1px;
+  }
+  .split-info .split-lbl { font-size: 9px; color: #999; }
+  .split-info .split-val { font-size: 9px; }
+</style>
+</head>
+<body>
+
+<div class="back-link"><a href="../conditional-poisson-sampling/">&larr; Back to blog post</a></div>
+<h1>Sampling from the Conditional Poisson Distribution</h1>
+<div class="subtitle">An animated walk through the product tree</div>
+
+<div class="widget-box">
+<p class="desc">
+Starting at the root with a quota of $n$ items, the algorithm walks the product tree top-down.
+At each internal node with quota $k$, it splits $k$ between left and right children with probability
+proportional to $P_L[j] \cdot P_R[k{-}j]$&mdash;the <strong>weighted Vandermonde identity</strong>.
+At the leaves, quota 1 = selected, quota 0 = excluded.
+</p>
+
+<div id="controls">
+  <span>$N$ = </span><input type="number" id="inp-N" min="2" max="16" value="8">
+  <span>&ensp;$n$ = </span><input type="number" id="inp-n" min="0" max="8" value="3">
+  <button id="btn-step">Step</button>
+  <button id="btn-play">Play</button>
+  <button id="btn-reset">New Sample</button>
+  <button id="btn-weights">Resample Weights</button>
+</div>
+
+<div id="anim-container" style="position: relative; overflow: visible;"></div>
+<div id="status-bar"></div>
+<div id="result-bar"></div>
+</div>
+
+<script>
+(function() {
+  // ── Colors (matching blog widgets) ──
+  var CW = '#5b9bd5', CR = '#c0504d', CI = '#d4a24e';
+  var CS = '#4caf50';   // selected green
+  var CX = '#ccc';      // excluded gray
+  var FONT = "'EB Garamond', serif";
+
+  var N = 8, n = 3;
+  var w = [];
+  var dur = 500;
+  var pauseDur = 400;
+
+  // ── Layout ──
+  var ballR = 7;
+  var nodeW = 60, nodeH = 32;
+  var vGap = 70;
+
+  // ── State ──
+  var tree, flatNodes, treeDepth;
+  var animState = null;
+  var playing = false;
+  var playTimer = null;
+
+  // ── Math ──
+  function polyMul(a, b) {
+    var out = new Array(a.length + b.length - 1).fill(0);
+    for (var i = 0; i < a.length; i++)
+      for (var j = 0; j < b.length; j++)
+        out[i+j] += a[i] * b[j];
+    return out;
+  }
+
+  function buildTree(ww, nn) {
+    var leaves = ww.map(function(wi, i) {
+      return { poly: [1, wi], items: [i], leaf: true, id: 'leaf-' + i };
+    });
+    var size = 1;
+    while (size < leaves.length) size *= 2;
+    while (leaves.length < size)
+      leaves.push({ poly: [1], items: [], leaf: true, pad: true, id: 'pad-' + leaves.length });
+    var level = leaves;
+    var allLevels = [level];
+    var nid = 0;
+    while (level.length > 1) {
+      var next = [];
+      for (var i = 0; i < level.length; i += 2) {
+        var l = level[i], r = level[i+1];
+        var p = polyMul(l.poly, r.poly);
+        if (p.length > nn + 1) p = p.slice(0, nn + 1);
+        next.push({ left: l, right: r, poly: p, items: l.items.concat(r.items), leaf: false, id: 'int-' + (nid++) });
+      }
+      level = next;
+      allLevels.push(level);
+    }
+    allLevels.reverse();
+    return { root: allLevels[0][0], levels: allLevels };
+  }
+
+  function randomWeights(N) {
+    var ww = [];
+    for (var i = 0; i < N; i++) ww.push(0.3 + Math.random() * 2.2);
+    return ww;
+  }
+
+  function initWeights() { w = randomWeights(N); }
+
+  function splitDist(nodeLeft, nodeRight, k) {
+    var probs = [], total = 0;
+    for (var j = 0; j <= k; j++) {
+      var pl = j < nodeLeft.poly.length ? nodeLeft.poly[j] : 0;
+      var pr = (k - j) < nodeRight.poly.length ? nodeRight.poly[k - j] : 0;
+      var v = Math.max(pl * pr, 0);
+      probs.push(v);
+      total += v;
+    }
+    if (total > 0) for (var j = 0; j < probs.length; j++) probs[j] /= total;
+    return probs;
+  }
+
+  function sampleCategorical(probs) {
+    var u = Math.random(), cum = 0;
+    for (var j = 0; j < probs.length; j++) {
+      cum += probs[j];
+      if (u < cum) return j;
+    }
+    return probs.length - 1;
+  }
+
+  // ── Layout ──
+  function layoutTree() {
+    var levels = tree.levels;
+    treeDepth = levels.length;
+    flatNodes = [];
+    for (var li = 0; li < levels.length; li++) {
+      for (var ni = 0; ni < levels[li].length; ni++) {
+        var nd = levels[li][ni];
+        nd._level = li;
+        nd._idx = ni;
+        if (!nd.pad) flatNodes.push(nd);
+      }
+    }
+    var leafLevel = levels[levels.length - 1];
+    var leafCount = leafLevel.filter(function(nd) { return !nd.pad; }).length;
+    var hSpacing = Math.max(nodeW + 20, 76);
+    var totalW = Math.max(leafCount * hSpacing, 320);
+    var realIdx = 0;
+    for (var i = 0; i < leafLevel.length; i++) {
+      var nd = leafLevel[i];
+      if (nd.pad) { nd.x = -9999; nd.y = -9999; continue; }
+      nd.x = 30 + realIdx * hSpacing + hSpacing / 2;
+      nd.y = (treeDepth - 1) * vGap + 36;
+      realIdx++;
+    }
+    for (var li = levels.length - 2; li >= 0; li--) {
+      for (var ni = 0; ni < levels[li].length; ni++) {
+        var nd = levels[li][ni];
+        nd.x = (nd.left.x + nd.right.x) / 2;
+        nd.y = li * vGap + 36;
+      }
+    }
+    return { svgW: totalW + 60, svgH: treeDepth * vGap + 56 };
+  }
+
+  // ── Drawing ──
+  var svg, container;
+
+  function draw() {
+    container = d3.select('#anim-container');
+    container.selectAll('*').remove();
+
+    tree = buildTree(w, n);
+    var dims = layoutTree();
+
+    svg = container.append('svg')
+      .attr('width', dims.svgW)
+      .attr('height', dims.svgH)
+      .style('display', 'block')
+      .style('user-select', 'none')
+      .style('overflow', 'visible');
+
+    // Edges
+    var levels = tree.levels;
+    for (var li = 0; li < levels.length - 1; li++) {
+      levels[li].forEach(function(nd) {
+        [nd.left, nd.right].forEach(function(child) {
+          if (!child || child.pad) return;
+          var x1 = nd.x, y1 = nd.y + nodeH / 2;
+          var x2 = child.x, y2 = child.y - nodeH / 2;
+          var my = (y1 + y2) / 2;
+          svg.append('path')
+            .attr('class', 'tree-edge')
+            .attr('data-parent', nd.id)
+            .attr('data-child', child.id)
+            .attr('d', 'M'+x1+','+y1+' C'+x1+','+my+' '+x2+','+my+' '+x2+','+y2)
+            .attr('fill', 'none')
+            .attr('stroke', '#ddd')
+            .attr('stroke-width', 1.5);
+        });
+      });
+    }
+
+    // Nodes
+    flatNodes.forEach(function(nd) {
+      var g = svg.append('g')
+        .attr('class', 'tree-node')
+        .attr('data-id', nd.id)
+        .attr('transform', 'translate('+(nd.x - nodeW/2)+','+(nd.y - nodeH/2)+')');
+
+      g.append('rect')
+        .attr('class', 'node-box')
+        .attr('width', nodeW).attr('height', nodeH)
+        .attr('rx', 5)
+        .attr('fill', '#f9f9f9').attr('stroke', '#e0e0e0').attr('stroke-width', 1);
+
+      // Leaf label
+      if (nd.leaf && nd.items.length === 1) {
+        var idx = nd.items[0];
+        g.append('text')
+          .attr('class', 'leaf-weight')
+          .attr('x', nodeW / 2)
+          .attr('y', nodeH + 14)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '10px')
+          .style('fill', CI)
+          .text('w\u2080'.replace('\u2080', subscript(idx + 1)) + ' = ' + w[idx].toFixed(2));
+
+        // Item name inside the box
+        g.append('text')
+          .attr('class', 'item-label')
+          .attr('x', nodeW / 2)
+          .attr('y', nodeH / 2 + 4)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '11px')
+          .style('fill', '#bbb')
+          .text('item ' + (idx + 1));
+      }
+    });
+
+    resetAnimState();
+    renderState();
+  }
+
+  function subscript(n) {
+    var digits = '₀₁₂₃₄₅₆₇₈₉';
+    return String(n).split('').map(function(d) { return digits[+d]; }).join('');
+  }
+
+  function resetAnimState() {
+    animState = {
+      level: -1,
+      quotas: {},
+      splits: {},
+      done: false
+    };
+    animState.quotas[tree.root.id] = n;
+    d3.select('#status-bar').html('Press <b>Step</b> to advance one level, or <b>Play</b> to animate.');
+    d3.select('#result-bar').html('');
+    container.selectAll('.split-info').remove();
+  }
+
+  function renderState() {
+    // Node colors
+    flatNodes.forEach(function(nd) {
+      var g = svg.select('[data-id="'+nd.id+'"]');
+      var q = animState.quotas[nd.id];
+      var isActive = (q !== undefined && q > 0);
+      var isZero = (q !== undefined && q === 0);
+      var isProcessed = animState.splits[nd.id] !== undefined;
+      var isDoneLeaf = animState.done && nd.leaf;
+
+      var rect = g.select('.node-box');
+      if (isDoneLeaf && q === 1) {
+        rect.attr('fill', '#e8f5e9').attr('stroke', CS).attr('stroke-width', 2);
+      } else if (isDoneLeaf && (q === 0 || q === undefined)) {
+        rect.attr('fill', '#fafafa').attr('stroke', '#ddd').attr('stroke-width', 1);
+      } else if (isActive) {
+        rect.attr('fill', '#e8f0fa').attr('stroke', CW).attr('stroke-width', 1.5);
+      } else if (isZero && nd.leaf) {
+        rect.attr('fill', '#fafafa').attr('stroke', '#ddd').attr('stroke-width', 1);
+      } else if (isProcessed) {
+        rect.attr('fill', '#f5f5f5').attr('stroke', '#d0d0d0').attr('stroke-width', 1);
+      } else {
+        rect.attr('fill', '#f9f9f9').attr('stroke', '#e0e0e0').attr('stroke-width', 1);
+      }
+
+      // Show/hide item label in leaf
+      g.selectAll('.item-label')
+        .style('opacity', (isDoneLeaf || (q !== undefined)) ? 0.4 : 1);
+    });
+
+    // Remove old quota visuals
+    svg.selectAll('.quota-ball').remove();
+    svg.selectAll('.quota-num').remove();
+    svg.selectAll('.leaf-icon').remove();
+
+    // Draw quota balls
+    flatNodes.forEach(function(nd) {
+      var q = animState.quotas[nd.id];
+      if (q === undefined) return;
+      if (animState.done && nd.leaf) {
+        // Show checkmark or X
+        var g = svg.select('[data-id="'+nd.id+'"]');
+        if (q === 1) {
+          g.append('text')
+            .attr('class', 'leaf-icon leaf-status')
+            .attr('x', nodeW / 2).attr('y', nodeH / 2 + 5)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '16px').style('fill', CS).style('font-weight', 'bold')
+            .text('\u2713');
+        } else {
+          g.append('text')
+            .attr('class', 'leaf-icon leaf-status')
+            .attr('x', nodeW / 2).attr('y', nodeH / 2 + 5)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '14px').style('fill', '#ccc')
+            .text('\u2717');
+        }
+        return;
+      }
+      if (q <= 0) return;
+
+      var cx = nd.x, cy = nd.y;
+      if (q <= 4) {
+        var gap = ballR * 2 + 3;
+        var totalBW = q * gap - 3;
+        var sx = cx - totalBW / 2 + ballR;
+        for (var i = 0; i < q; i++) {
+          svg.append('circle')
+            .attr('class', 'quota-ball')
+            .attr('cx', sx + i * gap).attr('cy', cy)
+            .attr('r', ballR)
+            .attr('fill', CW).attr('opacity', 0.85)
+            .attr('stroke', '#fff').attr('stroke-width', 1.5);
+        }
+      } else {
+        svg.append('circle')
+          .attr('class', 'quota-ball')
+          .attr('cx', cx).attr('cy', cy)
+          .attr('r', ballR + 4)
+          .attr('fill', CW).attr('opacity', 0.85)
+          .attr('stroke', '#fff').attr('stroke-width', 1.5);
+        svg.append('text')
+          .attr('class', 'quota-num')
+          .attr('x', cx).attr('y', cy + 4.5)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '12px').style('fill', '#fff').style('font-weight', 'bold')
+          .style('pointer-events', 'none')
+          .text(q);
+      }
+    });
+
+    // Edge highlighting
+    svg.selectAll('.tree-edge').each(function() {
+      var edge = d3.select(this);
+      var pid = edge.attr('data-parent');
+      var cid = edge.attr('data-child');
+      var parentSplit = animState.splits[pid];
+      var childQ = animState.quotas[cid];
+
+      if (parentSplit && childQ !== undefined && childQ > 0) {
+        edge.attr('stroke', CW).attr('stroke-width', 2.5).attr('opacity', 0.8);
+      } else if (parentSplit && childQ === 0) {
+        edge.attr('stroke', '#ddd').attr('stroke-width', 1).attr('opacity', 0.4);
+      } else if (parentSplit) {
+        edge.attr('stroke', '#ccc').attr('stroke-width', 1.2).attr('opacity', 0.5);
+      } else {
+        edge.attr('stroke', '#ddd').attr('stroke-width', 1.5).attr('opacity', 1);
+      }
+    });
+
+    // Show result when done
+    if (animState.done) {
+      var selected = [];
+      flatNodes.forEach(function(nd) {
+        if (nd.leaf && nd.items.length === 1 && animState.quotas[nd.id] === 1)
+          selected.push(nd.items[0] + 1);
+      });
+      d3.select('#result-bar').html(
+        '<span style="color:'+CS+'; font-weight:bold;">Sample:</span> $S = \\{' + selected.join(', ') + '\\}$'
+      );
+      typesetMath();
+    }
+  }
+
+  // ── Animation ──
+  function doStep(callback) {
+    if (animState.done) { stopPlaying(); if (callback) callback(); return; }
+
+    animState.level++;
+    var levels = tree.levels;
+
+    if (animState.level >= levels.length) {
+      animState.done = true;
+      renderState();
+      d3.select('#status-bar').html('<b>Done!</b> All leaves assigned.');
+      stopPlaying();
+      if (callback) callback();
+      return;
+    }
+
+    var currentLevel = levels[animState.level];
+    // Propagate quota=0 to children of zero-quota internal nodes
+    currentLevel.forEach(function(nd) {
+      if (nd.pad || nd.leaf) return;
+      var q = animState.quotas[nd.id];
+      if (q === 0) {
+        if (nd.left && !nd.left.pad) animState.quotas[nd.left.id] = 0;
+        if (nd.right && !nd.right.pad) animState.quotas[nd.right.id] = 0;
+      }
+    });
+
+    var activeNodes = currentLevel.filter(function(nd) {
+      return !nd.pad && !nd.leaf && animState.quotas[nd.id] > 0;
+    });
+
+    if (activeNodes.length === 0) {
+      if (animState.level >= levels.length - 1) {
+        animState.done = true;
+        renderState();
+        d3.select('#status-bar').html('<b>Done!</b> All leaves assigned.');
+        stopPlaying();
+        if (callback) callback();
+        return;
+      }
+      doStep(callback);
+      return;
+    }
+
+    // Process splits
+    var statusParts = [];
+    activeNodes.forEach(function(nd) {
+      var k = animState.quotas[nd.id];
+      var probs = splitDist(nd.left, nd.right, k);
+      var j = sampleCategorical(probs);
+      animState.splits[nd.id] = { probs: probs, j: j, k: k };
+      animState.quotas[nd.left.id] = j;
+      animState.quotas[nd.right.id] = k - j;
+      statusParts.push('{' + nd.items.map(function(i){return i+1;}).join(',') + '}: ' + k + ' \u2192 ' + j + ' | ' + (k-j));
+    });
+
+    d3.select('#status-bar').html(
+      '<b>Level ' + animState.level + '</b> \u2014 ' + statusParts.join(' &ensp;\u00b7&ensp; ')
+    );
+
+    // Show split panels
+    showSplitPanels(activeNodes);
+
+    // Animate balls
+    animateBallSplit(activeNodes, function() {
+      renderState();
+      // Check if leaves are next
+      var nextLi = animState.level + 1;
+      if (nextLi < levels.length && levels[nextLi].every(function(nd) { return nd.leaf || nd.pad; })) {
+        animState.done = true;
+        renderState();
+        d3.select('#status-bar').html('<b>Done!</b> All leaves assigned.');
+        stopPlaying();
+      }
+      if (callback) callback();
+    });
+  }
+
+  function animateBallSplit(nodes, callback) {
+    var totalAnim = 0, doneAnim = 0;
+
+    // First remove existing balls so the animation balls are visible
+    svg.selectAll('.quota-ball').remove();
+    svg.selectAll('.quota-num').remove();
+
+    nodes.forEach(function(nd) {
+      var split = animState.splits[nd.id];
+      if (!split) return;
+      var k = split.k, j = split.j;
+
+      for (var b = 0; b < k; b++) {
+        var goLeft = b < j;
+        var target = goLeft ? nd.left : nd.right;
+        if (target.pad) continue;
+        totalAnim++;
+
+        var gap = ballR * 2 + 3;
+        var totalBW = k * gap - 3;
+        var startX = nd.x - totalBW / 2 + ballR + b * gap;
+        var startY = nd.y;
+
+        var childQ = goLeft ? j : (k - j);
+        var childIdx = goLeft ? b : (b - j);
+        var endX, endY = target.y;
+        if (childQ <= 4) {
+          var cTotalBW = childQ * gap - 3;
+          endX = target.x - cTotalBW / 2 + ballR + childIdx * gap;
+        } else {
+          endX = target.x;
+        }
+
+        var ball = svg.append('circle')
+          .attr('class', 'anim-ball')
+          .attr('cx', startX).attr('cy', startY)
+          .attr('r', (k <= 4) ? ballR : ballR + 4)
+          .attr('fill', CW).attr('opacity', 0.9)
+          .attr('stroke', '#fff').attr('stroke-width', 1.5);
+
+        (function(ball, ex, ey) {
+          ball.transition()
+            .duration(dur)
+            .ease(d3.easeCubicInOut)
+            .attr('cx', ex).attr('cy', ey)
+            .on('end', function() {
+              ball.remove();
+              doneAnim++;
+              if (doneAnim >= totalAnim && callback) callback();
+            });
+        })(ball, endX, endY);
+      }
+    });
+
+    if (totalAnim === 0 && callback) callback();
+  }
+
+  function showSplitPanels(nodes) {
+    container.selectAll('.split-info').remove();
+
+    nodes.forEach(function(nd) {
+      var split = animState.splits[nd.id];
+      if (!split || split.k === 0) return;
+      var probs = split.probs, j = split.j, k = split.k;
+
+      // Position: to the right of the node, or left if no room
+      var svgBox = svg.node().getBoundingClientRect();
+      var contBox = container.node().getBoundingClientRect();
+      var px = nd.x + nodeW/2 + 14;
+      var py = nd.y - 20;
+
+      var panel = container.append('div')
+        .attr('class', 'split-info')
+        .style('left', px + 'px')
+        .style('top', py + 'px');
+
+      panel.append('div').attr('class', 'eq')
+        .html('$P(j \\mid k{=}' + k + ') \\propto P_L[j] \\cdot P_R[' + k + '{-}j]$');
+
+      var barsDiv = panel.append('div').attr('class', 'split-bars');
+      var maxP = Math.max.apply(null, probs);
+      if (maxP === 0) maxP = 1;
+      var barH = 36;
+
+      for (var jj = 0; jj <= k; jj++) {
+        var col = barsDiv.append('div').attr('class', 'split-col');
+        var isSampled = (jj === j);
+        var h = Math.max(1, probs[jj] / maxP * barH);
+        col.append('div').attr('class', 'split-val')
+          .style('font-size', '9px')
+          .style('color', isSampled ? CR : CW)
+          .style('font-weight', isSampled ? 'bold' : 'normal')
+          .text(probs[jj] < 0.005 ? '' : probs[jj].toFixed(2));
+        col.append('div').attr('class', 'split-fill')
+          .style('height', h + 'px')
+          .style('background', isSampled ? CR : CW)
+          .style('opacity', isSampled ? 0.9 : 0.45);
+        col.append('div').attr('class', 'split-lbl')
+          .style('color', isSampled ? CR : '#aaa')
+          .style('font-weight', isSampled ? 'bold' : 'normal')
+          .text(jj);
+      }
+
+      // Check if panel goes off-screen right
+      requestAnimationFrame(function() {
+        var pRect = panel.node().getBoundingClientRect();
+        if (pRect.right > contBox.right + 20) {
+          panel.style('left', (nd.x - nodeW/2 - pRect.width - 14) + 'px');
+        }
+      });
+    });
+
+    typesetMath();
+  }
+
+  function typesetMath() {
+    if (window.MathJax && MathJax.typesetPromise) {
+      MathJax.typesetPromise().catch(function(){});
+    }
+  }
+
+  // ── Controls ──
+  function stopPlaying() {
+    playing = false;
+    if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+    d3.select('#btn-play').text('Play').classed('active', false);
+  }
+
+  function playStep() {
+    if (!playing || animState.done) { stopPlaying(); return; }
+    doStep(function() {
+      if (playing && !animState.done) {
+        playTimer = setTimeout(playStep, pauseDur);
+      } else {
+        stopPlaying();
+      }
+    });
+  }
+
+  d3.select('#btn-step').on('click', function() {
+    stopPlaying();
+    doStep();
+  });
+
+  d3.select('#btn-play').on('click', function() {
+    if (playing) { stopPlaying(); return; }
+    if (animState.done) { resetAnimState(); renderState(); }
+    playing = true;
+    d3.select('#btn-play').text('Pause').classed('active', true);
+    playStep();
+  });
+
+  d3.select('#btn-reset').on('click', function() {
+    stopPlaying();
+    container.selectAll('.split-info').remove();
+    tree = buildTree(w, n);
+    layoutTree();
+    draw();
+  });
+
+  d3.select('#btn-weights').on('click', function() {
+    stopPlaying();
+    initWeights();
+    draw();
+  });
+
+  d3.select('#inp-N').on('change', function() {
+    var v = Math.max(2, Math.min(16, Math.round(+this.value)));
+    if (v === N) return;
+    N = v; n = Math.min(n, N);
+    d3.select('#inp-n').attr('max', N).property('value', n);
+    stopPlaying(); initWeights(); draw();
+  });
+
+  d3.select('#inp-n').on('change', function() {
+    var v = Math.max(0, Math.min(N, Math.round(+this.value)));
+    if (v === n) return;
+    n = v; stopPlaying(); draw();
+  });
+
+  // ── Init ──
+  initWeights();
+  draw();
+
+})();
+</script>
+
+</body>
+</html>
