@@ -43,7 +43,26 @@ $$|\pip_i - p_i| \;\leq\; \frac{p_i(1 - p_i)}{d}$$
 
 where $d \defeq \sum_j p_j(1-p_j) = \text{Var}(K)$ is the variance of the Poisson sample size $K = \sum_j I_j$.
 
-**Numerical evidence.** The ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ has been computed across $>10^6$ random instances with $N$ up to $200$ and weight spreads up to $e^{12}$.  It grows slowly with $N$—from $\approx 0.38$ at $N = 3$ to $\approx 0.58$ at $N = 29$—and appears to converge to a constant strictly less than $1$.  No violation has been found.
+**Numerical evidence.** The ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ has been computed across $>10^6$ random instances with $N$ up to $200$ and weight spreads up to $e^{12}$.  It grows slowly with $N$—from $\approx 0.38$ at $N = 3$ to $\approx 0.71$ at $N = 34$.  No violation has been found.
+
+
+## The Extremal Family
+
+The worst case has a clean structure: **one outlier item with $p_0 \to 0$ among $N-1$ identical items with $p_j = q$**.  For this family, the $N-1$ uniform items have $e_k = \binom{N-1}{k} w_q^k$, giving
+
+$$R_0 = \frac{w_q(N-n)}{n}, \qquad \pip_0 = \frac{w_0}{R_0 + w_0}.$$
+
+As $\epsilon = p_0 \to 0$:
+
+$$\frac{|\pip_0 - p_0| \cdot d}{p_0(1-p_0)} \;\to\; \frac{n(N{-}1{-}n)}{(N{-}n)(N{-}1)}.$$
+
+Maximizing over $n$: the critical point is $n^* = N - \sqrt{N}$, giving
+
+$$\sup_n \frac{n(N{-}1{-}n)}{(N{-}n)(N{-}1)} = \frac{(\sqrt{N}-1)^2}{N-1} = \frac{\sqrt{N}-1}{\sqrt{N}+1} \;\to\; 1 \text{ as } N \to \infty.$$
+
+So the **tight constant is exactly 1** and the bound $p_i(1-p_i)/d$ is asymptotically sharp.  The gap closes as $\mathcal{O}(1/\sqrt{N})$.
+
+**Schur-concavity fails.**  One might hope to prove the conjecture by showing the ratio is maximized when the non-$i$ items are uniform (Schur-concave in $\mathbf{p}_{-i}$).  This is **false**: for $N = 6$, $n = 3$, $p_0 = 0.01$, the ratio at uniform non-$i$ items is $0.399$, but a two-cluster configuration achieves $0.412$.  The true worst case has a **two-cluster** structure, not uniform.  However, the one-outlier-plus-uniform family remains the right asymptotic characterization as $N \to \infty$.
 
 ## Asymptotic Results (Known)
 
