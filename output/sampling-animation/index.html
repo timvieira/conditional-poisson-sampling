@@ -444,13 +444,8 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     renderStateAnimated();
     updateStatusBar();
 
-    // Update split overlay for the last processed node
-    svg.selectAll('.split-overlay').remove();
-    if (queueIdx > 0) {
-      var lastNd = nodeQueue[queueIdx - 1];
-      var lastSplit = animState.splits[lastNd.id];
-      if (lastSplit) showSplitOverlay(lastNd);
-    }
+    // Show preview overlay at cursor
+    showCurrentOverlay();
   }
 
   // Full rebuild for structural changes (N, n, resample)
@@ -461,6 +456,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     replaySplits(0, false);
     renderState();
     updateStatusBar();
+    showCurrentOverlay();
   }
 
   // Update PMF bar heights in-place (no SVG rebuild)
@@ -661,27 +657,26 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       uniforms = {};
       ensureUniforms();
     }
-    svg.selectAll('.split-overlay').remove();
     updateStatusBar();
     d3.select('#result-bar').html('');
     updateButtons();
+    showCurrentOverlay();
   }
 
   function updateStatusBar() {
     if (animState.done) {
       d3.select('#status-bar').html('<b>Done!</b> All leaves assigned.');
-    } else if (queueIdx === 0) {
-      d3.select('#status-bar').html('Press <b>Step</b> to advance one node, or <b>Play</b> to animate.');
     } else {
-      // Show the last processed node's split
-      var lastNd = nodeQueue[queueIdx - 1];
-      var split = animState.splits[lastNd.id];
-      if (split) {
-        var items = '{' + lastNd.items.map(function(i){return i+1;}).join(',') + '}';
+      var nextNd = findNextActiveNode();
+      if (nextNd) {
+        var items = '{' + nextNd.items.map(function(i){return i+1;}).join(',') + '}';
+        var k = animState.quotas[nextNd.id];
         d3.select('#status-bar').html(
-          '<b>Level ' + lastNd._level + '</b> \u2014 ' +
-          items + ': ' + split.k + ' \u2192 ' + split.j + ' | ' + (split.k - split.j)
+          '<b>Level ' + nextNd._level + '</b> \u2014 ' +
+          items + ': split quota ' + k + '. Press <b>Step</b>.'
         );
+      } else {
+        d3.select('#status-bar').html('Press <b>Step</b> to advance.');
       }
     }
   }
@@ -896,9 +891,8 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     animState.level = nd._level;
     queueIdx++;
 
-    // Show split overlay (persists until next step)
-    svg.selectAll('.split-overlay').remove();
-    showSplitOverlay(nd);
+    // Show the sampled result overlay (red highlight on chosen bar)
+    showSplitOverlay(nd, false);
 
     // Highlight edges immediately
     svg.selectAll('.tree-edge').each(function() {
@@ -964,15 +958,24 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     showCurrentOverlay();
   }
 
-  // Show (or clear) split overlay for the last processed node
+  // Show preview overlay at the next node to be processed (the cursor)
   function showCurrentOverlay() {
     svg.selectAll('.split-overlay').remove();
-    if (queueIdx > 0 && !animState.done) {
-      var lastNd = nodeQueue[queueIdx - 1];
-      if (animState.splits[lastNd.id]) {
-        showSplitOverlay(lastNd);
-      }
+    if (animState.done) return;
+    var nextNd = findNextActiveNode();
+    if (nextNd) {
+      showSplitOverlay(nextNd, true);
     }
+  }
+
+  // Find the next node in the queue with positive quota
+  function findNextActiveNode() {
+    for (var qi = queueIdx; qi < nodeQueue.length; qi++) {
+      var nd = nodeQueue[qi];
+      var q = animState.quotas[nd.id];
+      if (q !== undefined && q > 0) return nd;
+    }
+    return null;
   }
 
   function animateBallSplit(nodes, callback) {
@@ -1077,12 +1080,24 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     }
   }
 
-  function showSplitOverlay(nd) {
+  // Show split distribution overlay at a node.
+  // preview=true: all bars blue (showing distribution before sampling)
+  // preview=false: highlight the sampled bar in red
+  function showSplitOverlay(nd, preview) {
     svg.selectAll('.split-overlay').remove();
 
-    var split = animState.splits[nd.id];
-    if (!split || split.k === 0) return;
-    var probs = split.probs, j = split.j, k = split.k;
+    var k, probs, j;
+    if (preview) {
+      // Cursor mode: compute distribution but don't sample yet
+      k = animState.quotas[nd.id];
+      if (k === undefined || k <= 0) return;
+      probs = splitDist(nd.left, nd.right, k);
+      j = -1; // no sampled bar
+    } else {
+      var split = animState.splits[nd.id];
+      if (!split || split.k === 0) return;
+      k = split.k; probs = split.probs; j = split.j;
+    }
 
     var barW = 10, barH = 30, gap = 3;
     var nBars = probs.length;
@@ -1099,14 +1114,15 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       .attr('x', -6).attr('y', -4)
       .attr('width', totalW + 12).attr('height', barH + 22)
       .attr('rx', 4)
-      .attr('fill', '#fff').attr('stroke', '#ddd').attr('stroke-width', 0.5)
+      .attr('fill', '#fff').attr('stroke', preview ? CW : '#ddd')
+      .attr('stroke-width', preview ? 1 : 0.5)
       .attr('opacity', 0.9);
 
     var maxP = Math.max.apply(null, probs);
     if (maxP === 0) maxP = 1;
 
     for (var jj = 0; jj <= k; jj++) {
-      var isSampled = (jj === j);
+      var isSampled = (!preview && jj === j);
       var h = Math.max(1, probs[jj] / maxP * barH);
       var bx = jj * (barW + gap);
 
@@ -1115,7 +1131,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         .attr('width', barW).attr('height', h)
         .attr('rx', 1.5)
         .attr('fill', isSampled ? CR : CW)
-        .attr('opacity', isSampled ? 0.9 : 0.4);
+        .attr('opacity', isSampled ? 0.9 : (preview ? 0.6 : 0.4));
 
       g.append('text')
         .attr('x', bx + barW / 2).attr('y', barH + 11)
