@@ -596,6 +596,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   // Redraw SVG scaffolding (edges, nodes, PMFs, sliders) without resetting state
   function drawScaffolding() {
     container.selectAll('*').remove();
+    overlayNodeId = null; overlayIsPreview = null; overlayK = -1;
     tree = buildTree(w, n);
     var dims = layoutTree();
 
@@ -960,11 +961,12 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 
   // Show preview overlay at the next node to be processed (the cursor)
   function showCurrentOverlay() {
-    svg.selectAll('.split-overlay').remove();
-    if (animState.done) return;
+    if (animState.done) { clearOverlay(); return; }
     var nextNd = findNextActiveNode();
     if (nextNd) {
       showSplitOverlay(nextNd, true);
+    } else {
+      clearOverlay();
     }
   }
 
@@ -1080,26 +1082,54 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     }
   }
 
+  // Track current overlay state to avoid unnecessary rebuilds
+  var overlayNodeId = null;
+  var overlayIsPreview = null;
+  var overlayK = -1;
+
   // Show split distribution overlay at a node.
   // preview=true: all bars blue (showing distribution before sampling)
   // preview=false: highlight the sampled bar in red
   function showSplitOverlay(nd, preview) {
-    svg.selectAll('.split-overlay').remove();
-
     var k, probs, j;
     if (preview) {
-      // Cursor mode: compute distribution but don't sample yet
       k = animState.quotas[nd.id];
-      if (k === undefined || k <= 0) return;
+      if (k === undefined || k <= 0) { clearOverlay(); return; }
       probs = splitDist(nd.left, nd.right, k);
-      j = -1; // no sampled bar
+      j = -1;
     } else {
       var split = animState.splits[nd.id];
-      if (!split || split.k === 0) return;
+      if (!split || split.k === 0) { clearOverlay(); return; }
       k = split.k; probs = split.probs; j = split.j;
     }
 
     var barW = 10, barH = 30, gap = 3;
+    var maxP = Math.max.apply(null, probs);
+    if (maxP === 0) maxP = 1;
+
+    // If same node, same mode, same k — update bars in-place (no blink)
+    var existing = svg.select('.split-overlay');
+    if (!existing.empty() && overlayNodeId === nd.id && overlayIsPreview === preview && overlayK === k) {
+      // Update bar heights and colors with transitions
+      var bars = existing.selectAll('.overlay-bar');
+      bars.each(function(d, i) {
+        var isSampled = (!preview && i === j);
+        var h = Math.max(1, probs[i] / maxP * barH);
+        d3.select(this)
+          .transition().duration(tweenDur)
+          .attr('y', barH - h).attr('height', h)
+          .attr('fill', isSampled ? CR : CW)
+          .attr('opacity', isSampled ? 0.9 : (preview ? 0.6 : 0.4));
+      });
+      return;
+    }
+
+    // Different node or mode — full rebuild
+    svg.selectAll('.split-overlay').remove();
+    overlayNodeId = nd.id;
+    overlayIsPreview = preview;
+    overlayK = k;
+
     var nBars = probs.length;
     var totalW = nBars * (barW + gap) - gap;
     var cx = nd.x;
@@ -1107,8 +1137,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 
     var g = svg.append('g')
       .attr('class', 'split-overlay')
-      .attr('transform', 'translate(' + (cx - totalW / 2) + ',' + cy + ')')
-      .attr('opacity', 0);
+      .attr('transform', 'translate(' + (cx - totalW / 2) + ',' + cy + ')');
 
     g.append('rect')
       .attr('x', -6).attr('y', -4)
@@ -1118,15 +1147,13 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       .attr('stroke-width', preview ? 1 : 0.5)
       .attr('opacity', 0.9);
 
-    var maxP = Math.max.apply(null, probs);
-    if (maxP === 0) maxP = 1;
-
     for (var jj = 0; jj <= k; jj++) {
       var isSampled = (!preview && jj === j);
       var h = Math.max(1, probs[jj] / maxP * barH);
       var bx = jj * (barW + gap);
 
       g.append('rect')
+        .attr('class', 'overlay-bar')
         .attr('x', bx).attr('y', barH - h)
         .attr('width', barW).attr('height', h)
         .attr('rx', 1.5)
@@ -1141,8 +1168,13 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         .style('font-weight', isSampled ? 'bold' : 'normal')
         .text(jj);
     }
+  }
 
-    g.transition().duration(200).attr('opacity', 1);
+  function clearOverlay() {
+    svg.selectAll('.split-overlay').remove();
+    overlayNodeId = null;
+    overlayIsPreview = null;
+    overlayK = -1;
   }
 
   function typesetMath() {
