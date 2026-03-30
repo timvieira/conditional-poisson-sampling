@@ -457,11 +457,11 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     layoutTree();
     ensureUniforms();
 
-    // Update PMF histograms in-place with transitions
-    updatePMFs();
-
-    // Replay splits
+    // Replay splits first (so animState is current)
     replaySplits(prevQueueIdx, wasDone);
+
+    // Update PMF histograms in-place with transitions (uses current animState)
+    updatePMFs();
 
     // Animated render
     renderStateAnimated();
@@ -538,7 +538,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         rect.transition(t).attr('fill', '#f9f9f9').attr('stroke', '#e0e0e0').attr('stroke-width', 1);
       }
 
-      highlightPMFBar(g, nd, q);
+      // PMF colors handled by updatePMFs (called before this)
     });
 
     // Remove old dynamic elements
