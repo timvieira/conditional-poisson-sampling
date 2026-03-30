@@ -1193,7 +1193,16 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   d3.select('#inp-n').on('change', function() {
     var v = Math.max(0, Math.min(N, Math.round(+this.value)));
     if (v === n) return;
-    n = v; stopPlaying(); draw();
+    var prevQueueIdx = queueIdx;
+    var wasDone = animState ? animState.done : false;
+    n = v;
+    stopPlaying();
+    drawScaffolding();
+    ensureUniforms();
+    replaySplits(prevQueueIdx, wasDone);
+    renderState();
+    updateStatusBar();
+    showCurrentOverlay();
   });
 
   // ── Init ──
