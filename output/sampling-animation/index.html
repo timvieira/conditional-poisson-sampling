@@ -107,8 +107,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   var N = 8, n = 3;
   var w = [];
   var dur = 500;
-  var pauseDur = 400;
-  var splitStagger = 600;
+  var pauseDur = 600;
 
   // ── Layout ──
   var ballR = 6;
@@ -265,59 +264,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 
   function draw() {
     container = d3.select('#anim-container');
-    container.selectAll('*').remove();
-
-    tree = buildTree(w, n);
-    var dims = layoutTree();
-
-    svg = container.append('svg')
-      .attr('width', dims.svgW)
-      .attr('height', dims.svgH)
-      .style('display', 'block')
-      .style('user-select', 'none')
-      .style('overflow', 'visible');
-
-    // Edges
-    var levels = tree.levels;
-    for (var li = 0; li < levels.length - 1; li++) {
-      levels[li].forEach(function(nd) {
-        [nd.left, nd.right].forEach(function(child) {
-          if (!child || child.pad) return;
-          var x1 = nd.x, y1 = nd.y + nodeH / 2;
-          var x2 = child.x, y2 = child.y - nodeH / 2;
-          var my = (y1 + y2) / 2;
-          svg.append('path')
-            .attr('class', 'tree-edge')
-            .attr('data-parent', nd.id)
-            .attr('data-child', child.id)
-            .attr('d', 'M'+x1+','+y1+' C'+x1+','+my+' '+x2+','+my+' '+x2+','+y2)
-            .attr('fill', 'none')
-            .attr('stroke', '#ddd')
-            .attr('stroke-width', 1.5);
-        });
-      });
-    }
-
-    // Nodes
-    flatNodes.forEach(function(nd) {
-      var g = svg.append('g')
-        .attr('class', 'tree-node')
-        .attr('data-id', nd.id)
-        .attr('transform', 'translate('+(nd.x - nodeW/2)+','+(nd.y - nodeH/2)+')');
-
-      g.append('rect')
-        .attr('class', 'node-box')
-        .attr('width', nodeW).attr('height', nodeH)
-        .attr('rx', 4)
-        .attr('fill', '#f9f9f9').attr('stroke', '#e0e0e0').attr('stroke-width', 1);
-
-      // PMF histogram for ALL non-pad nodes (leaves get a 2-bar [1, w_i] histogram)
-      if (!nd.pad) {
-        drawPMF(g, nd);
-      }
-    });
-
-    buildSliders();
+    drawScaffolding();
     resetAnimState();
     renderState();
   }
@@ -432,17 +379,70 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 
   function onWeightsChanged() {
     stopPlaying();
-    // Remember how far we'd progressed
-    var prevLevel = animState ? animState.level : -1;
+    // Remember how many nodes we'd processed
+    var prevQueueIdx = queueIdx;
     var wasDone = animState ? animState.done : false;
 
     // Rebuild tree with new weights (new polynomials) but keep uniforms
-    tree = buildTree(w, n);
-    layoutTree();
+    drawScaffolding();
+    ensureUniforms();
 
-    // Redraw everything (nodes, edges, sliders, PMF histograms)
+    // Replay the same number of node-steps using same uniforms
+    animState = { level: -1, quotas: {}, splits: {}, done: false };
+    animState.quotas[tree.root.id] = n;
+    nodeQueue = buildNodeQueue();
+    queueIdx = 0;
+    history = [];
+
+    var targetIdx = wasDone ? nodeQueue.length : prevQueueIdx;
+    while (queueIdx < targetIdx && queueIdx < nodeQueue.length) {
+      var nd = nodeQueue[queueIdx];
+      var q = animState.quotas[nd.id];
+      if (q === undefined || q === 0) {
+        if (nd.left && !nd.left.pad) animState.quotas[nd.left.id] = 0;
+        if (nd.right && !nd.right.pad) animState.quotas[nd.right.id] = 0;
+        queueIdx++;
+        continue;
+      }
+      var k = q;
+      var probs = splitDist(nd.left, nd.right, k);
+      var u = uniforms[nd.id];
+      var j = sampleWithU(probs, u);
+      animState.splits[nd.id] = { probs: probs, j: j, k: k, u: u };
+      animState.quotas[nd.left.id] = j;
+      animState.quotas[nd.right.id] = k - j;
+      animState.level = nd._level;
+      queueIdx++;
+    }
+
+    // Check if done
+    var allDone = true;
+    for (var qi = queueIdx; qi < nodeQueue.length; qi++) {
+      var remaining = nodeQueue[qi];
+      var rq = animState.quotas[remaining.id];
+      if (rq !== undefined && rq > 0) { allDone = false; break; }
+    }
+    if (allDone || wasDone) {
+      // Propagate remaining zeros
+      for (var qi = queueIdx; qi < nodeQueue.length; qi++) {
+        var remaining = nodeQueue[qi];
+        if (remaining.left && !remaining.left.pad) animState.quotas[remaining.left.id] = 0;
+        if (remaining.right && !remaining.right.pad) animState.quotas[remaining.right.id] = 0;
+      }
+      queueIdx = nodeQueue.length;
+      animState.done = true;
+    }
+
+    renderState();
+    updateStatusBar();
+  }
+
+  // Redraw SVG scaffolding (edges, nodes, PMFs, sliders) without resetting state
+  function drawScaffolding() {
     container.selectAll('*').remove();
+    tree = buildTree(w, n);
     var dims = layoutTree();
+
     svg = container.append('svg')
       .attr('width', dims.svgW)
       .attr('height', dims.svgH)
@@ -482,57 +482,6 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       if (!nd.pad) drawPMF(g, nd);
     });
     buildSliders();
-    ensureUniforms();
-
-    // Replay splits from root down to prevLevel using same uniforms
-    animState = {
-      level: -1,
-      quotas: {},
-      splits: {},
-      done: false
-    };
-    animState.quotas[tree.root.id] = n;
-    history = [];
-
-    var targetLevel = wasDone ? levels.length - 1 : prevLevel;
-    for (var li = 0; li <= targetLevel && li < levels.length; li++) {
-      animState.level = li;
-      var currentLevel = levels[li];
-
-      currentLevel.forEach(function(nd) {
-        if (nd.pad || nd.leaf) return;
-        var q = animState.quotas[nd.id];
-        if (q === 0) {
-          if (nd.left && !nd.left.pad) animState.quotas[nd.left.id] = 0;
-          if (nd.right && !nd.right.pad) animState.quotas[nd.right.id] = 0;
-        }
-      });
-
-      var activeNodes = currentLevel.filter(function(nd) {
-        return !nd.pad && !nd.leaf && animState.quotas[nd.id] > 0;
-      });
-
-      activeNodes.forEach(function(nd) {
-        var k = animState.quotas[nd.id];
-        var probs = splitDist(nd.left, nd.right, k);
-        var u = uniforms[nd.id];
-        var j = sampleWithU(probs, u);
-        animState.splits[nd.id] = { probs: probs, j: j, k: k, u: u };
-        animState.quotas[nd.left.id] = j;
-        animState.quotas[nd.right.id] = k - j;
-      });
-
-      // Check if leaves are done
-      var nextLi = li + 1;
-      if (nextLi < levels.length && levels[nextLi].every(function(nd) { return nd.leaf || nd.pad; })) {
-        if (wasDone || li === targetLevel) {
-          animState.done = true;
-        }
-      }
-    }
-
-    renderState();
-    updateStatusBar();
   }
 
   // ── State ──
@@ -544,12 +493,15 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       done: false
     };
     animState.quotas[tree.root.id] = n;
+    nodeQueue = buildNodeQueue();
+    queueIdx = 0;
     history = [];
     animating = false;
     if (!keepUniforms) {
       uniforms = {};
       ensureUniforms();
     }
+    svg.selectAll('.split-overlay').remove();
     updateStatusBar();
     d3.select('#result-bar').html('');
     updateButtons();
@@ -558,21 +510,18 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   function updateStatusBar() {
     if (animState.done) {
       d3.select('#status-bar').html('<b>Done!</b> All leaves assigned.');
-    } else if (animState.level < 0) {
-      d3.select('#status-bar').html('Press <b>Step</b> to advance one level, or <b>Play</b> to animate.');
+    } else if (queueIdx === 0) {
+      d3.select('#status-bar').html('Press <b>Step</b> to advance one node, or <b>Play</b> to animate.');
     } else {
-      // Build status from splits at current level
-      var levels = tree.levels;
-      var currentLevel = levels[animState.level];
-      var parts = [];
-      currentLevel.forEach(function(nd) {
-        if (nd.pad || nd.leaf) return;
-        var split = animState.splits[nd.id];
-        if (!split || split.k === 0) return;
-        parts.push('{' + nd.items.map(function(i){return i+1;}).join(',') + '}: ' + split.k + ' \u2192 ' + split.j + ' | ' + (split.k - split.j));
-      });
-      if (parts.length > 0) {
-        d3.select('#status-bar').html('<b>Level ' + animState.level + '</b> \u2014 ' + parts.join(' &ensp;\u00b7&ensp; '));
+      // Show the last processed node's split
+      var lastNd = nodeQueue[queueIdx - 1];
+      var split = animState.splits[lastNd.id];
+      if (split) {
+        var items = '{' + lastNd.items.map(function(i){return i+1;}).join(',') + '}';
+        d3.select('#status-bar').html(
+          '<b>Level ' + lastNd._level + '</b> \u2014 ' +
+          items + ': ' + split.k + ' \u2192 ' + split.j + ' | ' + (split.k - split.j)
+        );
       }
     }
   }
@@ -617,11 +566,10 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       highlightPMFBar(g, nd, q);
     });
 
-    // Remove old quota visuals
+    // Remove old quota visuals (but NOT split-overlay — it persists)
     svg.selectAll('.quota-ball').remove();
     svg.selectAll('.quota-num').remove();
     svg.selectAll('.leaf-icon').remove();
-    svg.selectAll('.split-overlay').remove();
 
     // Draw quota balls
     flatNodes.forEach(function(nd) {
@@ -706,17 +654,41 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     }
   }
 
-  // ── Animation ──
+  // ── Build a flat queue of internal nodes in level order, skipping pad/leaf ──
+  function buildNodeQueue() {
+    var queue = [];
+    var levels = tree.levels;
+    for (var li = 0; li < levels.length; li++) {
+      for (var ni = 0; ni < levels[li].length; ni++) {
+        var nd = levels[li][ni];
+        if (!nd.pad && !nd.leaf) queue.push(nd);
+      }
+    }
+    return queue;
+  }
+
+  // ── Animation (per-node stepping) ──
+  var nodeQueue = [];   // flat list of internal nodes in level order
+  var queueIdx = 0;     // next node to process
+
   function doStep(callback) {
     if (animState.done) { stopPlaying(); if (callback) callback(); return; }
 
-    // Save snapshot before mutating
-    history.push(snapshot());
+    // Skip nodes with quota 0 (they just propagate zeros)
+    while (queueIdx < nodeQueue.length) {
+      var nd = nodeQueue[queueIdx];
+      var q = animState.quotas[nd.id];
+      if (q === undefined || q === 0) {
+        // Propagate zeros to children
+        if (nd.left && !nd.left.pad) animState.quotas[nd.left.id] = 0;
+        if (nd.right && !nd.right.pad) animState.quotas[nd.right.id] = 0;
+        queueIdx++;
+      } else {
+        break;
+      }
+    }
 
-    animState.level++;
-    var levels = tree.levels;
-
-    if (animState.level >= levels.length) {
+    if (queueIdx >= nodeQueue.length) {
       animState.done = true;
       renderState();
       updateStatusBar();
@@ -725,90 +697,28 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       return;
     }
 
-    var currentLevel = levels[animState.level];
-    // Propagate quota=0 to children of zero-quota internal nodes
-    currentLevel.forEach(function(nd) {
-      if (nd.pad || nd.leaf) return;
-      var q = animState.quotas[nd.id];
-      if (q === 0) {
-        if (nd.left && !nd.left.pad) animState.quotas[nd.left.id] = 0;
-        if (nd.right && !nd.right.pad) animState.quotas[nd.right.id] = 0;
-      }
-    });
+    // Save snapshot before mutating
+    history.push(snapshot());
+    var prevIdx = queueIdx;
 
-    var activeNodes = currentLevel.filter(function(nd) {
-      return !nd.pad && !nd.leaf && animState.quotas[nd.id] > 0;
-    });
+    var nd = nodeQueue[queueIdx];
+    var k = animState.quotas[nd.id];
+    var probs = splitDist(nd.left, nd.right, k);
+    var u = uniforms[nd.id];
+    var j = sampleWithU(probs, u);
+    animState.splits[nd.id] = { probs: probs, j: j, k: k, u: u };
+    animState.quotas[nd.left.id] = j;
+    animState.quotas[nd.right.id] = k - j;
+    animState.level = nd._level;
+    queueIdx++;
 
-    if (activeNodes.length === 0) {
-      if (animState.level >= levels.length - 1) {
-        animState.done = true;
-        renderState();
-        updateStatusBar();
-        stopPlaying();
-        if (callback) callback();
-        return;
-      }
-      doStep(callback);
-      return;
-    }
-
-    // Pre-compute all splits using stored uniforms
-    activeNodes.forEach(function(nd) {
-      var k = animState.quotas[nd.id];
-      var probs = splitDist(nd.left, nd.right, k);
-      var u = uniforms[nd.id];
-      var j = sampleWithU(probs, u);
-      animState.splits[nd.id] = { probs: probs, j: j, k: k, u: u };
-      animState.quotas[nd.left.id] = j;
-      animState.quotas[nd.right.id] = k - j;
-    });
-
-    animating = true;
-    updateButtons();
-
-    // Animate nodes one at a time within this level
-    animateNodesSequentially(activeNodes, 0, function() {
-      svg.selectAll('.split-overlay').remove();
-      animating = false;
-      renderState();
-      updateStatusBar();
-      // Check if leaves are next
-      var nextLi = animState.level + 1;
-      if (nextLi < levels.length && levels[nextLi].every(function(nd) { return nd.leaf || nd.pad; })) {
-        animState.done = true;
-        renderState();
-        updateStatusBar();
-        stopPlaying();
-      }
-      if (callback) callback();
-    });
-  }
-
-  function doBack() {
-    if (history.length === 0 || animating) return;
-    stopPlaying();
-    restoreSnapshot(history.pop());
-    renderState();
-    updateStatusBar();
-  }
-
-  function animateNodesSequentially(nodes, idx, callback) {
-    if (idx >= nodes.length) {
-      if (callback) callback();
-      return;
-    }
-
-    var nd = nodes[idx];
-    var split = animState.splits[nd.id];
-    var k = split.k, j = split.j;
-
-    // Show split panel for this node (only if k > 1)
+    // Show split overlay (persists until next step)
+    svg.selectAll('.split-overlay').remove();
     if (k > 1) {
       showSplitOverlay(nd);
     }
 
-    // Highlight edges for this node's children immediately
+    // Highlight edges immediately
     svg.selectAll('.tree-edge').each(function() {
       var edge = d3.select(this);
       if (edge.attr('data-parent') === nd.id) {
@@ -822,23 +732,65 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       }
     });
 
-    // Animate balls for this single node
+    animating = true;
+    updateButtons();
+
     animateBallSplit([nd], function() {
-      // Draw static balls for children so they're visible during stagger
-      [nd.left, nd.right].forEach(function(child) {
-        if (!child || child.pad) return;
-        var cq = animState.quotas[child.id];
-        if (cq !== undefined && cq > 0) drawStaticBalls(child, cq);
-        // Also highlight child's PMF bar
-        if (!child.pad) {
-          var cg = svg.select('[data-id="'+child.id+'"]');
-          highlightPMFBar(cg, child, cq);
+      animating = false;
+
+      // Check if all remaining nodes are zero-quota or exhausted
+      var allDone = true;
+      for (var qi = queueIdx; qi < nodeQueue.length; qi++) {
+        var remaining = nodeQueue[qi];
+        var rq = animState.quotas[remaining.id];
+        if (rq !== undefined && rq > 0) { allDone = false; break; }
+      }
+      if (allDone) {
+        // Propagate remaining zeros
+        for (var qi = queueIdx; qi < nodeQueue.length; qi++) {
+          var remaining = nodeQueue[qi];
+          if (remaining.left && !remaining.left.pad) animState.quotas[remaining.left.id] = 0;
+          if (remaining.right && !remaining.right.pad) animState.quotas[remaining.right.id] = 0;
         }
-      });
-      setTimeout(function() {
-        animateNodesSequentially(nodes, idx + 1, callback);
-      }, k > 1 ? splitStagger : 150);
+        queueIdx = nodeQueue.length;
+        animState.done = true;
+      }
+
+      renderState();
+      updateStatusBar();
+      // Re-show the split overlay (renderState clears it)
+      if (!animState.done && k > 1) {
+        showSplitOverlay(nd);
+      }
+      if (callback) callback();
     });
+  }
+
+  function doBack() {
+    if (history.length === 0 || animating) return;
+    stopPlaying();
+    var snap = history.pop();
+    restoreSnapshot(snap);
+    // Rewind queue index: find first unprocessed node
+    queueIdx = 0;
+    for (var qi = 0; qi < nodeQueue.length; qi++) {
+      if (animState.splits[nodeQueue[qi].id] === undefined) {
+        queueIdx = qi;
+        break;
+      }
+      queueIdx = qi + 1;
+    }
+    svg.selectAll('.split-overlay').remove();
+    renderState();
+    updateStatusBar();
+    // Show split overlay for the last processed node (if any)
+    if (queueIdx > 0) {
+      var lastNd = nodeQueue[queueIdx - 1];
+      var lastSplit = animState.splits[lastNd.id];
+      if (lastSplit && lastSplit.k > 1) {
+        showSplitOverlay(lastNd);
+      }
+    }
   }
 
   function animateBallSplit(nodes, callback) {
