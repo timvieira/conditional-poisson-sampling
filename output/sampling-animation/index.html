@@ -418,6 +418,8 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         queueIdx++;
         continue;
       }
+      // Save snapshot before each active split (enables back after replay)
+      history.push(snapshot());
       var k = q;
       var probs = splitDist(nd.left, nd.right, k);
       var u = uniforms[nd.id];
@@ -561,15 +563,10 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       var q = animState.quotas[nd.id];
       if (q === undefined) return;
 
-      var parentWasSplit = false;
-      flatNodes.forEach(function(pn) {
-        if (animState.splits[pn.id] &&
-            ((pn.left && pn.left.id === nd.id) || (pn.right && pn.right.id === nd.id))) {
-          parentWasSplit = true;
-        }
-      });
+      var decided = isNodeDecided(nd);
 
-      if (nd.leaf && nd.items.length && parentWasSplit) {
+      // Leaf with decided fate: checkmark or X
+      if (nd.leaf && nd.items.length && decided) {
         var g = svg.select('[data-id="'+nd.id+'"]');
         var rect = g.select('.node-box');
         if (q === 1) {
@@ -592,7 +589,8 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         return;
       }
 
-      if (q === 0 && parentWasSplit) {
+      // Internal node excluded (quota 0, decided): X marker
+      if (q === 0 && decided) {
         var g = svg.select('[data-id="'+nd.id+'"]');
         var rect = g.select('.node-box');
         rect.transition(t).attr('fill', '#fafafa').attr('stroke', '#ddd').attr('stroke-width', 1);
@@ -780,17 +778,10 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       var q = animState.quotas[nd.id];
       if (q === undefined) return;
 
-      // Check if this node's parent was split (i.e., we know its quota)
-      var parentWasSplit = false;
-      flatNodes.forEach(function(pn) {
-        if (animState.splits[pn.id] &&
-            ((pn.left && pn.left.id === nd.id) || (pn.right && pn.right.id === nd.id))) {
-          parentWasSplit = true;
-        }
-      });
+      var decided = isNodeDecided(nd);
 
       // Leaf with decided fate
-      if (nd.leaf && nd.items.length && parentWasSplit) {
+      if (nd.leaf && nd.items.length && decided) {
         var g = svg.select('[data-id="'+nd.id+'"]');
         var rect = g.select('.node-box');
         if (q === 1) {
@@ -813,8 +804,8 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         return;
       }
 
-      // Internal node or root-level node that received quota 0
-      if (q === 0 && parentWasSplit) {
+      // Internal node excluded (quota 0, decided): X marker
+      if (q === 0 && decided) {
         var g = svg.select('[data-id="'+nd.id+'"]');
         var rect = g.select('.node-box');
         rect.attr('fill', '#fafafa').attr('stroke', '#ddd').attr('stroke-width', 1);
@@ -868,19 +859,31 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     updateButtons();
   }
 
-  // Was this node actively visited by the sampler?
-  function isNodeVisited(nd) {
-    if (nd.leaf) {
-      // Leaf: visited if its parent was split
-      for (var qi = 0; qi < flatNodes.length; qi++) {
-        var pn = flatNodes[qi];
-        if (animState.splits[pn.id] &&
-            ((pn.left && pn.left.id === nd.id) || (pn.right && pn.right.id === nd.id))) {
-          return true;
-        }
+  // Was this node's fate decided by the sampler?
+  // True if: (a) the node was split, or (b) its parent was split/decided and
+  // assigned it a quota (including 0).
+  function isNodeDecided(nd) {
+    // Root is never "decided" in the display sense (it starts with quota n)
+    if (nd.id === tree.root.id) return animState.splits[nd.id] !== undefined;
+    // For all other nodes: decided if quota is defined AND some ancestor split
+    // led to this quota being assigned
+    if (animState.quotas[nd.id] === undefined) return false;
+    // Walk up: find the parent that set our quota
+    for (var qi = 0; qi < flatNodes.length; qi++) {
+      var pn = flatNodes[qi];
+      if ((pn.left && pn.left.id === nd.id) || (pn.right && pn.right.id === nd.id)) {
+        // Found parent — decided if parent was split or parent was itself decided with quota 0
+        if (animState.splits[pn.id]) return true;
+        if (animState.quotas[pn.id] === 0 && isNodeDecided(pn)) return true;
+        return false;
       }
-      return false;
     }
+    return false;
+  }
+
+  // Was this node actively split (for PMF highlight purposes)?
+  function isNodeVisited(nd) {
+    if (nd.leaf) return isNodeDecided(nd);
     return animState.splits[nd.id] !== undefined;
   }
 
