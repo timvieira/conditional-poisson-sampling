@@ -459,7 +459,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     showCurrentOverlay();
   }
 
-  // Update PMF bar heights in-place (no SVG rebuild)
+  // Update PMF bar heights and colors in-place (no SVG rebuild)
   function updatePMFs() {
     flatNodes.forEach(function(nd) {
       var g = svg.select('[data-id="'+nd.id+'"]');
@@ -472,13 +472,21 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       if (maxP === 0) maxP = 1;
       var topY = nodeH + 4;
 
+      // Determine which bar (if any) to highlight
+      var q = animState.quotas[nd.id];
+      var visited = isNodeVisited(nd);
+      var highlightIdx = (visited && q !== undefined && q >= 0 && q < pmf.length) ? q : -1;
+
       pmfG.selectAll('rect').each(function(d, i) {
         if (i < pmf.length) {
           var h = Math.max(0.5, pmf[i] / maxP * pmfBarH);
+          var isHigh = (i === highlightIdx);
           d3.select(this)
             .transition().duration(tweenDur)
             .attr('y', topY + pmfBarH - h)
-            .attr('height', h);
+            .attr('height', h)
+            .attr('fill', isHigh ? CR : CW)
+            .attr('opacity', isHigh ? 0.85 : 0.25);
         }
       });
     });
@@ -515,41 +523,53 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     svg.selectAll('.quota-num').remove();
     svg.selectAll('.leaf-icon').remove();
 
-    // Draw quota balls and leaf icons
+    // Draw quota balls, checkmarks, and X markers
     flatNodes.forEach(function(nd) {
       var q = animState.quotas[nd.id];
       if (q === undefined) return;
 
-      if (nd.leaf && nd.items.length) {
-        var parentWasSplit = false;
-        flatNodes.forEach(function(pn) {
-          if (animState.splits[pn.id] &&
-              ((pn.left && pn.left.id === nd.id) || (pn.right && pn.right.id === nd.id))) {
-            parentWasSplit = true;
-          }
-        });
-        if (parentWasSplit) {
-          var g = svg.select('[data-id="'+nd.id+'"]');
-          var rect = g.select('.node-box');
-          if (q === 1) {
-            rect.transition(t).attr('fill', '#e8f5e9').attr('stroke', CS).attr('stroke-width', 2);
-            g.append('text')
-              .attr('class', 'leaf-icon leaf-status')
-              .attr('x', nodeW / 2).attr('y', nodeH / 2 + 4)
-              .attr('text-anchor', 'middle')
-              .style('font-size', '14px').style('fill', CS).style('font-weight', 'bold')
-              .text('\u2713');
-          } else {
-            rect.transition(t).attr('fill', '#fafafa').attr('stroke', '#ddd').attr('stroke-width', 1);
-            g.append('text')
-              .attr('class', 'leaf-icon leaf-status')
-              .attr('x', nodeW / 2).attr('y', nodeH / 2 + 4)
-              .attr('text-anchor', 'middle')
-              .style('font-size', '12px').style('fill', '#ccc')
-              .text('\u2717');
-          }
-          return;
+      var parentWasSplit = false;
+      flatNodes.forEach(function(pn) {
+        if (animState.splits[pn.id] &&
+            ((pn.left && pn.left.id === nd.id) || (pn.right && pn.right.id === nd.id))) {
+          parentWasSplit = true;
         }
+      });
+
+      if (nd.leaf && nd.items.length && parentWasSplit) {
+        var g = svg.select('[data-id="'+nd.id+'"]');
+        var rect = g.select('.node-box');
+        if (q === 1) {
+          rect.transition(t).attr('fill', '#e8f5e9').attr('stroke', CS).attr('stroke-width', 2);
+          g.append('text')
+            .attr('class', 'leaf-icon leaf-status')
+            .attr('x', nodeW / 2).attr('y', nodeH / 2 + 4)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '14px').style('fill', CS).style('font-weight', 'bold')
+            .text('\u2713');
+        } else {
+          rect.transition(t).attr('fill', '#fafafa').attr('stroke', '#ddd').attr('stroke-width', 1);
+          g.append('text')
+            .attr('class', 'leaf-icon leaf-status')
+            .attr('x', nodeW / 2).attr('y', nodeH / 2 + 4)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '12px').style('fill', '#ccc')
+            .text('\u2717');
+        }
+        return;
+      }
+
+      if (q === 0 && parentWasSplit) {
+        var g = svg.select('[data-id="'+nd.id+'"]');
+        var rect = g.select('.node-box');
+        rect.transition(t).attr('fill', '#fafafa').attr('stroke', '#ddd').attr('stroke-width', 1);
+        g.append('text')
+          .attr('class', 'leaf-icon')
+          .attr('x', nodeW / 2).attr('y', nodeH / 2 + 4)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '12px').style('fill', '#ccc')
+          .text('\u2717');
+        return;
       }
 
       if (q <= 0) return;
@@ -722,42 +742,56 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     svg.selectAll('.quota-num').remove();
     svg.selectAll('.leaf-icon').remove();
 
-    // Draw quota balls and leaf icons
+    // Draw quota balls, checkmarks, and X markers
     flatNodes.forEach(function(nd) {
       var q = animState.quotas[nd.id];
       if (q === undefined) return;
 
-      // Show checkmark/X on leaves whose parent has been split
-      if (nd.leaf && nd.items.length) {
-        var parentWasSplit = false;
-        flatNodes.forEach(function(pn) {
-          if (animState.splits[pn.id] &&
-              ((pn.left && pn.left.id === nd.id) || (pn.right && pn.right.id === nd.id))) {
-            parentWasSplit = true;
-          }
-        });
-        if (parentWasSplit) {
-          var g = svg.select('[data-id="'+nd.id+'"]');
-          var rect = g.select('.node-box');
-          if (q === 1) {
-            rect.attr('fill', '#e8f5e9').attr('stroke', CS).attr('stroke-width', 2);
-            g.append('text')
-              .attr('class', 'leaf-icon leaf-status')
-              .attr('x', nodeW / 2).attr('y', nodeH / 2 + 4)
-              .attr('text-anchor', 'middle')
-              .style('font-size', '14px').style('fill', CS).style('font-weight', 'bold')
-              .text('\u2713');
-          } else {
-            rect.attr('fill', '#fafafa').attr('stroke', '#ddd').attr('stroke-width', 1);
-            g.append('text')
-              .attr('class', 'leaf-icon leaf-status')
-              .attr('x', nodeW / 2).attr('y', nodeH / 2 + 4)
-              .attr('text-anchor', 'middle')
-              .style('font-size', '12px').style('fill', '#ccc')
-              .text('\u2717');
-          }
-          return;
+      // Check if this node's parent was split (i.e., we know its quota)
+      var parentWasSplit = false;
+      flatNodes.forEach(function(pn) {
+        if (animState.splits[pn.id] &&
+            ((pn.left && pn.left.id === nd.id) || (pn.right && pn.right.id === nd.id))) {
+          parentWasSplit = true;
         }
+      });
+
+      // Leaf with decided fate
+      if (nd.leaf && nd.items.length && parentWasSplit) {
+        var g = svg.select('[data-id="'+nd.id+'"]');
+        var rect = g.select('.node-box');
+        if (q === 1) {
+          rect.attr('fill', '#e8f5e9').attr('stroke', CS).attr('stroke-width', 2);
+          g.append('text')
+            .attr('class', 'leaf-icon leaf-status')
+            .attr('x', nodeW / 2).attr('y', nodeH / 2 + 4)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '14px').style('fill', CS).style('font-weight', 'bold')
+            .text('\u2713');
+        } else {
+          rect.attr('fill', '#fafafa').attr('stroke', '#ddd').attr('stroke-width', 1);
+          g.append('text')
+            .attr('class', 'leaf-icon leaf-status')
+            .attr('x', nodeW / 2).attr('y', nodeH / 2 + 4)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '12px').style('fill', '#ccc')
+            .text('\u2717');
+        }
+        return;
+      }
+
+      // Internal node or root-level node that received quota 0
+      if (q === 0 && parentWasSplit) {
+        var g = svg.select('[data-id="'+nd.id+'"]');
+        var rect = g.select('.node-box');
+        rect.attr('fill', '#fafafa').attr('stroke', '#ddd').attr('stroke-width', 1);
+        g.append('text')
+          .attr('class', 'leaf-icon')
+          .attr('x', nodeW / 2).attr('y', nodeH / 2 + 4)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '12px').style('fill', '#ccc')
+          .text('\u2717');
+        return;
       }
 
       if (q <= 0) return;
@@ -801,37 +835,37 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     updateButtons();
   }
 
+  // Was this node actively visited by the sampler?
+  function isNodeVisited(nd) {
+    if (nd.leaf) {
+      // Leaf: visited if its parent was split
+      for (var qi = 0; qi < flatNodes.length; qi++) {
+        var pn = flatNodes[qi];
+        if (animState.splits[pn.id] &&
+            ((pn.left && pn.left.id === nd.id) || (pn.right && pn.right.id === nd.id))) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return animState.splits[nd.id] !== undefined;
+  }
+
   // Highlight the k-th bar in a node's PMF histogram
   function highlightPMFBar(g, nd, q) {
     var pmfG = g.select('.pmf-hist');
     if (pmfG.empty()) return;
     var pmf = polyToPMF(nd.poly);
 
-    // Reset all bars to dim default
-    pmfG.selectAll('rect').attr('fill', CW).attr('opacity', 0.25);
+    var visited = isNodeVisited(nd);
+    var highlightIdx = (visited && q !== undefined && q >= 0 && q < pmf.length) ? q : -1;
 
-    // Only highlight if this node was actively visited (has a split, or is a
-    // leaf/node that received a positive quota from its parent's split)
-    var parentSplit = false;
-    if (nd.leaf) {
-      // Leaf: highlight only if parent was split and gave us a quota
-      flatNodes.forEach(function(pn) {
-        if (animState.splits[pn.id] &&
-            ((pn.left && pn.left.id === nd.id) || (pn.right && pn.right.id === nd.id))) {
-          parentSplit = true;
-        }
-      });
-    } else {
-      parentSplit = animState.splits[nd.id] !== undefined;
-    }
-
-    if (parentSplit && q !== undefined && q >= 0 && q < pmf.length) {
-      pmfG.selectAll('rect').each(function(d, i) {
-        if (i === q) {
-          d3.select(this).attr('fill', CR).attr('opacity', 0.85);
-        }
-      });
-    }
+    pmfG.selectAll('rect').each(function(d, i) {
+      var isHigh = (i === highlightIdx);
+      d3.select(this)
+        .attr('fill', isHigh ? CR : CW)
+        .attr('opacity', isHigh ? 0.85 : 0.25);
+    });
   }
 
   // ── Build a flat queue of internal nodes in level order, skipping pad/leaf ──
@@ -1143,7 +1177,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       .attr('x', -6).attr('y', -4)
       .attr('width', totalW + 12).attr('height', barH + 22)
       .attr('rx', 4)
-      .attr('fill', '#fff').attr('stroke', preview ? CW : CR)
+      .attr('fill', '#fff').attr('stroke', '#ccc')
       .attr('stroke-width', 1)
       .attr('opacity', 0.9);
 
