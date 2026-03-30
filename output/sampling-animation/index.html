@@ -496,9 +496,19 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       var topY = nodeH + 4;
 
       // Determine which bar (if any) to highlight
+      // For internal nodes: highlight the bar corresponding to the quota they received
+      // For leaves: only highlight if selected (q=1), not if excluded (q=0)
       var q = animState.quotas[nd.id];
       var visited = isNodeVisited(nd);
-      var highlightIdx = (visited && q !== undefined && q >= 0 && q < pmf.length) ? q : -1;
+      var highlightIdx = -1;
+      if (visited && q !== undefined && q >= 0 && q < pmf.length) {
+        if (nd.leaf) {
+          // Only highlight selected leaves (q=1), not excluded ones (q=0)
+          if (q > 0) highlightIdx = q;
+        } else {
+          highlightIdx = q;
+        }
+      }
 
       pmfG.selectAll('rect').each(function(d, i) {
         if (i < pmf.length) {
@@ -881,7 +891,14 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     var pmf = polyToPMF(nd.poly);
 
     var visited = isNodeVisited(nd);
-    var highlightIdx = (visited && q !== undefined && q >= 0 && q < pmf.length) ? q : -1;
+    var highlightIdx = -1;
+    if (visited && q !== undefined && q >= 0 && q < pmf.length) {
+      if (nd.leaf) {
+        if (q > 0) highlightIdx = q;
+      } else {
+        highlightIdx = q;
+      }
+    }
 
     pmfG.selectAll('rect').each(function(d, i) {
       var isHigh = (i === highlightIdx);
