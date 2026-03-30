@@ -108,6 +108,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   var w = [];
   var dur = 500;
   var pauseDur = 600;
+  var tweenDur = 250;  // transition duration for slider-driven changes
 
   // ── Layout ──
   var ballR = 6;
@@ -358,8 +359,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
             // Update this slider visually
             sf.attr('y', sy + sliderH - frac * sliderH).attr('height', frac * sliderH);
             sl.attr('y', sy + sliderH - frac * sliderH - 2).text(w[idx].toFixed(2));
-          }).on('end', function() {
-            onWeightsChanged();
+            onWeightDrag();
           }));
       })(idx);
     });
@@ -377,25 +377,16 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     }
   }
 
-  function onWeightsChanged() {
-    stopPlaying();
-    // Remember how many nodes we'd processed
-    var prevQueueIdx = queueIdx;
-    var wasDone = animState ? animState.done : false;
-
-    // Rebuild tree with new weights (new polynomials) but keep uniforms
-    drawScaffolding();
-    ensureUniforms();
-
-    // Replay the same number of node-steps using same uniforms
+  // Replay splits up to a target queue index using current tree & uniforms
+  function replaySplits(targetIdx, wasDone) {
     animState = { level: -1, quotas: {}, splits: {}, done: false };
     animState.quotas[tree.root.id] = n;
     nodeQueue = buildNodeQueue();
     queueIdx = 0;
     history = [];
 
-    var targetIdx = wasDone ? nodeQueue.length : prevQueueIdx;
-    while (queueIdx < targetIdx && queueIdx < nodeQueue.length) {
+    var target = wasDone ? nodeQueue.length : targetIdx;
+    while (queueIdx < target && queueIdx < nodeQueue.length) {
       var nd = nodeQueue[queueIdx];
       var q = animState.quotas[nd.id];
       if (q === undefined || q === 0) {
@@ -418,12 +409,10 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     // Check if done
     var allDone = true;
     for (var qi = queueIdx; qi < nodeQueue.length; qi++) {
-      var remaining = nodeQueue[qi];
-      var rq = animState.quotas[remaining.id];
+      var rq = animState.quotas[nodeQueue[qi].id];
       if (rq !== undefined && rq > 0) { allDone = false; break; }
     }
     if (allDone || wasDone) {
-      // Propagate remaining zeros
       for (var qi = queueIdx; qi < nodeQueue.length; qi++) {
         var remaining = nodeQueue[qi];
         if (remaining.left && !remaining.left.pad) animState.quotas[remaining.left.id] = 0;
@@ -432,9 +421,180 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       queueIdx = nodeQueue.length;
       animState.done = true;
     }
+  }
 
+  // Live update during slider drag — no SVG rebuild, uses transitions
+  function onWeightDrag() {
+    stopPlaying();
+    var prevQueueIdx = queueIdx;
+    var wasDone = animState ? animState.done : false;
+
+    // Rebuild tree data (new polynomials) but keep same SVG elements
+    tree = buildTree(w, n);
+    layoutTree();
+    ensureUniforms();
+
+    // Update PMF histograms in-place with transitions
+    updatePMFs();
+
+    // Replay splits
+    replaySplits(prevQueueIdx, wasDone);
+
+    // Animated render
+    renderStateAnimated();
+    updateStatusBar();
+
+    // Update split overlay for the last processed node
+    svg.selectAll('.split-overlay').remove();
+    if (queueIdx > 0) {
+      var lastNd = nodeQueue[queueIdx - 1];
+      var lastSplit = animState.splits[lastNd.id];
+      if (lastSplit) showSplitOverlay(lastNd);
+    }
+  }
+
+  // Full rebuild for structural changes (N, n, resample)
+  function onWeightsChanged() {
+    stopPlaying();
+    drawScaffolding();
+    ensureUniforms();
+    replaySplits(0, false);
     renderState();
     updateStatusBar();
+  }
+
+  // Update PMF bar heights in-place (no SVG rebuild)
+  function updatePMFs() {
+    flatNodes.forEach(function(nd) {
+      var g = svg.select('[data-id="'+nd.id+'"]');
+      if (g.empty()) return;
+      var pmfG = g.select('.pmf-hist');
+      if (pmfG.empty()) return;
+
+      var pmf = polyToPMF(nd.poly);
+      var maxP = Math.max.apply(null, pmf);
+      if (maxP === 0) maxP = 1;
+      var topY = nodeH + 4;
+
+      pmfG.selectAll('rect').each(function(d, i) {
+        if (i < pmf.length) {
+          var h = Math.max(0.5, pmf[i] / maxP * pmfBarH);
+          d3.select(this)
+            .transition().duration(tweenDur)
+            .attr('y', topY + pmfBarH - h)
+            .attr('height', h);
+        }
+      });
+    });
+  }
+
+  // Like renderState but with transitions for smooth slider feedback
+  function renderStateAnimated() {
+    var t = d3.transition().duration(tweenDur);
+
+    // Node colors & PMF highlights
+    flatNodes.forEach(function(nd) {
+      var g = svg.select('[data-id="'+nd.id+'"]');
+      var q = animState.quotas[nd.id];
+      var isActive = (q !== undefined && q > 0);
+      var isZero = (q !== undefined && q === 0);
+      var isProcessed = animState.splits[nd.id] !== undefined;
+
+      var rect = g.select('.node-box');
+      if (isActive) {
+        rect.transition(t).attr('fill', '#e8f0fa').attr('stroke', CW).attr('stroke-width', 1.5);
+      } else if (isZero && nd.leaf) {
+        rect.transition(t).attr('fill', '#fafafa').attr('stroke', '#ddd').attr('stroke-width', 1);
+      } else if (isProcessed) {
+        rect.transition(t).attr('fill', '#f5f5f5').attr('stroke', '#d0d0d0').attr('stroke-width', 1);
+      } else {
+        rect.transition(t).attr('fill', '#f9f9f9').attr('stroke', '#e0e0e0').attr('stroke-width', 1);
+      }
+
+      highlightPMFBar(g, nd, q);
+    });
+
+    // Remove old dynamic elements
+    svg.selectAll('.quota-ball').remove();
+    svg.selectAll('.quota-num').remove();
+    svg.selectAll('.leaf-icon').remove();
+
+    // Draw quota balls and leaf icons
+    flatNodes.forEach(function(nd) {
+      var q = animState.quotas[nd.id];
+      if (q === undefined) return;
+
+      if (nd.leaf && nd.items.length) {
+        var parentWasSplit = false;
+        flatNodes.forEach(function(pn) {
+          if (animState.splits[pn.id] &&
+              ((pn.left && pn.left.id === nd.id) || (pn.right && pn.right.id === nd.id))) {
+            parentWasSplit = true;
+          }
+        });
+        if (parentWasSplit) {
+          var g = svg.select('[data-id="'+nd.id+'"]');
+          var rect = g.select('.node-box');
+          if (q === 1) {
+            rect.transition(t).attr('fill', '#e8f5e9').attr('stroke', CS).attr('stroke-width', 2);
+            g.append('text')
+              .attr('class', 'leaf-icon leaf-status')
+              .attr('x', nodeW / 2).attr('y', nodeH / 2 + 4)
+              .attr('text-anchor', 'middle')
+              .style('font-size', '14px').style('fill', CS).style('font-weight', 'bold')
+              .text('\u2713');
+          } else {
+            rect.transition(t).attr('fill', '#fafafa').attr('stroke', '#ddd').attr('stroke-width', 1);
+            g.append('text')
+              .attr('class', 'leaf-icon leaf-status')
+              .attr('x', nodeW / 2).attr('y', nodeH / 2 + 4)
+              .attr('text-anchor', 'middle')
+              .style('font-size', '12px').style('fill', '#ccc')
+              .text('\u2717');
+          }
+          return;
+        }
+      }
+
+      if (q <= 0) return;
+      drawStaticBalls(nd, q);
+    });
+
+    // Edge highlighting with transitions
+    svg.selectAll('.tree-edge').each(function() {
+      var edge = d3.select(this);
+      var pid = edge.attr('data-parent');
+      var cid = edge.attr('data-child');
+      var parentSplit = animState.splits[pid];
+      var childQ = animState.quotas[cid];
+
+      if (parentSplit && childQ !== undefined && childQ > 0) {
+        edge.transition(t).attr('stroke', CW).attr('stroke-width', 2.5).attr('opacity', 0.8);
+      } else if (parentSplit && childQ === 0) {
+        edge.transition(t).attr('stroke', '#ddd').attr('stroke-width', 1).attr('opacity', 0.4);
+      } else if (parentSplit) {
+        edge.transition(t).attr('stroke', '#ccc').attr('stroke-width', 1.2).attr('opacity', 0.5);
+      } else {
+        edge.transition(t).attr('stroke', '#ddd').attr('stroke-width', 1.5).attr('opacity', 1);
+      }
+    });
+
+    // Result bar
+    if (animState.done) {
+      var selected = [];
+      flatNodes.forEach(function(nd) {
+        if (nd.leaf && nd.items.length === 1 && animState.quotas[nd.id] === 1)
+          selected.push(nd.items[0] + 1);
+      });
+      d3.select('#result-bar').html(
+        '<span style="color:'+CS+'; font-weight:bold;">Sample:</span> $S = \\{' + selected.join(', ') + '\\}$'
+      );
+      typesetMath();
+    } else {
+      d3.select('#result-bar').html('');
+    }
+
+    updateButtons();
   }
 
   // Redraw SVG scaffolding (edges, nodes, PMFs, sliders) without resetting state
@@ -780,10 +940,8 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 
       renderState();
       updateStatusBar();
-      // Re-show the split overlay (renderState clears it)
-      if (!animState.done && k > 1) {
-        showSplitOverlay(nd);
-      }
+      // Re-show the split overlay after renderState
+      showCurrentOverlay();
       if (callback) callback();
     });
   }
@@ -791,8 +949,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   function doBack() {
     if (history.length === 0 || animating) return;
     stopPlaying();
-    var snap = history.pop();
-    restoreSnapshot(snap);
+    restoreSnapshot(history.pop());
     // Rewind queue index: find first unprocessed node
     queueIdx = 0;
     for (var qi = 0; qi < nodeQueue.length; qi++) {
@@ -802,14 +959,17 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
       }
       queueIdx = qi + 1;
     }
-    svg.selectAll('.split-overlay').remove();
     renderState();
     updateStatusBar();
-    // Show split overlay for the last processed node (if any)
-    if (queueIdx > 0) {
+    showCurrentOverlay();
+  }
+
+  // Show (or clear) split overlay for the last processed node
+  function showCurrentOverlay() {
+    svg.selectAll('.split-overlay').remove();
+    if (queueIdx > 0 && !animState.done) {
       var lastNd = nodeQueue[queueIdx - 1];
-      var lastSplit = animState.splits[lastNd.id];
-      if (lastSplit) {
+      if (animState.splits[lastNd.id]) {
         showSplitOverlay(lastNd);
       }
     }
