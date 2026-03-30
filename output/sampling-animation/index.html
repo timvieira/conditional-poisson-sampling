@@ -253,8 +253,31 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     for (var li = levels.length - 2; li >= 0; li--) {
       for (var ni = 0; ni < levels[li].length; ni++) {
         var nd = levels[li][ni];
-        nd.x = (nd.left.x + nd.right.x) / 2;
+        var lp = nd.left && !nd.left.pad;
+        var rp = nd.right && !nd.right.pad;
+        if (lp && rp) {
+          nd.x = (nd.left.x + nd.right.x) / 2;
+        } else if (lp) {
+          nd.x = nd.left.x;
+        } else if (rp) {
+          nd.x = nd.right.x;
+        } else {
+          // Both children are pad — mark this node as pad too
+          nd.pad = true;
+          nd.x = -9999; nd.y = -9999;
+          continue;
+        }
         nd.y = li * vGap + 36;
+      }
+    }
+    // Rebuild flatNodes since some internal nodes may now be pad
+    flatNodes = [];
+    for (var li = 0; li < levels.length; li++) {
+      for (var ni = 0; ni < levels[li].length; ni++) {
+        var nd = levels[li][ni];
+        nd._level = li;
+        nd._idx = ni;
+        if (!nd.pad) flatNodes.push(nd);
       }
     }
     return { svgW: totalW + 40, svgH: treeDepth * vGap + 46 + sliderH + 28 };
