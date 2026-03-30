@@ -688,6 +688,13 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         .attr('rx', 4)
         .attr('fill', '#f9f9f9').attr('stroke', '#e0e0e0').attr('stroke-width', 1);
       if (!nd.pad) drawPMF(g, nd);
+
+      // Hover: show split distribution tooltip
+      if (!nd.leaf && !nd.pad) {
+        g.style('cursor', 'pointer')
+          .on('mouseenter', (function(nd) { return function() { showHoverOverlay(nd); }; })(nd))
+          .on('mouseleave', function() { hideHoverOverlay(); });
+      }
     });
     buildSliders();
   }
@@ -1252,6 +1259,75 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     overlayNodeId = null;
     overlayIsPreview = null;
     overlayK = -1;
+  }
+
+  // ── Hover overlay (tooltip on internal nodes) ──
+  function showHoverOverlay(nd) {
+    hideHoverOverlay();
+    var k = animState.quotas[nd.id];
+    if (k === undefined) return;
+    // If node has no quota or is a leaf, nothing to show
+    if (nd.leaf) return;
+
+    var split = animState.splits[nd.id];
+    var probs, j;
+    if (split) {
+      // Already split: show the result
+      probs = split.probs; j = split.j; k = split.k;
+    } else if (k > 0) {
+      // Not yet split: show the distribution preview
+      probs = splitDist(nd.left, nd.right, k);
+      j = -1;
+    } else {
+      return; // quota 0, nothing interesting
+    }
+
+    var barW = 10, barH = 30, gap = 3;
+    var nBars = probs.length;
+    var totalW = nBars * (barW + gap) - gap;
+    // Position above the node
+    var cx = nd.x;
+    var cy = nd.y - nodeH / 2 - barH - 18;
+
+    var g = svg.append('g')
+      .attr('class', 'hover-overlay')
+      .attr('transform', 'translate(' + (cx - totalW / 2) + ',' + cy + ')');
+
+    g.append('rect')
+      .attr('x', -6).attr('y', -4)
+      .attr('width', totalW + 12).attr('height', barH + 22)
+      .attr('rx', 4)
+      .attr('fill', '#fff').attr('stroke', '#bbb')
+      .attr('stroke-width', 1)
+      .attr('opacity', 0.95);
+
+    var maxP = Math.max.apply(null, probs);
+    if (maxP === 0) maxP = 1;
+
+    for (var jj = 0; jj < nBars; jj++) {
+      var isSampled = (jj === j);
+      var h = Math.max(1, probs[jj] / maxP * barH);
+      var bx = jj * (barW + gap);
+
+      g.append('rect')
+        .attr('x', bx).attr('y', barH - h)
+        .attr('width', barW).attr('height', h)
+        .attr('rx', 1.5)
+        .attr('fill', isSampled ? CR : CW)
+        .attr('opacity', isSampled ? 0.9 : 0.5);
+
+      g.append('text')
+        .attr('x', bx + barW / 2).attr('y', barH + 11)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '8px')
+        .style('fill', isSampled ? CR : '#aaa')
+        .style('font-weight', isSampled ? 'bold' : 'normal')
+        .text(jj);
+    }
+  }
+
+  function hideHoverOverlay() {
+    svg.selectAll('.hover-overlay').remove();
   }
 
   function typesetMath() {
