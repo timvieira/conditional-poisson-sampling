@@ -64,36 +64,7 @@ MathJax = {
   .back-link a { color: #5b9bd5; text-decoration: none; }
   .back-link a:hover { text-decoration: underline; }
 
-  /* Split distribution panel */
-  .split-info {
-    position: absolute;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    padding: 8px 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    font-size: 0.82em;
-    pointer-events: none;
-    z-index: 10;
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  .split-info.visible { opacity: 1; }
-  .split-info .eq { color: #777; margin-bottom: 5px; font-size: 0.9em; }
-  .split-info .split-bars {
-    display: flex; align-items: flex-end; gap: 2px;
-    height: 44px; margin-bottom: 2px;
-  }
-  .split-info .split-col {
-    display: flex; flex-direction: column; align-items: center; gap: 1px;
-    min-width: 22px;
-  }
-  .split-info .split-fill {
-    width: 16px; border-radius: 2px; min-height: 1px;
-  }
-  .split-info .split-lbl { font-size: 9px; color: #999; }
-  .split-info .split-val { font-size: 9px; }
+  /* Split distribution — rendered in SVG, no overlay needed */
 </style>
 </head>
 <body>
@@ -372,7 +343,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     animState.quotas[tree.root.id] = n;
     d3.select('#status-bar').html('Press <b>Step</b> to advance one level, or <b>Play</b> to animate.');
     d3.select('#result-bar').html('');
-    container.selectAll('.split-info').remove();
+    svg.selectAll('.split-overlay').remove();
   }
 
   function renderState() {
@@ -548,6 +519,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 
     // Animate nodes one at a time within this level
     animateNodesSequentially(activeNodes, 0, function() {
+      svg.selectAll('.split-overlay').remove();
       renderState();
       // Check if leaves are next
       var nextLi = animState.level + 1;
@@ -588,6 +560,13 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 
     // Animate balls for this single node
     animateBallSplit([nd], function() {
+      // Draw static balls for the children that just received quota
+      // so they're visible during the stagger delay
+      [nd.left, nd.right].forEach(function(child) {
+        if (!child || child.pad) return;
+        var cq = animState.quotas[child.id];
+        if (cq !== undefined && cq > 0) drawStaticBalls(child, cq);
+      });
       // Brief pause, then next node
       setTimeout(function() {
         animateNodesSequentially(nodes, idx + 1, callback);
@@ -700,64 +679,61 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   }
 
   function showSingleSplitPanel(nd) {
-    // Remove previous panels
-    container.selectAll('.split-info').remove();
+    // Remove previous split overlays from SVG
+    svg.selectAll('.split-overlay').remove();
 
     var split = animState.splits[nd.id];
     if (!split || split.k === 0) return;
     var probs = split.probs, j = split.j, k = split.k;
 
-    // Position: centered above the node
-    var px = nd.x - 50;
-    var py = nd.y - nodeH/2 - 80;
+    // Draw the split distribution as SVG bars, centered below the node
+    var barW = 10, barH = 30, gap = 3;
+    var nBars = probs.length;
+    var totalW = nBars * (barW + gap) - gap;
+    var cx = nd.x;
+    var cy = nd.y + nodeH / 2 + 8;  // just below the node box
 
-    var panel = container.append('div')
-      .attr('class', 'split-info')
-      .style('left', px + 'px')
-      .style('top', py + 'px');
+    var g = svg.append('g')
+      .attr('class', 'split-overlay')
+      .attr('transform', 'translate(' + (cx - totalW / 2) + ',' + cy + ')')
+      .attr('opacity', 0);
 
-    panel.append('div').attr('class', 'eq')
-      .html('$P(j \\mid k{=}' + k + ') \\propto P_L[j] \\cdot P_R[' + k + '{-}j]$');
+    // Background
+    g.append('rect')
+      .attr('x', -6).attr('y', -4)
+      .attr('width', totalW + 12).attr('height', barH + 22)
+      .attr('rx', 4)
+      .attr('fill', '#fff').attr('stroke', '#ddd').attr('stroke-width', 0.5)
+      .attr('opacity', 0.9);
 
-    var barsDiv = panel.append('div').attr('class', 'split-bars');
     var maxP = Math.max.apply(null, probs);
     if (maxP === 0) maxP = 1;
-    var barH = 36;
 
     for (var jj = 0; jj <= k; jj++) {
-      var col = barsDiv.append('div').attr('class', 'split-col');
       var isSampled = (jj === j);
       var h = Math.max(1, probs[jj] / maxP * barH);
-      col.append('div').attr('class', 'split-val')
-        .style('font-size', '9px')
-        .style('color', isSampled ? CR : CW)
-        .style('font-weight', isSampled ? 'bold' : 'normal')
-        .text(probs[jj] < 0.005 ? '' : probs[jj].toFixed(2));
-      col.append('div').attr('class', 'split-fill')
-        .style('height', h + 'px')
-        .style('background', isSampled ? CR : CW)
-        .style('opacity', isSampled ? 0.9 : 0.45);
-      col.append('div').attr('class', 'split-lbl')
-        .style('color', isSampled ? CR : '#aaa')
+      var bx = jj * (barW + gap);
+
+      // Bar
+      g.append('rect')
+        .attr('x', bx).attr('y', barH - h)
+        .attr('width', barW).attr('height', h)
+        .attr('rx', 1.5)
+        .attr('fill', isSampled ? CR : CW)
+        .attr('opacity', isSampled ? 0.9 : 0.4);
+
+      // Label below bar
+      g.append('text')
+        .attr('x', bx + barW / 2).attr('y', barH + 11)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '8px')
+        .style('fill', isSampled ? CR : '#aaa')
         .style('font-weight', isSampled ? 'bold' : 'normal')
         .text(jj);
     }
 
     // Fade in
-    requestAnimationFrame(function() {
-      panel.classed('visible', true);
-      // Reposition if off-screen
-      var contBox = container.node().getBoundingClientRect();
-      var pRect = panel.node().getBoundingClientRect();
-      if (pRect.right > contBox.right + 10) {
-        panel.style('left', (contBox.right - pRect.width - contBox.left - 10) + 'px');
-      }
-      if (pRect.left < contBox.left - 10) {
-        panel.style('left', '4px');
-      }
-    });
-
-    typesetMath();
+    g.transition().duration(200).attr('opacity', 1);
   }
 
   function typesetMath() {
@@ -799,7 +775,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 
   d3.select('#btn-reset').on('click', function() {
     stopPlaying();
-    container.selectAll('.split-info').remove();
+    svg.selectAll('.split-overlay').remove();
     tree = buildTree(w, n);
     layoutTree();
     draw();
