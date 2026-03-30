@@ -3597,7 +3597,7 @@ graph TB
 <div style="background: #fff8f0; border: 1px solid #e8c97a; border-radius: 6px; padding: 12px 16px; margin: 16px 0;">
 <p><strong>Conjecture</strong> (non-asymptotic bound).<a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a>  For all $N$, $n$, $\bw$, and all items $i$:</p>
 <p>$$|\pip_i - p_i| \;\leq\; \frac{p_i(1 - p_i)}{d}.$$</p>
-<p>No hidden constants.  Proved for $N \leq 6$; verified across $>10^6$ random instances for $N$ up to $200$.  See the <a href="../poisson-approximation-bound/">companion post</a> for the proof attempts, the Boistard et al. derivation, and a summary of what remains open.</p>
+<p>No hidden constants.  Proved for $N \leq 6$; verified across $>10^6$ random instances for $N$ up to $200$.  See the <a href="../a-non-asymptotic-bound-for-the-poisson-approximation-to-conditional-poisson-sampling/">companion post</a> for the proof attempts, the Boistard et al. derivation, and a summary of what remains open.</p>
 </div>
 
 <p><strong>Inverting the approximation.</strong>  Since $p_i = \w_i r/(1+\w_i r)$, we can invert: $\w_i = p_i / (r(1 - p_i))$, giving $\theta_i = \log \w_i = \log(p_i/(1-p_i)) - \log r$.  If we want inclusion probabilities $\bpip^*$ and treat $\pip^*_i \approx p_i$, the initialization $\theta_i^{(0)} = \log(\pip^*_i / (1 - \pip^*_i))$ (i.e., the logit of the target) is off by at most $\mathcal{O}(1/N)$—a good warm start for the <a href="#Fitting-Weights-to-Target-Probabilities">fitting</a> optimizer.</p>
