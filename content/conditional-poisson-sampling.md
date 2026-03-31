@@ -101,10 +101,8 @@ article { counter-reset: sidenote-counter; }
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
 (function() {
-  var N=5, n=3, w=[0.124,0.265,0.066,0.372,0.174], pi=[];
-  function normW(){var s=w.reduce(function(a,b){return a+b;},0);w=w.map(function(v){return v/s;});}
-  normW();
-  var CW='#5b9bd5', CP='#c0504d';
+  var N=5, n=3, w=[0.5,1.2,0.3,1.8,0.8], pi=[];
+  var CW='#5b9bd5', CP='#c0504d', CI='#d4a24e';
   // Responsive bar sizing
   var mobile = window.innerWidth < 600;
   var barH = mobile ? 70 : 90;
@@ -139,13 +137,13 @@ article { counter-reset: sidenote-counter; }
         s*=0.5;
       }
     }
-    // Normalize w to sum to 1 (scale-invariant, keeps values in [0,1])
-    var ww = th.map(function(t){return Math.exp(t);});
-    var s = ww.reduce(function(a,b){return a+b;},0);
-    return ww.map(function(v){return v/s;});
+    // Center log-weights so geometric mean = 1 (scale-invariant, keeps values moderate)
+    var mean = th.reduce(function(a,b){return a+b;},0) / th.length;
+    return th.map(function(t){return Math.exp(t - mean);});
   }
 
-  function getMaxW(){ return 1; }
+  var WMAX = 3;
+  function getMaxW(){ return WMAX; }
 
   var root=d3.select('#cps');
   var wSvgs=[], wFills=[], wLabels=[];
@@ -188,7 +186,7 @@ article { counter-reset: sidenote-counter; }
     ctrl.append('input').attr('type','number').attr('min',2).attr('max',8).attr('value',N)
       .style('width','44px').style('font-family','inherit').style('font-size','inherit')
       .style('border','1px solid #ccc').style('border-radius','3px').style('padding','2px 4px')
-      .on('change input',function(){var v=+this.value;if(isNaN(v))return;if(v<2||v>8){d3.select('#cps-status').text('the distribution requires 2 \u2264 N \u2264 8').style('color','#c00');return;}v=Math.round(v);if(v===N)return;N=v;n=Math.min(n,N);while(w.length<N)w.push(0.5+Math.random());w=w.slice(0,N);normW();build();});
+      .on('change input',function(){var v=+this.value;if(isNaN(v))return;if(v<2||v>8){d3.select('#cps-status').text('the distribution requires 2 \u2264 N \u2264 8').style('color','#c00');return;}v=Math.round(v);if(v===N)return;N=v;n=Math.min(n,N);while(w.length<N)w.push(0.5+Math.random());w=w.slice(0,N);build();});
     ctrl.append('span').html('&ensp;$n$ = ');
     ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n)
       .style('width','44px').style('font-family','inherit').style('font-size','inherit')
@@ -203,46 +201,20 @@ article { counter-reset: sidenote-counter; }
     cg.append('col').style('width', '55px');
     var tbody = tbl.append('tbody');
 
-    // --- Weights header ---
+    // --- Weight labels ---
     var wh = tbody.append('tr');
-    wh.append('td').attr('class','rl').text('weights');
-    for(var i=0;i<N;i++) wh.append('td').attr('class','ic').style('color',CW).html('$w_'+(i+1)+'$');
+    wh.append('td').attr('class','rl');
+    for(var i=0;i<N;i++) wh.append('td').attr('class','ic').style('color',CI).html('$w_'+(i+1)+'$');
     wh.append('td').attr('class','pc');
 
     // --- Weight bars ---
     var wb = tbody.append('tr');
-    wb.append('td').attr('class','rl').style('font-size','0.7em').style('color','#999').html('drag to adjust<br>($\\sum w_i = 1$)');
+    wb.append('td').attr('class','rl');
     for(var i=0;i<N;i++){
       (function(idx){
         var td = wb.append('td').attr('class','bar-td');
-        var b = makeBar(td, w[idx], getMaxW(), CW, true, function(frac){
-          var target = Math.max(0, Math.min(0.99, frac));
-          var EPS = 0.005;
-          var wouldBeNonzero = 0;
-          for(var k=0;k<N;k++) {
-            if(k===idx) { if(target>EPS) wouldBeNonzero++; }
-            else { if(w[k]>EPS) wouldBeNonzero++; }
-          }
-          if(wouldBeNonzero < n) {
-            d3.select('#cps-status')
-              .text('the distribution requires at least n='+n+' items with positive weight')
-              .style('color','#c00');
-            return;
-          }
-          d3.select('#cps-status').text('');
-          var others = 0;
-          for(var k=0;k<N;k++) if(k!==idx) others+=w[k];
-          var remain = 1 - target;
-          if(others > 1e-20 && remain > 0) {
-            var scale = remain / others;
-            for(var k=0;k<N;k++){
-              if(k===idx) w[k]=target;
-              else w[k]*=scale;
-            }
-          } else {
-            w[idx] = target;
-          }
-          normW();
+        var b = makeBar(td, w[idx], WMAX, CI, true, function(frac){
+          w[idx] = Math.max(0.01, frac * WMAX);
           pi = getPi(w);
           update();
         });
@@ -261,8 +233,8 @@ article { counter-reset: sidenote-counter; }
       var tdata = getTable(w);
       var sh = tbody.append('tr');
       sh.append('td').attr('class','rl').style('text-align','right').html('Subset $S$');
-      for(var j=0;j<N;j++) sh.append('td').attr('class','ic').text(j+1);
-      sh.append('td').attr('class','pc').style('text-align','left').html('$P(S)$');
+      for(var j=0;j<N;j++) sh.append('td').attr('class','ic');
+      sh.append('td').attr('class','pc').style('text-align','left').style('color',CW).html('$P(S)$');
 
       // --- Subset rows ---
       tdata.forEach(function(r){
@@ -273,10 +245,10 @@ article { counter-reset: sidenote-counter; }
         var barWrap = pc.append('div').style('display','flex').style('align-items','center').style('gap','3px');
         barWrap.append('div').attr('class','prob-bar')
           .style('height','14px').style('border-radius','2px')
-          .style('background',CP).style('opacity','0.7')
+          .style('background',CW).style('opacity','0.7')
           .style('min-width','1px');
         barWrap.append('span').attr('class','prob-val')
-          .style('font-size','0.8em').style('color',CP).style('white-space','nowrap');
+          .style('font-size','0.8em').style('color',CW).style('white-space','nowrap');
         probCells.push(pc);
       });
     } else {
@@ -288,7 +260,7 @@ article { counter-reset: sidenote-counter; }
 
     // --- Pi header ---
     var ph = tbody.append('tr');
-    ph.append('td').attr('class','rl').style('font-weight','bold').html('inclusion prob.');
+    ph.append('td').attr('class','rl').style('color',CP).html('inclusion prob.');
     for(var i=0;i<N;i++) ph.append('td').attr('class','ic').style('color',CP).style('font-weight','bold').html('$\\pi_'+(i+1)+'$');
     ph.append('td').attr('class','pc');
 
@@ -302,6 +274,7 @@ article { counter-reset: sidenote-counter; }
           // Set this pi as target, solve for w
           pi[idx] = Math.max(0.02, Math.min(0.98, frac));
           w = fit(pi);
+          WMAX = Math.max(3, Math.max.apply(null, w) * 1.2);
           pi = getPi(w);
           update();
         });
@@ -388,9 +361,8 @@ svg text { font-family: 'EB Garamond', serif; }
 <script>
 (function() {
   var N = 4, n = 2;
-  var w = [0.2, 0.35, 0.15, 0.3];
-  function normW() { var s=w.reduce(function(a,b){return a+b;},0); w=w.map(function(v){return v/s;}); }
-  normW();
+  var w = [0.5, 1.2, 0.3, 1.0];
+  var WMAX = 3;
 
   var CW = '#5b9bd5', CR = '#c0504d', CI = '#d4a24e'; // blue, red, input gold
   var root = d3.select('#tw');
@@ -477,18 +449,15 @@ svg text { font-family: 'EB Garamond', serif; }
     function step() {
       if (N === target) { animating = false; return; }
       if (target > N) {
-        w.push(0);
+        w.push(0.5 + Math.random());
         N = N + 1;
         lastAction = 'add';
       } else {
-        var removed = w.pop();
+        w.pop();
         N = N - 1;
-        var s = w.reduce(function(a,b){return a+b;}, 0);
-        if (s > 0) w = w.map(function(v) { return v / s; });
         lastAction = 'remove';
       }
       n = Math.min(n, N);
-      normW();
       buildInner();
       if (N !== target) {
         setTimeout(step, dur);
@@ -648,17 +617,8 @@ svg text { font-family: 'EB Garamond', serif; }
       });
     }
 
-    // --- Draw histograms for all nodes ---
-    // Find global max coefficient for consistent scaling
-    var globalMax = 0;
-    (function walk(nd) {
-      if (!nd || nd.pad) return;
-      nd.poly.forEach(function(c) { if (Math.abs(c) > globalMax) globalMax = Math.abs(c); });
-      if (nd.left) walk(nd.left);
-      if (nd.right) walk(nd.right);
-    })(tree.root);
-    if (globalMax === 0) globalMax = 1;
-
+    // --- Draw histograms for all nodes (log scale, fixed reference) ---
+    var logMax = Math.log1p(Math.pow(WMAX, n));
     for (var li = 0; li < levels.length; li++) {
       levels[li].forEach(function(nd) {
         if (nd.pad) { nodeRefs.push(null); return; }
@@ -685,7 +645,7 @@ svg text { font-family: 'EB Garamond', serif; }
         var cRects = [], cTexts = [];
         for (var k = 0; k < nCoeffs; k++) {
           var bx = nodePad/2 + k * (bW + bGap);
-          var barFrac = Math.min(1, Math.abs(coeffs[k]) / globalMax);
+          var barFrac = Math.min(1, Math.log1p(Math.abs(coeffs[k])) / logMax);
           var barPx = Math.max(0.5, barFrac * bH);
           var isHighlight = (li === levels.length - 1 && k === n);
           var col = isHighlight ? CR : CW;
@@ -795,7 +755,7 @@ svg text { font-family: 'EB Garamond', serif; }
           .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
 
         // Fill
-        var frac = Math.min(w[idx], 1);
+        var frac = Math.min(w[idx] / WMAX, 1);
         var sf = sg.append('rect')
           .attr('x', barX + 2).attr('width', bW - 4).attr('rx', 1)
           .attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH)
@@ -822,18 +782,7 @@ svg text { font-family: 'EB Garamond', serif; }
           .style('touch-action', 'none')
           .call(d3.drag().on('drag', function(event) {
             var frac = (sliderTop + sliderH - event.y) / sliderH;
-            var target = Math.max(0.01, Math.min(0.99, frac));
-            var others = 0;
-            for (var k = 0; k < N; k++) if (k !== idx) others += w[k];
-            var remain = 1 - target;
-            if (others > 1e-10 && remain > 0) {
-              var scale = remain / others;
-              for (var k = 0; k < N; k++) {
-                if (k === idx) w[k] = target;
-                else w[k] = Math.max(0.001, w[k] * scale);
-              }
-            }
-            normW();
+            w[idx] = Math.max(0.01, Math.min(WMAX, frac * WMAX));
             updateTree();
           }));
       })(idx);
@@ -842,7 +791,7 @@ svg text { font-family: 'EB Garamond', serif; }
     // Z label in output zone, centered on the n-th bar
     zLabelDiv = addMathLabel(svgWrap, zLabelX, outputY, '', {anchor:'middle', color: CR, fontSize: '14px'});
 
-    root.datum({ levels: levels, tree: tree, globalMax: globalMax });
+    root.datum({ levels: levels, tree: tree });
     updateTree();
 
     // Animate new node sprouting in: fade in elements tagged 'new'
@@ -884,7 +833,7 @@ svg text { font-family: 'EB Garamond', serif; }
 
     // Update sliders
     for (var i = 0; i < N; i++) {
-      var frac = Math.min(w[i], 1);
+      var frac = Math.min(w[i] / WMAX, 1);
       sliderFills[i].attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH);
       sliderLabels[i].attr('y', sliderTop + sliderH - frac * sliderH - 2).text(w[i].toFixed(2));
     }
@@ -893,17 +842,8 @@ svg text { font-family: 'EB Garamond', serif; }
     var newTree = buildTree(w, n);
     var newLevels = newTree.levels;
 
-    // Recompute global max
-    var gMax = 0;
-    (function walk(nd) {
-      if (!nd || nd.pad) return;
-      nd.poly.forEach(function(c) { if (Math.abs(c) > gMax) gMax = Math.abs(c); });
-      if (nd.left) walk(nd.left);
-      if (nd.right) walk(nd.right);
-    })(newTree.root);
-    if (gMax === 0) gMax = 1;
-
-    // Update histograms
+    // Update histograms (log scale, fixed reference)
+    var logMax = Math.log1p(Math.pow(WMAX, n));
     var ri = 0;
     for (var li = 0; li < newLevels.length; li++) {
       for (var ni = 0; ni < newLevels[li].length; ni++) {
@@ -912,7 +852,7 @@ svg text { font-family: 'EB Garamond', serif; }
         var coeffs = newLevels[li][ni].poly;
         var nCoeffs = ref.nCoeffs;
         for (var k = 0; k < nCoeffs; k++) {
-          var barFrac = Math.min(1, Math.abs(coeffs[k]) / gMax);
+          var barFrac = Math.min(1, Math.log1p(Math.abs(coeffs[k])) / logMax);
           var barPx = Math.max(1, barFrac * bH);
           ref.cellRects[k].attr('y', nodePad/2 + bH - barPx).attr('height', barPx);
           if (ref.cellTexts[k]) {
@@ -966,9 +906,8 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
 <script>
 (function() {
   var N = 4, n = 2;
-  var w = [0.2, 0.35, 0.15, 0.3];
-  function normW() { var s=w.reduce(function(a,b){return a+b;},0); w=w.map(function(v){return v/s;}); }
-  normW();
+  var w = [0.5, 1.2, 0.3, 1.0];
+  var WMAX = 3;
 
   var CW = '#5b9bd5', CR = '#c0504d', CI = '#d4a24e', CA = '#7b2d8e'; // blue, red, gold, purple for adjoints
   var root = d3.select('#bp');
@@ -1094,7 +1033,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
         var v = Math.max(2, Math.round(+this.value));
         if (v === N) return;
         while (w.length < v) w.push(0.5 + Math.random());
-        w = w.slice(0, v); N = v; n = Math.min(n, N); normW(); build();
+        w = w.slice(0, v); N = v; n = Math.min(n, N); build();
       });
     ctrl.append('span').html('&ensp;$n$ = ');
     ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n)
@@ -1209,19 +1148,9 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
       });
     }
 
-    // Global max for scaling (primal and dual separately)
-    var globalMaxFwd = 0, globalMaxAdj = 0;
-    (function walk(nd) {
-      if (!nd || nd.pad) return;
-      nd.poly.forEach(function(c) { if (Math.abs(c) > globalMaxFwd) globalMaxFwd = Math.abs(c); });
-      if (nd.adj) nd.adj.forEach(function(a) { if (Math.abs(a) > globalMaxAdj) globalMaxAdj = Math.abs(a); });
-      if (nd.left) walk(nd.left);
-      if (nd.right) walk(nd.right);
-    })(tree.root);
-    if (globalMaxFwd === 0) globalMaxFwd = 1;
-    if (globalMaxAdj === 0) globalMaxAdj = 1;
-
-    // Draw primal + dual bars at each node
+    // Draw primal + dual bars at each node (log scale, fixed reference)
+    var logMaxFwd = Math.log1p(Math.pow(WMAX, n));
+    var logMaxAdj = Math.log1p(1); // adjoints are O(1/Z), start conservative
     for (var li = 0; li < levels.length; li++) {
       levels[li].forEach(function(nd, ni) {
         if (nd.pad) { nodeRefs.push(null); return; }
@@ -1254,7 +1183,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
 
           // --- Primal (forward) bar ---
           var fVal = k < coeffs.length ? coeffs[k] : 0;
-          var fFrac = Math.min(1, Math.abs(fVal) / globalMaxFwd);
+          var fFrac = Math.min(1, Math.log1p(Math.abs(fVal)) / logMaxFwd);
           var fPx = Math.max(0.5, fFrac * halfH);
           var fCol = isHighlight ? CR : CW;
 
@@ -1276,7 +1205,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
 
           // --- Dual (adjoint) bar ---
           var aVal = k < adj.length ? adj[k] : 0;
-          var aFrac = Math.min(1, Math.abs(aVal) / globalMaxAdj);
+          var aFrac = Math.min(1, Math.log1p(Math.abs(aVal)) / logMaxAdj);
           var aPx = Math.max(0.5, aFrac * halfH);
           var isSeed = isRoot && k === n;
           var aCol = isSeed ? CR : CA;
@@ -1342,7 +1271,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
           .attr('width', bW - 2).attr('height', sliderH)
           .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
 
-        var frac = Math.min(w[idx], 1);
+        var frac = Math.min(w[idx] / WMAX, 1);
         var sf = sg.append('rect')
           .attr('x', barX + 2).attr('width', bW - 4).attr('rx', 1)
           .attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH)
@@ -1365,18 +1294,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
           .style('touch-action', 'none')
           .call(d3.drag().on('drag', function(event) {
             var fr = (sliderTop + sliderH - event.y) / sliderH;
-            var target = Math.max(0.01, Math.min(0.99, fr));
-            var others = 0;
-            for (var k = 0; k < N; k++) if (k !== idx) others += w[k];
-            var remain = 1 - target;
-            if (others > 1e-10 && remain > 0) {
-              var scale = remain / others;
-              for (var k = 0; k < N; k++) {
-                if (k === idx) w[k] = target;
-                else w[k] = Math.max(0.001, w[k] * scale);
-              }
-            }
-            normW();
+            w[idx] = Math.max(0.01, Math.min(WMAX, fr * WMAX));
             updateBP();
           }));
       })(idx);
@@ -1454,7 +1372,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
 
     // Update sliders
     for (var i = 0; i < N; i++) {
-      var frac = Math.min(w[i], 1);
+      var frac = Math.min(w[i] / WMAX, 1);
       sliderFills[i].attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH);
       sliderLabels[i].attr('y', sliderTop + sliderH - frac * sliderH - 2).text(w[i].toFixed(2));
     }
@@ -1464,22 +1382,12 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
     var Z = backprop(newTree, n);
     var newLevels = newTree.levels;
 
-    // Recompute global maxes
-    var gMaxFwd = 0, gMaxAdj = 0;
-    (function walk(nd) {
-      if (!nd || nd.pad) return;
-      nd.poly.forEach(function(c) { if (Math.abs(c) > gMaxFwd) gMaxFwd = Math.abs(c); });
-      if (nd.adj) nd.adj.forEach(function(a) { if (Math.abs(a) > gMaxAdj) gMaxAdj = Math.abs(a); });
-      if (nd.left) walk(nd.left);
-      if (nd.right) walk(nd.right);
-    })(newTree.root);
-    if (gMaxFwd === 0) gMaxFwd = 1;
-    if (gMaxAdj === 0) gMaxAdj = 1;
-
+    var logMaxFwd = Math.log1p(Math.pow(WMAX, n));
+    var logMaxAdj = Math.log1p(1);
     var fwdTop = nodePad/2;
     var adjTop = nodePad/2 + halfH + divider;
 
-    // Update node bars (both primal and dual)
+    // Update node bars (log scale, fixed reference)
     var ri = 0;
     for (var li = 0; li < newLevels.length; li++) {
       for (var ni = 0; ni < newLevels[li].length; ni++) {
@@ -1492,14 +1400,14 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
         for (var k = 0; k < nCoeffs; k++) {
           // Primal
           var fVal = k < coeffs.length ? coeffs[k] : 0;
-          var fFrac = Math.min(1, Math.abs(fVal) / gMaxFwd);
+          var fFrac = Math.min(1, Math.log1p(Math.abs(fVal)) / logMaxFwd);
           var fPx = Math.max(1, fFrac * halfH);
           ref.fwdRects[k].attr('y', fwdTop + halfH - fPx).attr('height', fPx);
           ref.fwdTexts[k].attr('y', fwdTop + halfH - fPx - 3).text(fmtAdj(fVal));
 
           // Dual
           var aVal = k < adj.length ? adj[k] : 0;
-          var aFrac = Math.min(1, Math.abs(aVal) / gMaxAdj);
+          var aFrac = Math.min(1, Math.log1p(Math.abs(aVal)) / logMaxAdj);
           var aPx = Math.max(1, aFrac * halfH);
           ref.adjRects[k].attr('y', adjTop + halfH - aPx).attr('height', aPx);
           ref.adjTexts[k].attr('y', adjTop + halfH - aPx - 3).text(fmtAdj(aVal));
@@ -1903,41 +1811,39 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
 
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
-**Contour diagram.** The generating function $f(\z) = \prod_i(1 + \w_i \z)$ has zeros at $\z = -1/\w_i$ on the negative real axis.  Extracting the $n$<sup>th</sup> coefficient via FFT is equivalent to sampling $f$ at equally-spaced points on the circle $|\z| = r$.  Drag the circle to change $r$ and see how the coefficient bar chart shifts its peak toward degree $n$.
+**Contour diagram.** The generating function $f(\z) = \prod_i(1 + \w_i \z)$ has zeros at $\z = -1/\w_i$ on the negative real axis.  Extracting the $n$<sup>th</sup> coefficient via FFT is equivalent to sampling $f$ at equally-spaced points on the circle $|\z| = r$.  Drag the weight sliders or the circle to explore.
 
 <div id="contour-diagram"></div>
 <script>
 (function() {
   var W = 500, H = 280, barW = 500, barH = 100;
-  var weights = [1.5, 3.2, 0.8, 4.5, 2.0, 0.3, 5.1, 1.8];
-  var N = weights.length, n = 3;
-  var zeros = weights.map(function(w){ return -1/w; });
+  var WMAX = 6;
+  var CI = '#d4a24e', CW = '#5b9bd5', CR = '#c0504d';
+  var w = [1.5, 3.2, 0.8, 4.5, 2.0, 0.3, 5.1, 1.8];
+  var N = w.length, n = 3;
+  var r;
 
-  // Compute optimal r via Newton's method
   function solveR(target) {
     var lr = 0;
     for (var i = 0; i < 50; i++) {
-      var r = Math.exp(lr);
+      var rv = Math.exp(lr);
       var s = 0, ds = 0;
       for (var j = 0; j < N; j++) {
-        var p = weights[j]*r/(1+weights[j]*r);
+        var p = w[j]*rv/(1+w[j]*rv);
         s += p; ds += p*(1-p);
       }
       lr += (target - s) / ds;
     }
     return Math.exp(lr);
   }
-  var rOpt = solveR(n);
-  var r = rOpt;
 
-  // Compute coefficients c_k(r) = Z(w,k) * r^k
-  function coeffs(r) {
+  function coeffs(rv) {
     var poly = [1];
     for (var i = 0; i < N; i++) {
       var next = new Array(poly.length + 1).fill(0);
       for (var j = 0; j < poly.length; j++) {
         next[j] += poly[j];
-        next[j+1] += poly[j] * weights[i] * r;
+        next[j+1] += poly[j] * w[i] * rv;
       }
       poly = next;
     }
@@ -1946,157 +1852,191 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
 
   var root = d3.select('#contour-diagram');
 
-  // Complex plane
-  var svg = root.append('svg').attr('width', W).attr('height', H)
-    .style('display','block').style('margin','0 auto 8px auto');
+  // Weight sliders
+  var sliderH = 60, sliderW = 22;
+  var sliderSvg = root.append('svg')
+    .attr('width', N * (sliderW + 6) + 40).attr('height', sliderH + 20)
+    .style('display','block').style('margin','0 auto 4px auto');
+  var sliderFills = [], sliderLabels = [];
+  for (var i = 0; i < N; i++) {
+    (function(idx) {
+      var sx = 10 + idx * (sliderW + 6);
+      var sg = sliderSvg.append('g');
+      // Track
+      sg.append('rect').attr('x', sx + 1).attr('y', 14)
+        .attr('width', sliderW - 2).attr('height', sliderH)
+        .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
+      // Fill
+      var frac = Math.min(w[idx] / WMAX, 1);
+      var sf = sg.append('rect')
+        .attr('x', sx + 2).attr('width', sliderW - 4).attr('rx', 1)
+        .attr('y', 14 + sliderH - frac * sliderH).attr('height', frac * sliderH)
+        .attr('fill', CI).attr('opacity', 0.8).style('pointer-events', 'none');
+      sliderFills.push(sf);
+      // Label
+      var sl = sg.append('text')
+        .attr('x', sx + sliderW/2).attr('y', 14 + sliderH - frac * sliderH - 2)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '9px').style('fill', CI).style('pointer-events', 'none')
+        .text(w[idx].toFixed(1));
+      sliderLabels.push(sl);
+      // Drag target
+      sg.append('rect')
+        .attr('x', sx - 2).attr('y', 12)
+        .attr('width', sliderW + 4).attr('height', sliderH + 4)
+        .attr('fill', 'transparent').attr('cursor', 'ns-resize')
+        .style('touch-action', 'none')
+        .call(d3.drag().on('drag', function(event) {
+          var fr = (14 + sliderH - event.y) / sliderH;
+          w[idx] = Math.max(0.01, Math.min(WMAX, fr * WMAX));
+          build();
+        }));
+    })(i);
+  }
 
-  var cx = W * 0.5, cy = H * 0.5;
-  var minZero = Math.min.apply(null, zeros);  // most negative zero
-  var viewLeft = minZero * 1.3;
-  var viewRight = -viewLeft * 0.5;
-  var pxPerUnit = W / (viewRight - viewLeft);
+  function updateSliders() {
+    for (var i = 0; i < N; i++) {
+      var frac = Math.min(w[i] / WMAX, 1);
+      sliderFills[i].attr('y', 14 + sliderH - frac * sliderH).attr('height', frac * sliderH);
+      sliderLabels[i].attr('y', 14 + sliderH - frac * sliderH - 2).text(w[i].toFixed(1));
+    }
+  }
+
+  // Complex plane + bar chart containers
+  var svg, cx, cy, pxPerUnit, contour, zeroDots, rLabel, rStarLabel, dots, rOpt;
+  var barSvg, barG, bars, barLabels, bw, dynLabel;
+  var nFFT = 16;
 
   function toX(v) { return cx + v * pxPerUnit; }
   function toY(v) { return cy - v * pxPerUnit; }
 
-  // Axes
-  svg.append('line').attr('x1',0).attr('x2',W).attr('y1',cy).attr('y2',cy)
-    .attr('stroke','#ccc').attr('stroke-width',1);
-  svg.append('line').attr('x1',toX(0)).attr('x2',toX(0)).attr('y1',0).attr('y2',H)
-    .attr('stroke','#ccc').attr('stroke-width',1);
-  svg.append('text').attr('x',W-8).attr('y',cy-6).attr('text-anchor','end')
-    .style('font-size','12px').style('fill','#999').style('font-family',"'EB Garamond', serif").text('Re');
-  svg.append('text').attr('x',toX(0)+8).attr('y',14)
-    .style('font-size','12px').style('fill','#999').style('font-family',"'EB Garamond', serif").text('Im');
+  function build() {
+    updateSliders();
+    var zeros = w.map(function(wi){ return -1/wi; });
+    rOpt = solveR(n);
+    r = rOpt;
 
-  // Contour circle
-  var contour = svg.append('circle')
-    .attr('cx', toX(0)).attr('cy', cy)
-    .attr('fill','rgba(90,155,213,0.08)').attr('stroke','#4a90d9').attr('stroke-width',2)
-    .attr('stroke-dasharray','6,3');
+    // Remove old SVGs (keep slider SVG)
+    root.selectAll('svg:not(:first-child)').remove();
 
-  // Zeros on negative real axis
-  zeros.forEach(function(z, i) {
-    svg.append('circle').attr('cx', toX(z)).attr('cy', cy).attr('r', 5)
-      .attr('fill','none').attr('stroke','#c0504d').attr('stroke-width',2);
-  });
+    // Complex plane
+    var minZero = Math.min.apply(null, zeros);
+    var viewLeft = minZero * 1.3;
+    var viewRight = -viewLeft * 0.5;
+    cx = W * 0.5; cy = H * 0.5;
+    pxPerUnit = W / (viewRight - viewLeft);
 
-  // Zero labels
-  svg.append('text').attr('x', toX(zeros[0])).attr('y', cy + 20)
-    .attr('text-anchor','middle')
-    .style('font-size','11px').style('fill','#c0504d').style('font-family',"'EB Garamond', serif")
-    .text('zeros: âˆ’1/wáµ¢');
+    svg = root.append('svg').attr('width', W).attr('height', H)
+      .style('display','block').style('margin','0 auto 8px auto');
 
-  // Pole at origin
-  svg.append('text').attr('x', toX(0)-3).attr('y', cy-3).attr('text-anchor','end')
-    .style('font-size','16px').style('fill','#333').text('Ã—');
+    // Axes
+    svg.append('line').attr('x1',0).attr('x2',W).attr('y1',cy).attr('y2',cy)
+      .attr('stroke','#ccc').attr('stroke-width',1);
+    svg.append('line').attr('x1',toX(0)).attr('x2',toX(0)).attr('y1',0).attr('y2',H)
+      .attr('stroke','#ccc').attr('stroke-width',1);
+    svg.append('text').attr('x',W-8).attr('y',cy-6).attr('text-anchor','end')
+      .style('font-size','12px').style('fill','#999').style('font-family',"'EB Garamond', serif").text('Re');
+    svg.append('text').attr('x',toX(0)+8).attr('y',14)
+      .style('font-size','12px').style('fill','#999').style('font-family',"'EB Garamond', serif").text('Im');
 
-  // r label
-  var rLabel = svg.append('text')
-    .attr('text-anchor','start')
-    .style('font-size','13px').style('fill','#4a90d9').style('font-family',"'EB Garamond', serif");
+    // Contour circle
+    contour = svg.append('circle')
+      .attr('cx', toX(0)).attr('cy', cy)
+      .attr('fill','rgba(90,155,213,0.08)').attr('stroke','#4a90d9').attr('stroke-width',2)
+      .attr('stroke-dasharray','6,3');
 
-  // r* label
-  var rStarLabel = svg.append('text')
-    .attr('text-anchor','start')
-    .style('font-size','11px').style('fill','#999').style('font-family',"'EB Garamond', serif");
+    // Zeros
+    zeroDots = [];
+    zeros.forEach(function(z) {
+      zeroDots.push(svg.append('circle').attr('cx', toX(z)).attr('cy', cy).attr('r', 5)
+        .attr('fill','none').attr('stroke', CR).attr('stroke-width',2));
+    });
+    svg.append('text').attr('x', toX(zeros[0])).attr('y', cy + 20)
+      .attr('text-anchor','middle')
+      .style('font-size','11px').style('fill', CR).style('font-family',"'EB Garamond', serif")
+      .text('zeros: âˆ’1/wáµ¢');
 
-  // FFT sample points on the circle
-  var nFFT = 16;
-  var dots = svg.selectAll('.fft-dot').data(d3.range(nFFT)).enter()
-    .append('circle').attr('class','fft-dot').attr('r',2.5)
-    .attr('fill','#4a90d9').attr('opacity',0.5);
+    // Pole at origin
+    svg.append('text').attr('x', toX(0)-3).attr('y', cy-3).attr('text-anchor','end')
+      .style('font-size','16px').style('fill','#333').text('Ã—');
 
-  // Bar chart for coefficients
-  var barSvg = root.append('svg').attr('width', barW).attr('height', barH + 30)
-    .style('display','block').style('margin','0 auto');
+    rLabel = svg.append('text').attr('text-anchor','start')
+      .style('font-size','13px').style('fill','#4a90d9').style('font-family',"'EB Garamond', serif");
+    rStarLabel = svg.append('text').attr('text-anchor','start')
+      .style('font-size','11px').style('fill','#999').style('font-family',"'EB Garamond', serif");
 
-  var barG = barSvg.append('g').attr('transform','translate(40,5)');
-  var bw = (barW - 80) / (N + 1);
-  var bars = barG.selectAll('.coeff-bar').data(d3.range(N+1)).enter()
-    .append('rect').attr('class','coeff-bar')
-    .attr('x', function(d){ return d * bw; })
-    .attr('width', bw - 2).attr('fill', function(d){ return d === n ? '#c0504d' : '#4a90d9'; })
-    .attr('opacity', function(d){ return d === n ? 0.9 : 0.5; });
+    dots = svg.selectAll('.fft-dot').data(d3.range(nFFT)).enter()
+      .append('circle').attr('class','fft-dot').attr('r',2.5)
+      .attr('fill','#4a90d9').attr('opacity',0.5);
 
-  var barLabels = barG.selectAll('.coeff-label').data(d3.range(N+1)).enter()
-    .append('text').attr('class','coeff-label')
-    .attr('x', function(d){ return d * bw + (bw-2)/2; })
-    .attr('text-anchor','middle')
-    .style('font-size','10px').style('fill','#666').style('font-family',"'EB Garamond', serif");
+    // Drag on circle
+    contour.call(d3.drag().on('drag', function(event) {
+      var dx = event.x - toX(0), dy = event.y - cy;
+      r = Math.max(0.05, Math.sqrt(dx*dx + dy*dy) / pxPerUnit);
+      update();
+    })).style('cursor','ew-resize');
+    svg.append('circle').attr('cx',toX(0)).attr('cy',cy)
+      .attr('r', W/2).attr('fill','transparent').attr('pointer-events','all')
+      .style('cursor','ew-resize')
+      .call(d3.drag().on('drag', function(event) {
+        var dx = event.x - toX(0), dy = event.y - cy;
+        r = Math.max(0.05, Math.sqrt(dx*dx + dy*dy) / pxPerUnit);
+        update();
+      }));
 
-  // k axis labels
-  barG.selectAll('.k-label').data(d3.range(N+1)).enter()
-    .append('text').attr('class','k-label')
-    .attr('x', function(d){ return d * bw + (bw-2)/2; })
-    .attr('text-anchor','middle')
-    .style('font-size','11px').style('fill','#333').style('font-family',"'EB Garamond', serif")
-    .text(function(d){ return d; });
+    // Bar chart
+    barSvg = root.append('svg').attr('width', barW).attr('height', barH + 30)
+      .style('display','block').style('margin','0 auto');
+    barG = barSvg.append('g').attr('transform','translate(40,5)');
+    bw = (barW - 80) / (N + 1);
+    bars = barG.selectAll('.coeff-bar').data(d3.range(N+1)).enter()
+      .append('rect').attr('class','coeff-bar')
+      .attr('x', function(d){ return d * bw; })
+      .attr('width', bw - 2).attr('fill', function(d){ return d === n ? CR : CW; })
+      .attr('opacity', function(d){ return d === n ? 0.9 : 0.5; });
+    barLabels = barG.selectAll('.coeff-label').data(d3.range(N+1)).enter()
+      .append('text').attr('class','coeff-label')
+      .attr('x', function(d){ return d * bw + (bw-2)/2; })
+      .attr('text-anchor','middle')
+      .style('font-size','10px').style('fill','#666').style('font-family',"'EB Garamond', serif");
+    barG.selectAll('.k-label').data(d3.range(N+1)).enter()
+      .append('text').attr('class','k-label')
+      .attr('x', function(d){ return d * bw + (bw-2)/2; })
+      .attr('text-anchor','middle')
+      .style('font-size','11px').style('fill','#333').style('font-family',"'EB Garamond', serif")
+      .text(function(d){ return d; });
+    barSvg.append('text').attr('x', barW/2).attr('y', barH + 26)
+      .attr('text-anchor','middle')
+      .style('font-size','12px').style('fill','#666').style('font-family',"'EB Garamond', serif")
+      .text('degree k');
+    dynLabel = barSvg.append('text').attr('x', barW - 10).attr('y', 16)
+      .attr('text-anchor','end')
+      .style('font-size','11px').style('fill','#999').style('font-family',"'EB Garamond', serif");
 
-  barSvg.append('text').attr('x', barW/2).attr('y', barH + 26)
-    .attr('text-anchor','middle')
-    .style('font-size','12px').style('fill','#666').style('font-family',"'EB Garamond', serif")
-    .text('degree k');
-
-  var dynLabel = barSvg.append('text').attr('x', barW - 10).attr('y', 16)
-    .attr('text-anchor','end')
-    .style('font-size','11px').style('fill','#999').style('font-family',"'EB Garamond', serif");
+    update();
+  }
 
   function update() {
     var rPx = r * pxPerUnit;
     contour.attr('r', rPx);
-
-    // FFT sample points
     dots.attr('cx', function(d){ return toX(r * Math.cos(2*Math.PI*d/nFFT)); })
         .attr('cy', function(d){ return toY(r * Math.sin(2*Math.PI*d/nFFT)); });
+    rLabel.attr('x', toX(r) + 6).attr('y', cy - 4).text('r = ' + r.toFixed(2));
+    rStarLabel.attr('x', toX(rOpt) + 4).attr('y', cy + 24).text('r* = ' + rOpt.toFixed(2));
 
-    // r label on the circle
-    rLabel.attr('x', toX(r) + 6).attr('y', cy - 4)
-      .text('r = ' + r.toFixed(2));
-
-    // r* tick mark
-    var rOptPx = toX(rOpt);
-    rStarLabel.attr('x', rOptPx + 4).attr('y', cy + 24)
-      .text('r* = ' + rOpt.toFixed(2));
-
-    // Update bar chart
     var c = coeffs(r);
     var maxC = Math.max.apply(null, c);
     var barMax = barH - 10;
-
     bars.attr('y', function(d){ return barMax - (c[d]/maxC) * barMax + 5; })
         .attr('height', function(d){ return (c[d]/maxC) * barMax; });
-
     barLabels.attr('y', function(d){ return barMax - (c[d]/maxC) * barMax; })
       .text(function(d){ var v = c[d]/maxC; return v > 0.05 ? v.toFixed(2) : ''; });
-
-    // k axis
     barG.selectAll('.k-label').attr('y', barMax + 16);
-
-    // Dynamic range
     var dynRange = maxC / Math.max(c[n], 1e-300);
     dynLabel.text('max/câ‚™ = ' + (dynRange < 100 ? dynRange.toFixed(1) : dynRange.toExponential(1)));
   }
 
-  // Drag on the contour circle to change r
-  var dragR = d3.drag().on('drag', function(event) {
-    var dx = event.x - toX(0), dy = event.y - cy;
-    r = Math.max(0.05, Math.sqrt(dx*dx + dy*dy) / pxPerUnit);
-    update();
-  });
-  contour.call(dragR).style('cursor','ew-resize');
-
-  // Also add an invisible larger drag target
-  svg.append('circle').attr('cx',toX(0)).attr('cy',cy)
-    .attr('r', W/2).attr('fill','transparent').attr('pointer-events','all')
-    .style('cursor','ew-resize')
-    .call(d3.drag().on('drag', function(event) {
-      var dx = event.x - toX(0), dy = event.y - cy;
-      r = Math.max(0.05, Math.sqrt(dx*dx + dy*dy) / pxPerUnit);
-      update();
-    }));
-
-  update();
+  build();
 })();
 </script>
 
