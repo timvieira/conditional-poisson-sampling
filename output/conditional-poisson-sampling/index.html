@@ -1946,7 +1946,8 @@ article { counter-reset: sidenote-counter; }
     return th.map(function(t){return Math.exp(t);});
   }
 
-  function getMaxW(){ return Math.max.apply(null, w); }
+  var WMAX = 3;
+  function getMaxW(){ return WMAX; }
 
   var root=d3.select('#cps');
   var wSvgs=[], wFills=[], wLabels=[];
@@ -2016,8 +2017,8 @@ article { counter-reset: sidenote-counter; }
     for(var i=0;i<N;i++){
       (function(idx){
         var td = wb.append('td').attr('class','bar-td');
-        var b = makeBar(td, w[idx], getMaxW(), CW, true, function(frac){
-          w[idx] = Math.max(0.01, frac * getMaxW());
+        var b = makeBar(td, w[idx], WMAX, CW, true, function(frac){
+          w[idx] = Math.max(0.01, frac * WMAX);
           pi = getPi(w);
           update();
         });
@@ -2153,9 +2154,8 @@ svg text { font-family: 'EB Garamond', serif; }
 <script>
 (function() {
   var N = 4, n = 2;
-  var w = [0.2, 0.35, 0.15, 0.3];
-  function normW() { var s=w.reduce(function(a,b){return a+b;},0); w=w.map(function(v){return v/s;}); }
-  normW();
+  var w = [0.5, 1.2, 0.3, 1.0];
+  var WMAX = 3;
 
   var CW = '#5b9bd5', CR = '#c0504d', CI = '#d4a24e'; // blue, red, input gold
   var root = d3.select('#tw');
@@ -2246,14 +2246,11 @@ svg text { font-family: 'EB Garamond', serif; }
         N = N + 1;
         lastAction = 'add';
       } else {
-        var removed = w.pop();
+        w.pop();
         N = N - 1;
-        var s = w.reduce(function(a,b){return a+b;}, 0);
-        if (s > 0) w = w.map(function(v) { return v / s; });
         lastAction = 'remove';
       }
       n = Math.min(n, N);
-      normW();
       buildInner();
       if (N !== target) {
         setTimeout(step, dur);
@@ -2560,7 +2557,7 @@ svg text { font-family: 'EB Garamond', serif; }
           .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
 
         // Fill
-        var frac = Math.min(w[idx], 1);
+        var frac = Math.min(w[idx] / WMAX, 1);
         var sf = sg.append('rect')
           .attr('x', barX + 2).attr('width', bW - 4).attr('rx', 1)
           .attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH)
@@ -2587,18 +2584,7 @@ svg text { font-family: 'EB Garamond', serif; }
           .style('touch-action', 'none')
           .call(d3.drag().on('drag', function(event) {
             var frac = (sliderTop + sliderH - event.y) / sliderH;
-            var target = Math.max(0.01, Math.min(0.99, frac));
-            var others = 0;
-            for (var k = 0; k < N; k++) if (k !== idx) others += w[k];
-            var remain = 1 - target;
-            if (others > 1e-10 && remain > 0) {
-              var scale = remain / others;
-              for (var k = 0; k < N; k++) {
-                if (k === idx) w[k] = target;
-                else w[k] = Math.max(0.001, w[k] * scale);
-              }
-            }
-            normW();
+            w[idx] = Math.max(0.01, Math.min(WMAX, frac * WMAX));
             updateTree();
           }));
       })(idx);
@@ -2649,7 +2635,7 @@ svg text { font-family: 'EB Garamond', serif; }
 
     // Update sliders
     for (var i = 0; i < N; i++) {
-      var frac = Math.min(w[i], 1);
+      var frac = Math.min(w[i] / WMAX, 1);
       sliderFills[i].attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH);
       sliderLabels[i].attr('y', sliderTop + sliderH - frac * sliderH - 2).text(w[i].toFixed(2));
     }
@@ -2719,9 +2705,8 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
 <script>
 (function() {
   var N = 4, n = 2;
-  var w = [0.2, 0.35, 0.15, 0.3];
-  function normW() { var s=w.reduce(function(a,b){return a+b;},0); w=w.map(function(v){return v/s;}); }
-  normW();
+  var w = [0.5, 1.2, 0.3, 1.0];
+  var WMAX = 3;
 
   var CW = '#5b9bd5', CR = '#c0504d', CI = '#d4a24e', CA = '#7b2d8e'; // blue, red, gold, purple for adjoints
   var root = d3.select('#bp');
@@ -2847,7 +2832,7 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
         var v = Math.max(2, Math.round(+this.value));
         if (v === N) return;
         while (w.length < v) w.push(0.5 + Math.random());
-        w = w.slice(0, v); N = v; n = Math.min(n, N); normW(); build();
+        w = w.slice(0, v); N = v; n = Math.min(n, N); build();
       });
     ctrl.append('span').html('&ensp;$n$ = ');
     ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n)
@@ -3095,7 +3080,7 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
           .attr('width', bW - 2).attr('height', sliderH)
           .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
 
-        var frac = Math.min(w[idx], 1);
+        var frac = Math.min(w[idx] / WMAX, 1);
         var sf = sg.append('rect')
           .attr('x', barX + 2).attr('width', bW - 4).attr('rx', 1)
           .attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH)
@@ -3118,18 +3103,7 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
           .style('touch-action', 'none')
           .call(d3.drag().on('drag', function(event) {
             var fr = (sliderTop + sliderH - event.y) / sliderH;
-            var target = Math.max(0.01, Math.min(0.99, fr));
-            var others = 0;
-            for (var k = 0; k < N; k++) if (k !== idx) others += w[k];
-            var remain = 1 - target;
-            if (others > 1e-10 && remain > 0) {
-              var scale = remain / others;
-              for (var k = 0; k < N; k++) {
-                if (k === idx) w[k] = target;
-                else w[k] = Math.max(0.001, w[k] * scale);
-              }
-            }
-            normW();
+            w[idx] = Math.max(0.01, Math.min(WMAX, fr * WMAX));
             updateBP();
           }));
       })(idx);
