@@ -2007,15 +2007,15 @@ article { counter-reset: sidenote-counter; }
     cg.append('col').style('width', '55px');
     var tbody = tbl.append('tbody');
 
-    // --- Weights header ---
+    // --- Weight labels ---
     var wh = tbody.append('tr');
-    wh.append('td').attr('class','rl').text('weights');
-    for(var i=0;i<N;i++) wh.append('td').attr('class','ic').style('color',CW).html('$w_'+(i+1)+'$');
+    wh.append('td').attr('class','rl');
+    for(var i=0;i<N;i++) wh.append('td').attr('class','ic').style('color',CI).html('$w_'+(i+1)+'$');
     wh.append('td').attr('class','pc');
 
     // --- Weight bars ---
     var wb = tbody.append('tr');
-    wb.append('td').attr('class','rl').style('font-size','0.7em').style('color','#999').html('drag to adjust');
+    wb.append('td').attr('class','rl');
     for(var i=0;i<N;i++){
       (function(idx){
         var td = wb.append('td').attr('class','bar-td');
@@ -2039,7 +2039,7 @@ article { counter-reset: sidenote-counter; }
       var tdata = getTable(w);
       var sh = tbody.append('tr');
       sh.append('td').attr('class','rl').style('text-align','right').html('Subset $S$');
-      for(var j=0;j<N;j++) sh.append('td').attr('class','ic').text(j+1);
+      for(var j=0;j<N;j++) sh.append('td').attr('class','ic');
       sh.append('td').attr('class','pc').style('text-align','left').html('$P(S)$');
 
       // --- Subset rows ---
