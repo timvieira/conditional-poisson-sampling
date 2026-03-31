@@ -1257,8 +1257,6 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
     var g = svg.append('g')
       .attr('class', 'split-overlay')
       .attr('transform', 'translate(' + (cx - totalW / 2) + ',' + cy + ')')
-      .attr('opacity', 0);
-
     g.append('rect')
       .attr('x', -6).attr('y', -4)
       .attr('width', totalW + 12).attr('height', barH + 22)
@@ -1288,8 +1286,6 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         .style('font-weight', isSampled ? 'bold' : 'normal')
         .text(jj);
     }
-
-    g.transition().duration(200).attr('opacity', 1);
   }
 
   function clearOverlay() {
