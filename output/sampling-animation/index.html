@@ -1109,7 +1109,8 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
         if (pn.id === nd.id) isAnimChild = true;
       });
       if (isAnimChild) return;
-      if (animState.done && nd.leaf) return;
+      // Skip decided leaves — they show checkmarks, not balls
+      if (nd.leaf && isNodeDecided(nd)) return;
       drawStaticBalls(nd, q);
     });
 
