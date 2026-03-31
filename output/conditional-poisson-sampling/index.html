@@ -2040,7 +2040,7 @@ article { counter-reset: sidenote-counter; }
       var sh = tbody.append('tr');
       sh.append('td').attr('class','rl').style('text-align','right').html('Subset $S$');
       for(var j=0;j<N;j++) sh.append('td').attr('class','ic');
-      sh.append('td').attr('class','pc').style('text-align','left').html('$P(S)$');
+      sh.append('td').attr('class','pc').style('text-align','left').style('color',CW).html('$P(S)$');
 
       // --- Subset rows ---
       tdata.forEach(function(r){
@@ -2066,7 +2066,7 @@ article { counter-reset: sidenote-counter; }
 
     // --- Pi header ---
     var ph = tbody.append('tr');
-    ph.append('td').attr('class','rl').style('font-weight','bold').html('inclusion prob.');
+    ph.append('td').attr('class','rl').style('color',CP).html('inclusion prob.');
     for(var i=0;i<N;i++) ph.append('td').attr('class','ic').style('color',CP).style('font-weight','bold').html('$\\pi_'+(i+1)+'$');
     ph.append('td').attr('class','pc');
 
