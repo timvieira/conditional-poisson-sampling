@@ -1943,7 +1943,9 @@ article { counter-reset: sidenote-counter; }
         s*=0.5;
       }
     }
-    return th.map(function(t){return Math.exp(t);});
+    // Center log-weights so geometric mean = 1 (scale-invariant, keeps values moderate)
+    var mean = th.reduce(function(a,b){return a+b;},0) / th.length;
+    return th.map(function(t){return Math.exp(t - mean);});
   }
 
   var WMAX = 3;
@@ -2078,6 +2080,7 @@ article { counter-reset: sidenote-counter; }
           // Set this pi as target, solve for w
           pi[idx] = Math.max(0.02, Math.min(0.98, frac));
           w = fit(pi);
+          WMAX = Math.max(3, Math.max.apply(null, w) * 1.2);
           pi = getPi(w);
           update();
         });
