@@ -2242,7 +2242,7 @@ svg text { font-family: 'EB Garamond', serif; }
     function step() {
       if (N === target) { animating = false; return; }
       if (target > N) {
-        w.push(0);
+        w.push(0.5 + Math.random());
         N = N + 1;
         lastAction = 'add';
       } else {
@@ -3181,7 +3181,7 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
 
     // Update sliders
     for (var i = 0; i < N; i++) {
-      var frac = Math.min(w[i], 1);
+      var frac = Math.min(w[i] / WMAX, 1);
       sliderFills[i].attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH);
       sliderLabels[i].attr('y', sliderTop + sliderH - frac * sliderH - 2).text(w[i].toFixed(2));
     }
