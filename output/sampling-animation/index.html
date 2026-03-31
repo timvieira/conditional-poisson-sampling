@@ -126,6 +126,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   var animState = null;
   var uniforms = {};      // pre-drawn U[0,1] per node id — common random numbers
   var history = [];       // stack of snapshots for back-stepping
+  var prevRun = null;     // saved state from previous run (for undo past reset)
   var animating = false;  // true while ball animation is in flight
   var playing = false;
   var playTimer = null;
@@ -704,6 +705,15 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 
   // ── State ──
   function resetAnimState(keepUniforms) {
+    // Save current run so Back can restore it
+    if (animState && (history.length > 0 || animState.done)) {
+      prevRun = {
+        animState: snapshot(),
+        history: history.slice(),
+        uniforms: Object.assign({}, uniforms),
+        queueIdx: queueIdx
+      };
+    }
     animState = {
       level: -1,
       quotas: {},
@@ -744,7 +754,7 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   }
 
   function updateButtons() {
-    d3.select('#btn-back').property('disabled', history.length === 0 || animating);
+    d3.select('#btn-back').property('disabled', (history.length === 0 && !prevRun) || animating);
 
     var stepBtn = d3.select('#btn-step');
     if (animState.done) {
@@ -1029,8 +1039,23 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
   }
 
   function doBack() {
-    if (history.length === 0 || animating) return;
+    if (animating) return;
     stopPlaying();
+
+    if (history.length === 0 && prevRun) {
+      // Restore previous run
+      restoreSnapshot(prevRun.animState);
+      history = prevRun.history;
+      uniforms = prevRun.uniforms;
+      queueIdx = prevRun.queueIdx;
+      prevRun = null;
+      renderState();
+      updateStatusBar();
+      showCurrentOverlay();
+      return;
+    }
+
+    if (history.length === 0) return;
     restoreSnapshot(history.pop());
     // Rewind queue index: find first unprocessed node
     queueIdx = 0;
