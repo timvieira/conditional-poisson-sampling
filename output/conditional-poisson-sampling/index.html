@@ -2410,15 +2410,13 @@ svg text { font-family: 'EB Garamond', serif; }
       });
     }
 
-    // --- Draw histograms for all nodes (per-node max scaling) ---
+    // --- Draw histograms for all nodes (log scale, fixed reference) ---
+    var logMax = Math.log1p(Math.pow(WMAX, n));
     for (var li = 0; li < levels.length; li++) {
       levels[li].forEach(function(nd) {
         if (nd.pad) { nodeRefs.push(null); return; }
         var coeffs = nd.poly;
         var nCoeffs = Math.min(coeffs.length, n + 1);
-        var nodeMax = 0;
-        for (var k = 0; k < nCoeffs; k++) { if (Math.abs(coeffs[k]) > nodeMax) nodeMax = Math.abs(coeffs[k]); }
-        if (nodeMax === 0) nodeMax = 1;
         var boxW = nCoeffs * (bW + bGap) - bGap + nodePad;
         var gx = nd.x - boxW/2;
         // Only the leaf itself is "new" — ancestors already existed
@@ -2440,7 +2438,7 @@ svg text { font-family: 'EB Garamond', serif; }
         var cRects = [], cTexts = [];
         for (var k = 0; k < nCoeffs; k++) {
           var bx = nodePad/2 + k * (bW + bGap);
-          var barFrac = Math.min(1, Math.abs(coeffs[k]) / nodeMax);
+          var barFrac = Math.min(1, Math.log1p(Math.abs(coeffs[k])) / logMax);
           var barPx = Math.max(0.5, barFrac * bH);
           var isHighlight = (li === levels.length - 1 && k === n);
           var col = isHighlight ? CR : CW;
@@ -2637,7 +2635,8 @@ svg text { font-family: 'EB Garamond', serif; }
     var newTree = buildTree(w, n);
     var newLevels = newTree.levels;
 
-    // Update histograms (per-node max so sibling subtrees stay visually stable)
+    // Update histograms (log scale, fixed reference)
+    var logMax = Math.log1p(Math.pow(WMAX, n));
     var ri = 0;
     for (var li = 0; li < newLevels.length; li++) {
       for (var ni = 0; ni < newLevels[li].length; ni++) {
@@ -2645,11 +2644,8 @@ svg text { font-family: 'EB Garamond', serif; }
         if (!ref) continue;
         var coeffs = newLevels[li][ni].poly;
         var nCoeffs = ref.nCoeffs;
-        var nodeMax = 0;
-        for (var k = 0; k < nCoeffs; k++) { if (Math.abs(coeffs[k]) > nodeMax) nodeMax = Math.abs(coeffs[k]); }
-        if (nodeMax === 0) nodeMax = 1;
         for (var k = 0; k < nCoeffs; k++) {
-          var barFrac = Math.min(1, Math.abs(coeffs[k]) / nodeMax);
+          var barFrac = Math.min(1, Math.log1p(Math.abs(coeffs[k])) / logMax);
           var barPx = Math.max(1, barFrac * bH);
           ref.cellRects[k].attr('y', nodePad/2 + bH - barPx).attr('height', barPx);
           if (ref.cellTexts[k]) {
@@ -2933,7 +2929,9 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
       });
     }
 
-    // Draw primal + dual bars at each node (per-node max scaling)
+    // Draw primal + dual bars at each node (log scale, fixed reference)
+    var logMaxFwd = Math.log1p(Math.pow(WMAX, n));
+    var logMaxAdj = Math.log1p(1); // adjoints are O(1/Z), start conservative
     for (var li = 0; li < levels.length; li++) {
       levels[li].forEach(function(nd, ni) {
         if (nd.pad) { nodeRefs.push(null); return; }
@@ -2941,13 +2939,6 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
         var coeffs = nd.poly;
         var nCoeffs = Math.min(Math.max(coeffs.length, adj.length), n + 1);
         if (nCoeffs === 0) { nodeRefs.push(null); return; }
-        var nodeMaxFwd = 0, nodeMaxAdj = 0;
-        for (var k = 0; k < nCoeffs; k++) {
-          if (k < coeffs.length && Math.abs(coeffs[k]) > nodeMaxFwd) nodeMaxFwd = Math.abs(coeffs[k]);
-          if (k < adj.length && Math.abs(adj[k]) > nodeMaxAdj) nodeMaxAdj = Math.abs(adj[k]);
-        }
-        if (nodeMaxFwd === 0) nodeMaxFwd = 1;
-        if (nodeMaxAdj === 0) nodeMaxAdj = 1;
         var boxW = nCoeffs * (bW + bGap) - bGap + nodePad;
         var boxH = halfH * 2 + divider + nodePad;
         var gx = nd.x - boxW/2;
@@ -2973,7 +2964,7 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
 
           // --- Primal (forward) bar ---
           var fVal = k < coeffs.length ? coeffs[k] : 0;
-          var fFrac = Math.min(1, Math.abs(fVal) / nodeMaxFwd);
+          var fFrac = Math.min(1, Math.log1p(Math.abs(fVal)) / logMaxFwd);
           var fPx = Math.max(0.5, fFrac * halfH);
           var fCol = isHighlight ? CR : CW;
 
@@ -2995,7 +2986,7 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
 
           // --- Dual (adjoint) bar ---
           var aVal = k < adj.length ? adj[k] : 0;
-          var aFrac = Math.min(1, Math.abs(aVal) / nodeMaxAdj);
+          var aFrac = Math.min(1, Math.log1p(Math.abs(aVal)) / logMaxAdj);
           var aPx = Math.max(0.5, aFrac * halfH);
           var isSeed = isRoot && k === n;
           var aCol = isSeed ? CR : CA;
@@ -3172,10 +3163,12 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
     var Z = backprop(newTree, n);
     var newLevels = newTree.levels;
 
+    var logMaxFwd = Math.log1p(Math.pow(WMAX, n));
+    var logMaxAdj = Math.log1p(1);
     var fwdTop = nodePad/2;
     var adjTop = nodePad/2 + halfH + divider;
 
-    // Update node bars (per-node max so sibling subtrees stay visually stable)
+    // Update node bars (log scale, fixed reference)
     var ri = 0;
     for (var li = 0; li < newLevels.length; li++) {
       for (var ni = 0; ni < newLevels[li].length; ni++) {
@@ -3185,24 +3178,17 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
         var coeffs = nd.poly;
         var adj = nd.adj || [];
         var nCoeffs = ref.nCoeffs;
-        var nodeMaxFwd = 0, nodeMaxAdj = 0;
-        for (var k = 0; k < nCoeffs; k++) {
-          if (k < coeffs.length && Math.abs(coeffs[k]) > nodeMaxFwd) nodeMaxFwd = Math.abs(coeffs[k]);
-          if (k < adj.length && Math.abs(adj[k]) > nodeMaxAdj) nodeMaxAdj = Math.abs(adj[k]);
-        }
-        if (nodeMaxFwd === 0) nodeMaxFwd = 1;
-        if (nodeMaxAdj === 0) nodeMaxAdj = 1;
         for (var k = 0; k < nCoeffs; k++) {
           // Primal
           var fVal = k < coeffs.length ? coeffs[k] : 0;
-          var fFrac = Math.min(1, Math.abs(fVal) / nodeMaxFwd);
+          var fFrac = Math.min(1, Math.log1p(Math.abs(fVal)) / logMaxFwd);
           var fPx = Math.max(1, fFrac * halfH);
           ref.fwdRects[k].attr('y', fwdTop + halfH - fPx).attr('height', fPx);
           ref.fwdTexts[k].attr('y', fwdTop + halfH - fPx - 3).text(fmtAdj(fVal));
 
           // Dual
           var aVal = k < adj.length ? adj[k] : 0;
-          var aFrac = Math.min(1, Math.abs(aVal) / nodeMaxAdj);
+          var aFrac = Math.min(1, Math.log1p(Math.abs(aVal)) / logMaxAdj);
           var aPx = Math.max(1, aFrac * halfH);
           ref.adjRects[k].attr('y', adjTop + halfH - aPx).attr('height', aPx);
           ref.adjTexts[k].attr('y', adjTop + halfH - aPx - 3).text(fmtAdj(aVal));
