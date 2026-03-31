@@ -342,9 +342,9 @@ At the leaves, quota 1 = selected, quota 0 = excluded.
 
         var sg = svg.append('g').attr('class', 'weight-slider');
 
-        // Label above
+        // Label below
         sg.append('text')
-          .attr('x', nd.x).attr('y', sy - 2)
+          .attr('x', nd.x).attr('y', sy + sliderH + 10)
           .attr('text-anchor', 'middle')
           .style('font-size', '9px').style('fill', CI)
           .text('w' + subscript(idx + 1));
