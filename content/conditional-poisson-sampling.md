@@ -3050,7 +3050,7 @@ A common use case: you know the inclusion probabilities you *want* and need to f
 **Objective.**  Given target inclusion probabilities $\bpiptgt$, we find weights $\bw$ (equivalently, log-weights $\btheta$ where $\theta_i = \log \w_i$) by maximizing
 
 $$
-L(\btheta) \defeq \bpiptgt^{\top} \btheta - \log \Zw{\bw}{n}
+\ell(\btheta) \defeq \bpiptgt^{\top} \btheta - \log \Zw{\bw}{n}
 $$
 
 This is concave, so any local maximum is global.
@@ -3058,7 +3058,7 @@ This is concave, so any local maximum is global.
 <details class="derivation">
 <summary>Why this objective?</summary>
 
-Maximizing $L(\btheta)$ is the dual of the maximum-entropy problem: find the distribution over size-$n$ subsets with maximum entropy subject to prescribed inclusion probabilities.
+Maximizing $\ell(\btheta)$ is the dual of the maximum-entropy problem: find the distribution over size-$n$ subsets with maximum entropy subject to prescribed inclusion probabilities.
 
 $$
 \max_{\Ps \in \triangle^{\binom{\mathcal{S}}{n}}} H(\Ps) \quad \text{subject to} \quad \mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \piptgt_i \;\; \text{for } 1 \le i \le N
@@ -3096,11 +3096,11 @@ $$
 \end{align}
 $$
 
-The dual problem minimizes $\mathcal{L}$ over $\btheta$, which is equivalent to maximizing $L(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $\Ps$ and the primal is feasible (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$).
+The dual problem minimizes $\mathcal{L}$ over $\btheta$, which is equivalent to maximizing $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $\Ps$ and the primal is feasible (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$).
 
 </details>
 
-**Gradient.**  $\nabla_{\btheta} L(\btheta) = \bpiptgt - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpiptgt$ exactly, so the gradient is zero.  Each evaluation of $L$ and $\nabla L$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
+**Gradient.**  $\nabla_{\btheta} \ell(\btheta) = \bpiptgt - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpiptgt$ exactly, so the gradient is zero.  Each evaluation of $\ell$ and $\nabla \ell$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
 
 **Optimizer.**  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The [Poisson approximation](#The-Poisson-Approximation) provides a warm start: $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.
 
