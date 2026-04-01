@@ -4807,7 +4807,7 @@ Drag the weight sliders to change $w_i$ and see how the split distributions upda
 <p><strong>Inverting the approximation.</strong>  Since $p_i = \w_i r/(1+\w_i r)$, we can invert: $\w_i = p_i / (r(1 - p_i))$, giving $\theta_i = \log \w_i = \log(p_i/(1-p_i)) - \log r$.  If we want inclusion probabilities $\bpip^*$ and treat $\pip^*_i \approx p_i$, the initialization $\theta_i^{(0)} = \log(\pip^*_i / (1 - \pip^*_i))$ (i.e., the logit of the target) is off by at most $\mathcal{O}(1/N)$—a good warm start for the <a href="#Fitting-Weights-to-Target-Probabilities">fitting</a> optimizer.</p>
 <h2 id="fitting-weights-to-target-probabilities">Fitting Weights to Target Probabilities</h2>
 <p>A common use case: you know the inclusion probabilities you <em>want</em> and need to find weights that produce them.<a href="test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a></p>
-<p><strong>Objective.</strong>  The log-probability of a subset is $\log P(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$, where $\theta_i \defeq \log \w_i$.  We maximize</p>
+<p><strong>Objective.</strong>  We maximize</p>
 <p>$$
 L(\btheta) \defeq \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
 $$</p>
