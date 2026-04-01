@@ -3032,7 +3032,7 @@ The actual inclusion probabilities are close but not identical—conditioning on
 
 </div>
 
-**Hájek's approximation.**  [Hájek (1964, Theorem 5.2)](https://doi.org/10.1214/aoms/1177700375) showed that the conditional inclusion probabilities satisfy
+<a id="Hájek's-approximation"></a>**Hájek's approximation.**  [Hájek (1964, Theorem 5.2)](https://doi.org/10.1214/aoms/1177700375) showed that the conditional inclusion probabilities satisfy
 
 $$\pip_i = p_i + \mathcal{O}(1/N)$$
 
