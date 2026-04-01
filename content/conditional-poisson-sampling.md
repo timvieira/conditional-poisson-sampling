@@ -3061,7 +3061,13 @@ $$
 \mathcal{L}(P, \btheta) = H(P) + \sum_i \theta_i \big(\mathbb{E}_P[\mathbf{1}[i \in S]] - \pip^*_i\big)
 $$
 
-Maximizing over $P$ for fixed $\btheta$ gives the exponential-family form $P^*(S) = \exp\!\big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\big)$, where $\w_i = e^{\theta_i}$—this is precisely the conditional Poisson distribution.  Substituting back yields the dual objective:
+Maximizing over $P$ for fixed $\btheta$ gives the exponential-family form
+
+$$
+P^*(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
+$$
+
+where $\w_i = e^{\theta_i}$—this is precisely the conditional Poisson distribution.  Substituting back yields the dual objective:
 
 $$
 L(\btheta) = H(P^*) + \sum_i \theta_i (\pip_i(\btheta) - \pip^*_i) = \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
