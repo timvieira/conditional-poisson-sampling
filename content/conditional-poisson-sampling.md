@@ -3073,7 +3073,7 @@ $$
 P(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
 $$
 
-where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n}$ is the normalizing constant—this is precisely the conditional Poisson distribution.  Substituting $P$ back into $\mathcal{L}$:
+where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n}$ is the normalizing constant—this is precisely the conditional Poisson distribution.  Substituting $P$ back into $\mathcal{L}$ gives the dual objective $L(\btheta) \defeq \max_P \mathcal{L}(P, \btheta) = \mathcal{L}(P(\btheta), \btheta)$:
 
 $$
 L(\btheta) = H(P) + \sum_i \theta_i \big(\pip_i(\btheta) - \pip^*_i\big)
