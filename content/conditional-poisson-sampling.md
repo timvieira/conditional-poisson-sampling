@@ -3044,7 +3044,7 @@ We conjecture<a href="test_identities.py#test_poisson_approximation_bound" title
 
 A common use case: you know the inclusion probabilities you *want* and need to find weights that produce them.<a href="test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a>
 
-**Objective.**  The log-probability of a subset is $\log P(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$, where $\theta_i \defeq \log \w_i$.  We maximize
+**Objective.**  We maximize
 
 $$
 L(\btheta) \defeq \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
