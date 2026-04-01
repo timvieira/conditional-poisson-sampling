@@ -329,15 +329,17 @@ small { font-size: smaller; }
 
 ## The Polynomial Product Tree
 
-The key idea is to encode the sum over all $\binom{N}{n}$ subsets as the coefficient of $\z^n$ in a product of polynomials:
+The key idea is that $\Zw{\bw}{n}$ is hiding inside a product of polynomials:
 
 $$
 (1 + \w_1 \z)(1 + \w_2 \z) \cdots (1 + \w_N \z) = \sum_{k=0}^{N} \Zw{\bw}{k}\, \z^k
 $$
 
-The $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the *subproduct tree* (see [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065), Chapter 10).
+**Why does this work?** When you expand the product, each factor $(1 + \w_i \z)$ contributes either $1$ (item $i$ excluded) or $\w_i \z$ (item $i$ included).  A single term in the expansion picks one choice per factor, giving $\prod_{i \in S} \w_i \cdot \z^{|S|}$ for some subset $S$.  The exponent of $\z$ counts how many items were included.  Summing over all $2^N$ terms and collecting by powers of $\z$, the coefficient of $\z^k$ is exactly $\sum_{|S|=k} \prod_{i \in S} \w_i = \Zw{\bw}{k}$.
 
-**Polynomials as arrays.** A polynomial, such as $1 + 3\z + 2\z^2$, is basically just a weird encoding of an array: `[1, 3, 2]`.  The $\z$ is a *formal* variable—we never substitute a number into it.  It is pure bookkeeping that gives the array a notion of *multiplication* (convolution) that predates computers by centuries.  Euler, Cauchy, and their contemporaries used generating functions to manipulate sequences long before anyone had a term for "data structure."  Multiplying two polynomials is convolution of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving `[1, 2]` with `[1, 3]` to get `[1, 5, 6]`.  It turns out that convolution can be done efficiently using the fast Fourier transform (FFT), costing $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.
+So the $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the *subproduct tree* (see [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065), Chapter 10).
+
+**Polynomials as arrays.** A polynomial, such as $1 + 3\z + 2\z^2$, is just an array of coefficients: `[1, 3, 2]`.  The $\z$ is a *formal* variable—we never substitute a number into it.  It is pure bookkeeping that gives the array a notion of *multiplication* (convolution).  Multiplying two polynomials is convolution of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving `[1, 2]` with `[1, 3]` to get `[1, 5, 6]`.  It turns out that convolution can be done efficiently using the fast Fourier transform (FFT), costing $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.
 
 **Notation.** We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.
 
