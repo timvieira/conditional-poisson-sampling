@@ -3064,16 +3064,16 @@ $$
 Maximizing over $P$ for fixed $\btheta$ gives the exponential-family form
 
 $$
-P^*(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
+P(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
 $$
 
 where $\w_i = e^{\theta_i}$—this is precisely the conditional Poisson distribution.  Substituting back yields the dual objective:
 
 $$
-L(\btheta) = H(P^*) + \sum_i \theta_i (\pip_i(\btheta) - \pip^*_i) = \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
+L(\btheta) = H(P) + \sum_i \theta_i (\pip_i(\btheta) - \pip^*_i) = \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
 $$
 
-where the second equality uses $H(P^*) = \log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta$ (the standard entropy-of-an-exponential-family identity).  $L$ is concave, so any local maximum is global.  Strong duality holds because the marginal constraints are affine in $P$ and the primal is feasible (whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
+where the second equality uses $H(P) = \log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta$ (the standard entropy-of-an-exponential-family identity).  $L$ is concave, so any local maximum is global.  Strong duality holds because the marginal constraints are affine in $P$ and the primal is feasible (whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
 
 </details>
 
