@@ -4828,7 +4828,7 @@ $$
 L(\btheta) = H(P^*) + \sum_i \theta_i (\pip_i(\btheta) - \pip^*_i) = \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
 $$
 
-where the second equality uses $H(P^*) = \log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta$ (the standard entropy-of-an-exponential-family identity).  Since $\log \Zw{\bw}{n}$ is strictly convex as a log-partition function of a minimal exponential family, $L$ is strictly concave, so any maximizer is the unique global maximum.  Strong duality holds because Slater's condition is satisfied (there exists a feasible interior point whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
+where the second equality uses $H(P^*) = \log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta$ (the standard entropy-of-an-exponential-family identity).  Since $\log \Zw{\bw}{n}$ is strictly convex as a log-partition function of a minimal exponential family, $L$ is strictly concave, so any maximizer is the unique global maximum.  Strong duality holds because the marginal constraints are affine in $P$ and the primal is feasible (a feasible $P$ exists whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
 
 </details>
 
