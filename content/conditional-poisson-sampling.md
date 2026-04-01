@@ -10,6 +10,7 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 \newcommand{\Z}{Z}
 \newcommand{\Zw}[2]{\binom{#1}{#2}}
 \newcommand{\pip}{\pi}
+\newcommand{\Ps}{p}
 \def\btheta{{\boldsymbol{\theta}}}
 \def\bpip{\boldsymbol{\pi}}
 \newcommand{\piptgt}{\widehat{\pip}}
@@ -30,12 +31,12 @@ Suppose you want to draw a random subset of exactly $n$ items from a universe of
 The **conditional Poisson distribution** assigns each size-$n$ subset a probability proportional to the product of its weights:<a href="test_identities.py#test_distribution_definition" title="test_distribution_definition, test_Z_is_elementary_symmetric_poly" class="verified" target="_blank">✓</a>
 
 $$
-P(S) \propto \mathbf{1}\big[ |S| = n\big] \prod_{i \in S} \w_i
+\Ps(S) \propto \mathbf{1}\big[ |S| = n\big] \prod_{i \in S} \w_i
 $$
 
 The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is a weighted generalization of the binomial coefficient, which recovers $\binom{N}{n} = \Zw{\bw}{n}$ when $\bw = \mathbf{1}^N$.<a href="test_identities.py#test_Z_equals_binomial_when_uniform" title="test_Z_equals_binomial_when_uniform" class="verified" target="_blank">✓</a>
 
-**Inclusion probabilities.** The inclusion probability $\pip_i \defeq \sum_{S} P(S)\, \mathbf{1}[i \in S]$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$, as the other items push back through the size constraint $|S| = n$. Later in this article, we provide an interactive widget for exploring the nonlinear relationship between $\bw$ and $\bpip$.
+**Inclusion probabilities.** The inclusion probability $\pip_i \defeq \sum_{S} \Ps(S)\, \mathbf{1}[i \in S]$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$, as the other items push back through the size constraint $|S| = n$. Later in this article, we provide an interactive widget for exploring the nonlinear relationship between $\bw$ and $\bpip$.
 
 **Why is this distribution special?** The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, it is the unique *maximum-entropy* one<a href="test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>—making the fewest assumptions beyond the marginals ([Jaynes, 1957](https://doi.org/10.1103/PhysRev.106.620); [Chen, Dempster & Liu, 1994](https://academic.oup.com/biomet/article-abstract/81/3/457/256956)), in the same sense that the Gaussian is max-entropy for given mean and variance.  The log-normalizer $\log \Zw{\bw}{n}$ is convex in $\btheta$, so many properties follow mechanically: inclusion probabilities are the gradient ($\pip_i = \partial \log \Z / \partial \theta_i$) and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the *exponential fixed-size design* for this reason.
 
@@ -54,12 +55,12 @@ $\quad$ $S \leftarrow \{s_1, \ldots, s_n\}$<br>
 <b>return</b> $S$
 </div>
 
-The resulting distribution over size-$n$ subsets is exactly $P(S)$.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a>
+The resulting distribution over size-$n$ subsets is exactly $\Ps(S)$.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a>
 This rejection sampler is not a practical sampling algorithm;<footnote>The acceptance probability of this construction is $n! \cdot \Zw{\bw}{n} / \W^n$.<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a></footnote>
-it simply establishes what the distribution *is*.  We will derive sampling algorithms that sample from $P(S)$ efficiently.
+it simply establishes what the distribution *is*.  We will derive sampling algorithms that sample from $\Ps(S)$ efficiently.
 
 
-**What this post covers.** The computational challenges are: computing $\Zw{\bw}{n}$ and $P(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim P$, and the inverse problem of finding $\bw$ from target $\bpip$.  This post gives efficient algorithms for all four—in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree.  The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).
+**What this post covers.** The computational challenges are: computing $\Zw{\bw}{n}$ and $\Ps(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim \Ps$, and the inverse problem of finding $\bw$ from target $\bpip$.  This post gives efficient algorithms for all four—in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree.  The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).
 
 **Software.** As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python (or any language outside of R's survey-sampling packages).  Existing R implementations—`UPmaxentropy` in the [sampling](https://cran.r-project.org/web/packages/sampling/) package and the [BalancedSampling](https://cran.r-project.org/web/packages/BalancedSampling/) package—use either rejection sampling or $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I'm aware of.
 
@@ -97,7 +98,7 @@ article { counter-reset: sidenote-counter; }
 
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
-**Interactive explorer.** Drag the weight bars to see how changing $w_i$ affects the subset probabilities $P(S)$ and inclusion probabilities $\pi_i$. Drag the $\pi_i$ bars to solve the inverse problem: find weights that produce given inclusion probabilities. Use the $N$ and $n$ controls to change the problem size.
+**Interactive explorer.** Drag the weight bars to see how changing $w_i$ affects the subset probabilities $\Ps(S)$ and inclusion probabilities $\pi_i$. Drag the $\pi_i$ bars to solve the inverse problem: find weights that produce given inclusion probabilities. Use the $N$ and $n$ controls to change the problem size.
 
 <div id="cps"></div>
 <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -236,7 +237,7 @@ article { counter-reset: sidenote-counter; }
       var sh = tbody.append('tr');
       sh.append('td').attr('class','rl').style('text-align','right').html('Subset $S$');
       for(var j=0;j<N;j++) sh.append('td').attr('class','ic');
-      sh.append('td').attr('class','pc').style('text-align','left').style('color',CW).html('$P(S)$');
+      sh.append('td').attr('class','pc').style('text-align','left').style('color',CW).html('$\Ps(S)$');
 
       // --- Subset rows ---
       tdata.forEach(function(r){
@@ -3046,7 +3047,7 @@ We conjecture<a href="test_identities.py#test_poisson_approximation_bound" title
 
 A common use case: you know the inclusion probabilities you *want* and need to find weights that produce them.<a href="test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a>
 
-**Objective.**  We maximize
+**Objective.**  Given target inclusion probabilities $\bpiptgt$, we find weights $\bw$ (equivalently, log-weights $\btheta$ where $\theta_i = \log \w_i$) by maximizing
 
 $$
 L(\btheta) \defeq \bpiptgt^{\top} \btheta - \log \Zw{\bw}{n}
@@ -3060,42 +3061,42 @@ This is concave, so any local maximum is global.
 Maximizing $L(\btheta)$ is the dual of the maximum-entropy problem: find the distribution over size-$n$ subsets with maximum entropy subject to prescribed inclusion probabilities.
 
 $$
-\max_{P \in \triangle^{\binom{\mathcal{S}}{n}}} H(P) \quad \text{subject to} \quad \mathbb{E}_P[\mathbf{1}[i \in S]] = \piptgt_i \;\; \text{for } 1 \le i \le N
+\max_{\Ps \in \triangle^{\binom{\mathcal{S}}{n}}} H(\Ps) \quad \text{subject to} \quad \mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \piptgt_i \;\; \text{for } 1 \le i \le N
 $$
 
-where $H(P) \defeq -\sum_S P(S) \log P(S)$ is the Shannon entropy.  Write the Lagrangian with multipliers $\theta_i$ for each marginal constraint:
+where $H(\Ps) \defeq -\sum_S \Ps(S) \log \Ps(S)$ is the Shannon entropy.  Write the Lagrangian with multipliers $\theta_i$ for each marginal constraint:
 
 $$
-\mathcal{L}(P, \btheta) = H(P) + \sum_i \theta_i \big(\mathbb{E}_P[\mathbf{1}[i \in S]] - \piptgt_i\big)
+\mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_i \theta_i \big(\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] - \piptgt_i\big)
 $$
 
-Maximizing $\mathcal{L}$ over $P$ for fixed $\btheta$ is a standard calculus-of-variations exercise: set the functional derivative $\delta \mathcal{L}/\delta P(S) = -\log P(S) - 1 + \sum_{i \in S} \theta_i = 0$, giving $P(S) \propto \exp\!\big(\sum_{i \in S} \theta_i\big)$.  Normalizing over size-$n$ subsets:
+Maximizing $\mathcal{L}$ over $\Ps \in \triangle^{\binom{\mathcal{S}}{n}}$ for fixed $\btheta$: the entropy barrier keeps $\Ps$ in the interior, so we set $\partial \mathcal{L}/\partial \Ps(S) = -\log \Ps(S) - 1 + \sum_{i \in S} \theta_i = 0$, giving $\Ps(S) \propto \exp\!\big(\sum_{i \in S} \theta_i\big)$.  Normalizing over size-$n$ subsets:
 
 $$
-P(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
+\Ps(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
 $$
 
-where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n}$ is the normalizing constant—this is precisely the conditional Poisson distribution.  Substituting $P$ back into $\mathcal{L}$ gives $\mathcal{L}(P(\btheta), \btheta) = H(P) + \sum_i \theta_i \big(\pip_i(\btheta) - \piptgt_i\big)$.  The entropy of this exponential-family distribution is
+where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n}$ is the normalizing constant—this is precisely the conditional Poisson distribution.  Substituting $\Ps$ back into $\mathcal{L}$: since $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \pip_i(\btheta)$, we get $\mathcal{L} = H(\Ps) + \sum_i \theta_i \big(\pip_i(\btheta) - \piptgt_i\big)$.  The entropy of this exponential-family distribution is
 
 $$
 \begin{align}
-H(P) &= -\sum_S P(S) \log P(S) \\
-      &= -\sum_S P(S)\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big) \\
+H(\Ps) &= -\sum_S \Ps(S) \log \Ps(S) \\
+      &= -\sum_S \Ps(S)\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big) \\
       &= \log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta
 \end{align}
 $$
 
-Substituting $H(P)$ into $\mathcal{L}$:
+Substituting $H(\Ps)$ into $\mathcal{L}$:
 
 $$
 \begin{align}
-\mathcal{L}(P(\btheta), \btheta)
+\mathcal{L}
 &= \big(\log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta\big) + \bpip(\btheta)^\top \btheta - \bpiptgt^{\top} \btheta \\
 &= \log \Zw{\bw}{n} - \bpiptgt^{\top} \btheta
 \end{align}
 $$
 
-The dual problem is $\min_{\btheta} \mathcal{L}(P(\btheta), \btheta)$, i.e., $\min_{\btheta} \log \Zw{\bw}{n} - \bpiptgt^{\top}\btheta$, which is equivalent to $\max_{\btheta} \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n} = L(\btheta)$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $P$ and the primal is feasible (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$).
+The dual problem is $\min_{\btheta} \mathcal{L}$, i.e., $\min_{\btheta} \log \Zw{\bw}{n} - \bpiptgt^{\top}\btheta$, which is equivalent to $\max_{\btheta} \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n} = L(\btheta)$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $\Ps$ and the primal is feasible (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$).
 
 </details>
 
@@ -3478,10 +3479,10 @@ So far we've built machinery for sampling fixed-size subsets and computing inclu
 
 **Setup.** Suppose you have a distribution $p$ over a universe $\mathcal{S}$ of $N$ items, and a function $f$ that is expensive to evaluate.  You want to estimate $\mu = \sum_i p(i)\, f(i)$ using only $n$ evaluations of $f$.  With i.i.d. Monte Carlo, you'd draw $n$ samples—but some items may repeat, wasting evaluations.
 
-**The estimator.** The **Horvitz-Thompson estimator** ([Horvitz & Thompson, 1952](https://doi.org/10.1080/01621459.1952.10483446)) uses sampling *without* replacement to guarantee $n$ *distinct* evaluations.  Draw a fixed-size subset $S \sim P_n$ using conditional Poisson sampling, then form:
+**The estimator.** The **Horvitz-Thompson estimator** ([Horvitz & Thompson, 1952](https://doi.org/10.1080/01621459.1952.10483446)) uses sampling *without* replacement to guarantee $n$ *distinct* evaluations.  Draw a fixed-size subset $S \sim \Ps_n$ using conditional Poisson sampling, then form:
 
 $$
-\hat{\mu}_{\text{HT}}(S) = \sum_{i \in S} \frac{p(i)}{\pip_i}\, f(i), \quad S \sim P_n
+\hat{\mu}_{\text{HT}}(S) = \sum_{i \in S} \frac{p(i)}{\pip_i}\, f(i), \quad S \sim \Ps_n
 $$
 
 This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.
