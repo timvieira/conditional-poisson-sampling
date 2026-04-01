@@ -2132,7 +2132,7 @@ $$</p>
 <p>The $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the <em>subproduct tree</em> (see <a href="https://doi.org/10.1017/CBO9781139856065">von zur Gathen &amp; Gerhard (2013)</a>, Chapter 10).</p>
 <p><strong>Polynomials as arrays.</strong> Each polynomial is stored as an array of coefficients: <code>[1, 3, 2]</code> represents $1 + 3\z + 2\z^2$.  Multiplying two polynomials is <em>convolution</em> of their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ corresponds to convolving <code>[1, 2]</code> with <code>[1, 3]</code> to get <code>[1, 5, 6]</code>.  Using the fast Fourier transform (FFT), this convolution costs $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.</p>
 <p><strong>Notation.</strong> We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.</p>
-<h3 id="computing-the-normalizing-constant-math98">Computing the Normalizing Constant $\Z$</h3>
+<h3 id="computing-the-normalizing-constant-math101">Computing the Normalizing Constant $\Z$</h3>
 <p>Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.</p>
 <style>
 #content { overflow: visible !important; }
@@ -2677,7 +2677,7 @@ svg text { font-family: 'EB Garamond', serif; }
 <p>$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N), \quad T(1) = \mathcal{O}(1)$$</p>
 <p>which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
 The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be <strong>truncated to degree $n$</strong> without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.</p>
-<h3 id="computing-inclusion-probabilities-math124">Computing Inclusion Probabilities $\bpip$</h3>
+<h3 id="computing-inclusion-probabilities-math127">Computing Inclusion Probabilities $\bpip$</h3>
 <p>The inclusion probability is the gradient of the log-normalizer (an exponential family identity):</p>
 <p>$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$</p>
 <p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running <a href="../evaluating-fx-is-as-fast-as-fx/">backpropagation</a> on the same tree—no new algorithm needed.  By the Baur-Strassen theorem (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">1983</a>), the gradient costs at most a constant factor more than the forward computation.</p>
@@ -4807,12 +4807,36 @@ Drag the weight sliders to change $w_i$ and see how the split distributions upda
 <p><strong>Inverting the approximation.</strong>  Since $p_i = \w_i r/(1+\w_i r)$, we can invert: $\w_i = p_i / (r(1 - p_i))$, giving $\theta_i = \log \w_i = \log(p_i/(1-p_i)) - \log r$.  If we want inclusion probabilities $\bpip^*$ and treat $\pip^*_i \approx p_i$, the initialization $\theta_i^{(0)} = \log(\pip^*_i / (1 - \pip^*_i))$ (i.e., the logit of the target) is off by at most $\mathcal{O}(1/N)$—a good warm start for the <a href="#Fitting-Weights-to-Target-Probabilities">fitting</a> optimizer.</p>
 <h2 id="fitting-weights-to-target-probabilities">Fitting Weights to Target Probabilities</h2>
 <p>A common use case: you know the inclusion probabilities you <em>want</em> and need to find weights that produce them.<a href="test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a></p>
-<p><strong>Objective.</strong><label class="sidenote-number"></label><span class="margin-note">@CLAUDE: the explanation of the objective doesn't make much sense still.  Should the objective be maximize entropy subject to the inclusion probability constraint?  I suppose the objective that we have may be the dual of that (per the usual exponential family duality).<br/><b>claude</b>: Yes, exactly. The primal is: maximize $H(P)$ subject to $\mathbb{E}_P[\mathbf{1}[i \in S]] = \pip^*_i$. The dual (Lagrangian) is $L(\btheta) = \bpip^{*\top}\btheta - \log Z(\btheta)$, where the $\theta_i$ are Lagrange multipliers. This is standard exponential-family duality—maximizing the dual recovers the max-entropy distribution with the prescribed marginals. The current prose jumps straight to the dual without motivating it from the primal; you might want to add a sentence like "This is the dual of the max-entropy problem: find the distribution over size-$n$ subsets with maximum entropy subject to inclusion probabilities $\bpip^*$."</span>
-The log-probability of a subset is $\log P(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$, where $\theta_i \defeq \log \w_i$.  Taking the expectation under the target marginals $\bpip^*$ gives the objective:</p>
+<p><strong>Objective.</strong>  The goal is to find the maximum-entropy distribution over size-$n$ subsets whose inclusion probabilities match a target $\bpip^*$.  The primal problem is</p>
+<p>$$
+\max_{P \in \Delta(\binom{\mathcal{S}}{n})} H(P) \quad \text{subject to} \quad \mathbb{E}_P[\mathbf{1}[i \in S]] = \pip^*_i \;\; \forall\, i
+$$</p>
+<p>where $H(P) \defeq -\sum_S P(S) \log P(S)$ is the Shannon entropy.  We solve this via its dual, which is an unconstrained concave maximization over the log-weights $\btheta$.<label class="sidenote-number"></label><span class="margin-note">The dual arises by standard exponential-family / Lagrangian duality.  Introduce multipliers $\theta_i$ for each marginal constraint and form the Lagrangian.  The optimal primal distribution has the form $P(S) \propto \exp(\sum_{i \in S} \theta_i)$—exactly the conditional Poisson family—and the dual function to maximize is $L(\btheta) = \bpip^{*\top}\btheta - \log \Zw{\bw}{n}$.  Since the log-partition function $\log \Zw{\bw}{n}$ is convex in $\btheta$, the dual is concave with a unique global maximum.  At the optimum, the inclusion probabilities $\bpip(\btheta)$ match the targets $\bpip^*$ exactly.</span></p>
+<details class="derivation">
+<summary>Derivation of the dual (click to expand)
+</summary>
+
+Write the Lagrangian with multipliers $\theta_i$ for each marginal constraint:
+
+$$
+\mathcal{L}(P, \btheta) = H(P) + \sum_i \theta_i \big(\mathbb{E}_P[\mathbf{1}[i \in S]] - \pip^*_i\big)
+$$
+
+Maximizing over $P$ for fixed $\btheta$ gives the exponential-family form $P^*(S) = \exp\!\big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\big)$, where $\w_i = e^{\theta_i}$—this is precisely the conditional Poisson distribution.  Substituting back yields the dual objective:
+
+$$
+L(\btheta) = H(P^*) + \sum_i \theta_i (\pip_i(\btheta) - \pip^*_i) = \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
+$$
+
+where the second equality uses $H(P^*) = \log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta$ (the standard entropy-of-an-exponential-family identity).  Since $\log \Zw{\bw}{n}$ is convex as a log-partition function, $L$ is concave, guaranteeing a unique global maximum.  Strong duality holds because Slater's condition is satisfied (there exists a feasible interior point whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
+
+</details>
+
+<p>The log-probability of a subset is $\log P(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$, where $\theta_i \defeq \log \w_i$.  The dual objective is:</p>
 <p>$$
 L(\btheta) \defeq \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
 $$</p>
-<p>This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function), guaranteeing a unique global maximum.</p>
+<p>This is concave, guaranteeing a unique global maximum.</p>
 <p><strong>Gradient.</strong>  $\nabla_{\btheta} L(\btheta) = \bpip^* - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpip^*$ exactly, so the gradient is zero.  Each evaluation of $L$ and $\nabla L$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.</p>
 <p><strong>Optimizer.</strong>  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The <a href="#The-Poisson-Approximation">Poisson approximation</a> provides a warm start: $\theta_i^{(0)} = \text{logit}(\pip^*_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.</p>
 
