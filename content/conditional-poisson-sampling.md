@@ -3058,25 +3058,45 @@ This is concave, so any local maximum is global.
 <details class="derivation">
 <summary>Why this objective?</summary>
 
-Maximizing $\ell(\btheta)$ is the dual of the maximum-entropy problem: find the distribution over size-$n$ subsets with maximum entropy subject to prescribed inclusion probabilities.
+We want the "least biased" distribution over size-$n$ subsets that hits the target inclusion probabilities—that is, the one with maximum entropy.
+
+**The primal problem.** Find the distribution $\Ps$ over size-$n$ subsets that maximizes entropy subject to the inclusion-probability constraints:
 
 $$
 \max_{\Ps \in \triangle^{\binom{\mathcal{S}}{n}}} H(\Ps) \quad \text{subject to} \quad \mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \piptgt_i \;\; \text{for } 1 \le i \le N
 $$
 
-where $H(\Ps) \defeq -\sum_S \Ps(S) \log \Ps(S)$ is the Shannon entropy.  Write the Lagrangian with multipliers $\theta_i$ for each marginal constraint:
+where $H(\Ps) \defeq -\sum_S \Ps(S) \log \Ps(S)$ is the Shannon entropy.  This is a convex optimization problem (maximizing a concave function over a convex set with linear constraints), so it has a unique solution.  However, the optimization variable $\Ps$ lives in a space with $\binom{N}{n}$ dimensions—one probability per subset—so we cannot solve it directly.
+
+**The Lagrangian.** To handle the $N$ inclusion-probability constraints, introduce a multiplier $\theta_i$ for each one:
 
 $$
 \mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_i \theta_i \big(\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] - \piptgt_i\big)
 $$
 
-Maximizing $\mathcal{L}(\Ps, \btheta)$ over $\Ps \in \triangle^{\binom{\mathcal{S}}{n}}$ for fixed $\btheta$: the entropy barrier keeps $\Ps$ in the interior, so we set $\partial \mathcal{L}(\Ps, \btheta)/\partial \Ps(S) = -\log \Ps(S) - 1 + \sum_{i \in S} \theta_i = 0$, giving $\Ps(S) \propto \exp\!\big(\sum_{i \in S} \theta_i\big)$.  Normalizing over size-$n$ subsets:
+The idea is to solve $\max_{\Ps} \min_{\btheta} \mathcal{L}(\Ps, \btheta)$ instead of the constrained problem.  At any saddle point, the constraints are satisfied (otherwise the $\min$ over $\btheta$ would send $\mathcal{L}(\Ps, \btheta)$ to $-\infty$).
+
+**Solving for $\Ps$ given $\btheta$.**  For fixed $\btheta$, we maximize $\mathcal{L}(\Ps, \btheta)$ over distributions $\Ps$.  Writing out the expectation as $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \sum_S \Ps(S)\, \mathbf{1}[i \in S]$ and taking the derivative with respect to each $\Ps(S)$:
+
+$$
+\frac{\partial \mathcal{L}(\Ps, \btheta)}{\partial \Ps(S)} = -\log \Ps(S) - 1 + \sum_{i \in S} \theta_i
+$$
+
+Setting this to zero gives $\Ps(S) \propto \exp\!\big(\sum_{i \in S} \theta_i\big)$.  (We don't need a separate multiplier for the normalization constraint $\sum_S \Ps(S) = 1$ because we can absorb it into the proportionality constant.)  After normalizing over size-$n$ subsets:
 
 $$
 \Ps(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
 $$
 
-where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n}$ is the normalizing constant—this is precisely the conditional Poisson distribution.  Substituting $\Ps$ back into $\mathcal{L}(\Ps, \btheta)$: since $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \pip_i(\btheta)$, we get $\mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_i \theta_i \big(\pip_i(\btheta) - \piptgt_i\big)$.  The entropy of this exponential-family distribution is
+where $\w_i \defeq e^{\theta_i}$ and $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is the normalizing constant.  This is exactly the conditional Poisson distribution!  So the max-entropy distribution with inclusion-probability constraints must be a CPS distribution—the only question is *which* weights.
+
+**Eliminating $\Ps$.**  Now substitute this optimal $\Ps$ back into $\mathcal{L}(\Ps, \btheta)$ to get a function of $\btheta$ alone.  The inclusion probabilities under $\Ps$ are $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \pip_i(\btheta)$, so:
+
+$$
+\mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_i \theta_i \big(\pip_i(\btheta) - \piptgt_i\big)
+$$
+
+We need $H(\Ps)$.  Since $\log \Ps(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$:
 
 $$
 \begin{align}
@@ -3086,7 +3106,7 @@ H(\Ps) &= -\sum_S \Ps(S) \log \Ps(S) \\
 \end{align}
 $$
 
-Substituting $H(\Ps)$ into $\mathcal{L}(\Ps, \btheta)$:
+where the last step uses $\sum_S \Ps(S) \sum_{i \in S} \theta_i = \sum_i \theta_i \pip_i(\btheta) = \bpip(\btheta)^\top \btheta$.  Substituting $H(\Ps)$ into $\mathcal{L}(\Ps, \btheta)$:
 
 $$
 \begin{align}
@@ -3096,7 +3116,11 @@ $$
 \end{align}
 $$
 
-The dual problem is to find $\btheta$ maximizing $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$ (the negation of $\mathcal{L}(\Ps, \btheta)$).  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $\Ps$ and the primal is feasible (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$), so at the optimum, the conditional Poisson distribution parameterized by $\w_i = e^{\theta_i}$ achieves maximum entropy among all distributions over size-$n$ subsets with inclusion probabilities $\bpiptgt$—in particular, $\bpip(\btheta) = \bpiptgt$.
+The $\bpip(\btheta)$ terms cancel, leaving a clean function of $\btheta$ alone.
+
+**The dual problem.**  The Lagrangian dual minimizes $\mathcal{L}(\Ps, \btheta)$ over $\btheta$.  Negating to turn this into a maximization, we get $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).
+
+**Why it works.** Strong duality holds because the inclusion-probability constraints are linear in $\Ps$ and the primal is feasible (a valid $\Ps$ exists whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$).  So the optimal $\btheta$ from the dual gives weights $\w_i = e^{\theta_i}$ whose conditional Poisson distribution solves the primal: it achieves maximum entropy among all distributions over size-$n$ subsets, and its inclusion probabilities match the targets exactly, $\bpip(\btheta) = \bpiptgt$.
 
 </details>
 
