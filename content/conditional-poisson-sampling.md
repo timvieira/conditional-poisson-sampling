@@ -3055,7 +3055,7 @@ This is concave, so any local maximum is global.
 <details class="derivation">
 <summary>Why this objective?</summary>
 
-Maximizing $L(\btheta)$ is the Lagrangian dual of the maximum-entropy problem: find the distribution over size-$n$ subsets with maximum entropy subject to prescribed inclusion probabilities.
+Maximizing $L(\btheta)$ is the dual of the maximum-entropy problem: find the distribution over size-$n$ subsets with maximum entropy subject to prescribed inclusion probabilities.
 
 $$
 \max_{P \in \triangle^{\binom{\mathcal{S}}{n}}} H(P) \quad \text{subject to} \quad \mathbb{E}_P[\mathbf{1}[i \in S]] = \pip^*_i \;\; \text{for } 1 \le i \le N
