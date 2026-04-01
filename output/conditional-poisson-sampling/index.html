@@ -1774,14 +1774,6 @@ details.derivation.draft > summary::before {
   <!-- MathJax 3 -->
   <script>
     window.MathJax = {
-      startup: {
-        typeset: false,
-        ready: function() {
-          MathJax.startup.defaultReady();
-          // Signal that MathJax is fully ready
-          window._mathjaxReady = MathJax.startup.promise;
-        }
-      },
       tex: {
         inlineMath: [['$', '$']],
         displayMath: [['$$', '$$']],
@@ -1794,22 +1786,6 @@ details.derivation.draft > summary::before {
     };
   </script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-  <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({startOnLoad: false, math: {enabled: true}});
-    // 1) Render Mermaid first (its built-in KaTeX handles $$ in labels)
-    await mermaid.run({querySelector: '.mermaid'});
-    // 2) MathJax is loaded synchronously above, so startup.promise exists.
-    //    Remove mermaid SVGs temporarily, typeset page with MathJax, restore.
-    await MathJax.startup.promise;
-    const saved = [];
-    document.querySelectorAll('.mermaid').forEach(el => {
-      saved.push({el, parent: el.parentNode, next: el.nextSibling});
-      el.remove();
-    });
-    await MathJax.typesetPromise();
-    saved.forEach(({el, parent, next}) => parent.insertBefore(el, next));
-  </script>
 </head>
 
 <body>
@@ -1855,8 +1831,8 @@ $$</p>
 <p>The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is a weighted generalization of the binomial coefficient, which recovers $\binom{N}{n} = \Zw{\bw}{n}$ when $\bw = \mathbf{1}^N$.<a href="test_identities.py#test_Z_equals_binomial_when_uniform" title="test_Z_equals_binomial_when_uniform" class="verified" target="_blank">✓</a></p>
 <p><strong>Inclusion probabilities.</strong> The inclusion probability $\pip_i \defeq \sum_{S} \Ps(S)\, \mathbf{1}[i \in S]$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$, as the other items push back through the size constraint $|S| = n$. Later in this article, we provide an interactive widget for exploring the nonlinear relationship between $\bw$ and $\bpip$.</p>
 <p><strong>Why is this distribution special?</strong> The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, it is the unique <em>maximum-entropy</em> one<a href="test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>—making the fewest assumptions beyond the marginals (<a href="https://doi.org/10.1103/PhysRev.106.620">Jaynes, 1957</a>; <a href="https://academic.oup.com/biomet/article-abstract/81/3/457/256956">Chen, Dempster &amp; Liu, 1994</a>), in the same sense that the Gaussian is max-entropy for given mean and variance.  The log-normalizer $\log \Zw{\bw}{n}$ is convex in $\btheta$, so many properties follow mechanically: inclusion probabilities are the gradient ($\pip_i = \partial \log \Z / \partial \theta_i$) and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the <em>exponential fixed-size design</em> for this reason.</p>
-<p><strong>Relationship to Poisson sampling.</strong> In Poisson sampling,<label class="sidenote-number"></label><span class="margin-note">Named after mathematician <a href="https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson">Siméon Denis Poisson</a>.  Although poisson is the French word for fish, no fishing metaphor is intended.</span> each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_i \mathbf{1}[i \in S]$ is random.  The <em>conditional</em> Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.  The weight $\w_i$ is the <em>odds</em> of the $i$<sup>th</sup> coin: $\w_i \defeq p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a>  (The <a href="#Parameterizations">identities section</a> compares the odds and probability parameterizations.)</p>
-<p><strong>Sampling without replacement.</strong> The following construction shows how conditional
+<p><strong>Relationship to Poisson sampling.</strong> In Poisson sampling,<label class="sidenote-number"></label><span class="margin-note">Named after mathematician <a href="https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson">Siméon Denis Poisson</a>.  Although poisson is the French word for fish, no fishing metaphor is intended.</span> each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_i \mathbf{1}[i \in S]$ is random.  The <em>conditional</em> Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.  The weight $\w_i$ is the <em>odds</em> of the $i$<sup>th</sup> coin: $\w_i \defeq p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a>
+<strong>Sampling without replacement.</strong> The following construction shows how conditional
 Poisson can be used for sampling without replacement.  Draw $n$ items
 independently from the categorical distribution over weights, and keep only the
 samples where all draws are distinct:</p>
