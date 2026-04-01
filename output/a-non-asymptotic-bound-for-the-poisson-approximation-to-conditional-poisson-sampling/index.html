@@ -1565,6 +1565,11 @@ a.tag:hover {
 .jp-MarkdownCell .jp-InputArea { padding: 0; }
 .cm-editor { margin: 0; }
 
+/* Sidenote numbering */
+body { counter-reset: sidenote; }
+.sidenote-number { counter-increment: sidenote; }
+.sidenote-number::after { content: counter(sidenote); font-size: 0.75em; vertical-align: super; line-height: 0; }
+
 /* Margin notes — float into the right margin without biting into paragraph text */
 .margin-note {
     float: right;
