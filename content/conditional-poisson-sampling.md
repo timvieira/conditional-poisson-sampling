@@ -62,7 +62,7 @@ it simply establishes what the distribution *is*.  We will derive sampling algor
 
 **What this post covers.** The computational challenges are: computing $\Zw{\bw}{n}$ and $\Ps(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim \Ps$, and the inverse problem of finding $\bw$ from target $\bpip$.  This post gives efficient algorithms for all four—in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree.
 
-**Software.** The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).  As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python (or any language outside of R's survey-sampling packages).  Existing R implementations—`UPmaxentropy` in the [sampling](https://cran.r-project.org/web/packages/sampling/) package and the [BalancedSampling](https://cran.r-project.org/web/packages/BalancedSampling/) package—use either rejection sampling or $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I'm aware of.
+**Software.** The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).  As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python (or any language outside of R's survey-sampling packages).  Existing R implementations—`UPmaxentropy` in the [sampling](https://cran.r-project.org/web/packages/sampling/) package and the [BalancedSampling](https://cran.r-project.org/web/packages/BalancedSampling/) package—use either rejection sampling or $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I could find.
 
 
 <style>
