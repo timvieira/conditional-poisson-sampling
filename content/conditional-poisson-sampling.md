@@ -41,6 +41,7 @@ The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ 
 **Why is this distribution special?** The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, it is the unique *maximum-entropy* one<a href="test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>—making the fewest assumptions beyond the marginals ([Jaynes, 1957](https://doi.org/10.1103/PhysRev.106.620); [Chen, Dempster & Liu, 1994](https://academic.oup.com/biomet/article-abstract/81/3/457/256956)), in the same sense that the Gaussian is max-entropy for given mean and variance.  The log-normalizer $\log \Zw{\bw}{n}$ is convex in $\btheta$, so many properties follow mechanically: inclusion probabilities are the gradient ($\pip_i = \partial \log \Z / \partial \theta_i$) and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the *exponential fixed-size design* for this reason.
 
 **Relationship to Poisson sampling.** In Poisson sampling,<footnote>Named after mathematician [Siméon Denis Poisson](https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson).  Although poisson is the French word for fish, no fishing metaphor is intended.</footnote> each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_i \mathbf{1}[i \in S]$ is random.  The *conditional* Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.  The weight $\w_i$ is the *odds* of the $i$<sup>th</sup> coin: $\w_i \defeq p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a>
+
 **Sampling without replacement.** The following construction shows how conditional
 Poisson can be used for sampling without replacement.  Draw $n$ items
 independently from the categorical distribution over weights, and keep only the
@@ -65,12 +66,6 @@ it simply establishes what the distribution *is*.  We will derive sampling algor
 
 
 <style>
-/* Tufte-style sidenote numbering */
-article { counter-reset: sidenote-counter; }
-.sidenote-number { counter-increment: sidenote-counter; }
-.sidenote-number::after { content: counter(sidenote-counter); font-size: 0.6em; vertical-align: super; }
-.sidenote-number + .margin-note::before { content: counter(sidenote-counter); font-size: 0.6em; vertical-align: super; }
-
 #cps table { border-collapse: collapse; width: auto; margin: 0; }
 #cps th, #cps td { padding: 1px 2px; font-family: inherit; font-size: 0.85em; line-height: 1.3; }
 #cps th { border: none; font-weight: normal; color: #666; }
@@ -326,7 +321,7 @@ small { font-size: smaller; }
 </div>
 
 
-## The Polynomial Product Tree
+## Computing $\Zw{\bw}{n}$, $\bpip$, and Samples
 
 The key idea is that $\Zw{\bw}{n}$ is hiding inside a product of polynomials:
 
@@ -2827,7 +2822,7 @@ The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="tes
 
 $$\pip_i \;\approx\; \frac{\w_i \, r}{1 + \w_i \, r}.$$
 
-The actual inclusion probabilities are close but not identical—conditioning on $|S|=n$ introduces a correction of $\mathcal{O}(1/N)$ per item (see [Hájek's bound](#Hájek's-approximation) below).
+<a id="Hájek's-approximation"></a>The actual inclusion probabilities are close but not identical—[Hájek (1964, Theorem 5.2)](https://doi.org/10.1214/aoms/1177700375) showed that $\pip_i = p_i + \mathcal{O}(1/N)$.  This means initializing $\theta_i^{(0)} = \text{logit}(\piptgt_i)$ gives a warm start that is off by at most $\mathcal{O}(1/N)$ for the [fitting](#Fitting-Weights-to-Target-Probabilities) optimizer.
 
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
@@ -3031,22 +3026,6 @@ The actual inclusion probabilities are close but not identical—conditioning on
 </script>
 
 </div>
-
-<a id="Hájek's-approximation"></a>**Hájek's approximation.**  [Hájek (1964, Theorem 5.2)](https://doi.org/10.1214/aoms/1177700375) showed that the conditional inclusion probabilities satisfy
-
-$$\pip_i = p_i + \mathcal{O}(1/N)$$
-
-so the Poisson approximation is essentially exact for large $N$.  [Boistard, Lopuhaä & Ruiz-Gazen (2012)](https://arxiv.org/abs/1207.5654) give the explicit correction:
-
-$$\pip_i = p_i\Big(1 - d^{-1}(p_i - \bar{p})(1 - p_i) + \mathcal{O}(d^{-2})\Big)$$
-
-where $d \defeq \sum_i p_i(1-p_i)$ is the variance of the Poisson sample size and $\bar{p} \defeq d^{-1}\sum_i p_i^2(1-p_i)$.  Under the regularity condition $\limsup N/d < \infty$ (which holds whenever the $p_i$ are bounded away from 0 and 1), $d = \Theta(N)$ and the error is $\mathcal{O}(1/N)$ per item.
-
-The correction has a natural interpretation: when $p_i > \bar{p}$ (item $i$ has higher-than-average inclusion probability), conditioning on $|S| = n$ forces the other items to "make room," so $\pip_i > p_i$.  The factor $(1 - p_i)$ modulates this—items already near certain inclusion have less room to adjust.  The denominator $d = \text{Var}(K)$ measures how much slack the system has for redistribution.
-
-We conjecture<a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a> a non-asymptotic bound with no hidden constants: $|\pip_i - p_i| \leq p_i(1 - p_i) / d$.  The proof, along with the Boistard et al. derivation, multiple proof attempts, and a summary of what remains open, is in a [companion post](../poisson-approximation-bound/).
-
-**Inverting the approximation.**  Since $p_i = \w_i r/(1+\w_i r)$, we can invert: $\w_i = p_i / (r(1 - p_i))$, giving $\theta_i = \log \w_i = \log(p_i/(1-p_i)) - \log r$.  If we want inclusion probabilities $\bpiptgt$ and treat $\piptgt_i \approx p_i$, the initialization $\theta_i^{(0)} = \log(\piptgt_i / (1 - \piptgt_i))$ (i.e., the logit of the target) is off by at most $\mathcal{O}(1/N)$—a good warm start for the [fitting](#Fitting-Weights-to-Target-Probabilities) optimizer.
 
 
 ## Fitting Weights to Target Probabilities
