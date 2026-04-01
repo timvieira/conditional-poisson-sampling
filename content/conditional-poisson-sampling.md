@@ -81,6 +81,10 @@ article { counter-reset: sidenote-counter; }
 #cps .ic { text-align: center; }
 #cps .pc { text-align: right; }
 b, strong { font-weight: bold; }
+em, i { font-style: italic; }
+sub { vertical-align: sub; font-size: smaller; }
+sup { vertical-align: super; font-size: smaller; }
+small { font-size: smaller; }
 #cps .zero { color: #ccc; }
 #cps .bar-td {
   vertical-align: bottom; text-align: center; padding: 2px 1px;
