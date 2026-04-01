@@ -4832,7 +4832,7 @@ $$
 \mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_i \theta_i \big(\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] - \piptgt_i\big)
 $$
 
-The idea is to solve $\max_{\Ps} \min_{\btheta} \mathcal{L}(\Ps, \btheta)$ instead of the constrained problem.  At any saddle point, the constraints are satisfied (otherwise the $\min$ over $\btheta$ would send $\mathcal{L}(\Ps, \btheta)$ to $-\infty$).
+The key property: if $\Ps$ violates any constraint, the corresponding $\theta_i$ can be driven to $\pm\infty$ to make $\mathcal{L}(\Ps, \btheta) \to -\infty$.  So $\max_{\Ps} \min_{\btheta} \mathcal{L}(\Ps, \btheta)$ has the same solution as the constrained problem—the constraints are enforced by the multipliers rather than explicitly.
 
 **Solving for $\Ps$ given $\btheta$.**  For fixed $\btheta$, we maximize $\mathcal{L}(\Ps, \btheta)$ over distributions $\Ps$.  Writing out the expectation as $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \sum_S \Ps(S)\, \mathbf{1}[i \in S]$ and taking the derivative with respect to each $\Ps(S)$:
 
@@ -4876,9 +4876,9 @@ $$
 
 The $\bpip(\btheta)$ terms cancel, leaving a clean function of $\btheta$ alone.
 
-**The dual problem.**  The Lagrangian dual minimizes $\mathcal{L}(\Ps, \btheta)$ over $\btheta$.  Negating to turn this into a maximization, we get $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).
+**The dual problem.**  The dual minimizes $\mathcal{L}(\Ps, \btheta)$ over $\btheta$.  Negating to turn this into a maximization, we get $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$.  This is concave because $\log \Zw{\bw}{n}$ is convex in $\btheta$ (it is a log of a sum of exponentials).
 
-**Why it works.** Strong duality holds because the inclusion-probability constraints are linear in $\Ps$ and the primal is feasible (a valid $\Ps$ exists whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$).  So the optimal $\btheta$ from the dual gives weights $\w_i = e^{\theta_i}$ whose conditional Poisson distribution solves the primal: it achieves maximum entropy among all distributions over size-$n$ subsets, and its inclusion probabilities match the targets exactly, $\bpip(\btheta) = \bpiptgt$.
+**Why it works.**  Because the inclusion-probability constraints are linear in $\Ps$ and a feasible $\Ps$ exists (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$), there is no gap between the primal and dual optima.  So the optimal $\btheta$ from the dual gives weights $\w_i = e^{\theta_i}$ whose conditional Poisson distribution solves the primal: it achieves maximum entropy among all distributions over size-$n$ subsets, and its inclusion probabilities match the targets exactly, $\bpip(\btheta) = \bpiptgt$.
 
 </details>
 
