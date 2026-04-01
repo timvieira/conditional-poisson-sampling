@@ -3044,18 +3044,24 @@ We conjecture<a href="test_identities.py#test_poisson_approximation_bound" title
 
 A common use case: you know the inclusion probabilities you *want* and need to find weights that produce them.<a href="test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a>
 
-**Objective.**  The goal is to find the maximum-entropy distribution over size-$n$ subsets whose inclusion probabilities match a target $\bpip^*$.  The primal problem is
+**Objective.**  The log-probability of a subset is $\log P(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$, where $\theta_i \defeq \log \w_i$.  We maximize
+
+$$
+L(\btheta) \defeq \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
+$$
+
+This is concave, so any local maximum is global.
+
+<details class="derivation">
+<summary>Why this objective?</summary>
+
+$L(\btheta)$ is the Lagrangian dual of the maximum-entropy problem: find the distribution over size-$n$ subsets with maximum entropy subject to prescribed inclusion probabilities.
 
 $$
 \max_{P \in \triangle^{\binom{\mathcal{S}}{n}}} H(P) \quad \text{subject to} \quad \mathbb{E}_P[\mathbf{1}[i \in S]] = \pip^*_i \;\; \text{for } 1 \le i \le N
 $$
 
-where $H(P) \defeq -\sum_S P(S) \log P(S)$ is the Shannon entropy.  We solve this via its dual, which is an unconstrained concave maximization over the log-weights $\btheta$.<footnote>The dual arises by standard exponential-family / Lagrangian duality.  Introduce multipliers $\theta_i$ for each marginal constraint and form the Lagrangian.  The optimal primal distribution has the form $P(S) \propto \exp(\sum_{i \in S} \theta_i)$—exactly the conditional Poisson family—and the dual function to maximize is $L(\btheta) = \bpip^{*\top}\btheta - \log \Zw{\bw}{n}$.  Since the log-partition function $\log \Zw{\bw}{n}$ is convex in $\btheta$, the dual is concave with a unique global maximum.  At the optimum, the inclusion probabilities $\bpip(\btheta)$ match the targets $\bpip^*$ exactly.</footnote>
-
-<details class="derivation">
-<summary>Derivation of the dual</summary>
-
-Write the Lagrangian with multipliers $\theta_i$ for each marginal constraint:
+where $H(P) \defeq -\sum_S P(S) \log P(S)$ is the Shannon entropy.  Write the Lagrangian with multipliers $\theta_i$ for each marginal constraint:
 
 $$
 \mathcal{L}(P, \btheta) = H(P) + \sum_i \theta_i \big(\mathbb{E}_P[\mathbf{1}[i \in S]] - \pip^*_i\big)
@@ -3093,17 +3099,9 @@ L(\btheta)
 \end{align}
 $$
 
-Negating (to maximize rather than minimize), we get the dual objective $\bpip^{*\top} \btheta - \log \Zw{\bw}{n}$, which is concave, so any local maximum is global.  Strong duality holds because the marginal constraints are affine in $P$ and the primal is feasible (whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
+Negating (to maximize rather than minimize), we get $L(\btheta) = \bpip^{*\top} \btheta - \log \Zw{\bw}{n}$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $P$ and the primal is feasible (whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
 
 </details>
-
-The log-probability of a subset is $\log P(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$, where $\theta_i \defeq \log \w_i$.  The dual objective is:
-
-$$
-L(\btheta) \defeq \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
-$$
-
-This is concave, so any local maximum is global.
 
 **Gradient.**  $\nabla_{\btheta} L(\btheta) = \bpip^* - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpip^*$ exactly, so the gradient is zero.  Each evaluation of $L$ and $\nabla L$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
 
