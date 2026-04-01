@@ -3073,13 +3073,7 @@ $$
 P(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
 $$
 
-where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n}$ is the normalizing constant—this is precisely the conditional Poisson distribution.  Substituting $P$ back into $\mathcal{L}$ gives the dual objective $L(\btheta) \defeq \max_P \mathcal{L}(P, \btheta) = \mathcal{L}(P(\btheta), \btheta)$:
-
-$$
-L(\btheta) = H(P) + \sum_i \theta_i \big(\pip_i(\btheta) - \pip^*_i\big)
-$$
-
-The entropy of this exponential-family distribution is
+where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n}$ is the normalizing constant—this is precisely the conditional Poisson distribution.  Substituting $P$ back into $\mathcal{L}$ gives $\mathcal{L}(P(\btheta), \btheta) = H(P) + \sum_i \theta_i \big(\pip_i(\btheta) - \pip^*_i\big)$.  The entropy of this exponential-family distribution is
 
 $$
 \begin{align}
@@ -3089,17 +3083,17 @@ H(P) &= -\sum_S P(S) \log P(S) \\
 \end{align}
 $$
 
-Substituting $H(P)$ into $L(\btheta)$:
+Substituting $H(P)$ into $\mathcal{L}$:
 
 $$
 \begin{align}
-L(\btheta)
+\mathcal{L}(P(\btheta), \btheta)
 &= \big(\log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta\big) + \bpip(\btheta)^\top \btheta - \bpip^{*\top} \btheta \\
 &= \log \Zw{\bw}{n} - \bpip^{*\top} \btheta
 \end{align}
 $$
 
-Negating (to maximize rather than minimize), we get $L(\btheta) = \bpip^{*\top} \btheta - \log \Zw{\bw}{n}$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $P$ and the primal is feasible (whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
+The dual problem is $\min_{\btheta} \mathcal{L}(P(\btheta), \btheta)$, i.e., $\min_{\btheta} \log \Zw{\bw}{n} - \bpip^{*\top}\btheta$, which is equivalent to $\max_{\btheta} \bpip^{*\top}\btheta - \log \Zw{\bw}{n} = L(\btheta)$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $P$ and the primal is feasible (whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
 
 </details>
 
