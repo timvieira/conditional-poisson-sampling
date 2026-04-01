@@ -60,9 +60,9 @@ This rejection sampler is not a practical sampling algorithm;<footnote>The accep
 it simply establishes what the distribution *is*.  We will derive sampling algorithms that sample from $\Ps(S)$ efficiently.
 
 
-**What this post covers.** The computational challenges are: computing $\Zw{\bw}{n}$ and $\Ps(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim \Ps$, and the inverse problem of finding $\bw$ from target $\bpip$.  This post gives efficient algorithms for all four—in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree.  The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).
+**What this post covers.** The computational challenges are: computing $\Zw{\bw}{n}$ and $\Ps(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim \Ps$, and the inverse problem of finding $\bw$ from target $\bpip$.  This post gives efficient algorithms for all four—in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree.
 
-**Software.** As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python (or any language outside of R's survey-sampling packages).  Existing R implementations—`UPmaxentropy` in the [sampling](https://cran.r-project.org/web/packages/sampling/) package and the [BalancedSampling](https://cran.r-project.org/web/packages/BalancedSampling/) package—use either rejection sampling or $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I'm aware of.
+**Software.** The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).  As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python (or any language outside of R's survey-sampling packages).  Existing R implementations—`UPmaxentropy` in the [sampling](https://cran.r-project.org/web/packages/sampling/) package and the [BalancedSampling](https://cran.r-project.org/web/packages/BalancedSampling/) package—use either rejection sampling or $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I'm aware of.
 
 
 <style>
@@ -242,7 +242,7 @@ small { font-size: smaller; }
       var sh = tbody.append('tr');
       sh.append('td').attr('class','rl').style('text-align','right').html('Subset $S$');
       for(var j=0;j<N;j++) sh.append('td').attr('class','ic');
-      sh.append('td').attr('class','pc').style('text-align','left').style('color',CW).html('$\Ps(S)$');
+      sh.append('td').attr('class','pc').style('text-align','left').style('color',CW).html('$\\Ps(S)$');
 
       // --- Subset rows ---
       tdata.forEach(function(r){
