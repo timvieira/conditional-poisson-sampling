@@ -2112,7 +2112,7 @@ $$</p>
 <p>So the $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the <em>subproduct tree</em> (see <a href="https://doi.org/10.1017/CBO9781139856065">von zur Gathen &amp; Gerhard (2013)</a>, Chapter 10).</p>
 <p><strong>Polynomials as arrays.</strong> In code, a polynomial like $1 + 3\z + 2\z^2$ is just the array <code>[1, 3, 2]</code>.  The $\z$ is a <em>formal</em> variable—we never substitute a number into it; it just tracks which coefficient is which.  Multiplying two polynomials corresponds to <em>convolving</em> their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ convolves <code>[1, 2]</code> with <code>[1, 3]</code> to get <code>[1, 5, 6]</code>.  It turns out that convolution can be done efficiently using the <a href="https://en.wikipedia.org/wiki/Fast_Fourier_transform">fast Fourier transform</a> (FFT), costing $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.</p>
 <p><strong>Notation.</strong> We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.</p>
-<h3 id="computing-the-normalizing-constant-math116">Computing the Normalizing Constant $\Z$</h3>
+<h3 id="computing-the-normalizing-constant-math115">Computing the Normalizing Constant $\Z$</h3>
 <p>Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.</p>
 <style>
 #content { overflow: visible !important; }
@@ -2657,7 +2657,7 @@ svg text { font-family: 'EB Garamond', serif; }
 <p>$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N), \quad T(1) = \mathcal{O}(1)$$</p>
 <p>which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
 The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be <strong>truncated to degree $n$</strong> without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.</p>
-<h3 id="computing-inclusion-probabilities-math142">Computing Inclusion Probabilities $\bpip$</h3>
+<h3 id="computing-inclusion-probabilities-math141">Computing Inclusion Probabilities $\bpip$</h3>
 <p>The inclusion probability is the gradient of the log-normalizer (an exponential family identity):</p>
 <p>$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$</p>
 <p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running <a href="../evaluating-fx-is-as-fast-as-fx/">backpropagation</a> on the same tree—no new algorithm needed.  By the Baur-Strassen theorem (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">1983</a>), the gradient costs at most a constant factor more than the forward computation.</p>
@@ -4777,10 +4777,7 @@ Drag the weight sliders to change $w_i$ and see how the split distributions upda
 
 </div>
 
-<p><a id="Hájek's-approximation"></a><strong>Hájek's approximation.</strong>  <a href="https://doi.org/10.1214/aoms/1177700375">Hájek (1964, Theorem 5.2)</a> showed that the conditional inclusion probabilities satisfy</p>
-<p>$$\pip_i = p_i + \mathcal{O}(1/N)$$</p>
-<p>so the Poisson approximation is essentially exact for large $N$.  The explicit first-order correction and sharper bounds are in a <a href="../poisson-approximation-bound/">companion post</a>.</p>
-<p><strong>Inverting the approximation.</strong>  Since $p_i = \w_i r/(1+\w_i r)$, we can invert: $\w_i = p_i / (r(1 - p_i))$, giving $\theta_i = \log \w_i = \log(p_i/(1-p_i)) - \log r$.  If we want inclusion probabilities $\bpiptgt$ and treat $\piptgt_i \approx p_i$, the initialization $\theta_i^{(0)} = \log(\piptgt_i / (1 - \piptgt_i))$ (i.e., the logit of the target) is off by at most $\mathcal{O}(1/N)$—a good warm start for the <a href="#Fitting-Weights-to-Target-Probabilities">fitting</a> optimizer.</p>
+<p><a id="Hájek's-approximation"></a><strong>Hájek's approximation.</strong>  <a href="https://doi.org/10.1214/aoms/1177700375">Hájek (1964, Theorem 5.2)</a> showed that $\pip_i = p_i + \mathcal{O}(1/N)$, so the Poisson approximation is essentially exact for large $N$ (<a href="../poisson-approximation-bound/">sharper bounds</a>).  This means treating $\piptgt_i \approx p_i$ and initializing $\theta_i^{(0)} = \text{logit}(\piptgt_i)$ gives a warm start that is off by at most $\mathcal{O}(1/N)$ for the <a href="#Fitting-Weights-to-Target-Probabilities">fitting</a> optimizer.</p>
 <h2 id="fitting-weights-to-target-probabilities">Fitting Weights to Target Probabilities</h2>
 <p>A common use case: you know the inclusion probabilities you <em>want</em> and need to find weights that produce them.<a href="test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a></p>
 <p><strong>Objective.</strong>  Given target inclusion probabilities $\bpiptgt$, we find weights $\bw$ (equivalently, log-weights $\btheta$ where $\theta_i = \log \w_i$) by maximizing</p>
