@@ -12,6 +12,8 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 \newcommand{\pip}{\pi}
 \def\btheta{{\boldsymbol{\theta}}}
 \def\bpip{\boldsymbol{\pi}}
+\newcommand{\piptgt}{\widehat{\pip}}
+\newcommand{\bpiptgt}{\widehat{\bpip}}
 \newcommand{\ba}{\boldsymbol{a}}
 \newcommand{\bb}{\boldsymbol{b}}
 \newcommand{\z}{z}
@@ -3037,7 +3039,7 @@ The correction has a natural interpretation: when $p_i > \bar{p}$ (item $i$ has 
 
 We conjecture<a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a> a non-asymptotic bound with no hidden constants: $|\pip_i - p_i| \leq p_i(1 - p_i) / d$.  The proof, along with the Boistard et al. derivation, multiple proof attempts, and a summary of what remains open, is in a [companion post](../poisson-approximation-bound/).
 
-**Inverting the approximation.**  Since $p_i = \w_i r/(1+\w_i r)$, we can invert: $\w_i = p_i / (r(1 - p_i))$, giving $\theta_i = \log \w_i = \log(p_i/(1-p_i)) - \log r$.  If we want inclusion probabilities $\bpip^*$ and treat $\pip^*_i \approx p_i$, the initialization $\theta_i^{(0)} = \log(\pip^*_i / (1 - \pip^*_i))$ (i.e., the logit of the target) is off by at most $\mathcal{O}(1/N)$—a good warm start for the [fitting](#Fitting-Weights-to-Target-Probabilities) optimizer.
+**Inverting the approximation.**  Since $p_i = \w_i r/(1+\w_i r)$, we can invert: $\w_i = p_i / (r(1 - p_i))$, giving $\theta_i = \log \w_i = \log(p_i/(1-p_i)) - \log r$.  If we want inclusion probabilities $\bpiptgt$ and treat $\piptgt_i \approx p_i$, the initialization $\theta_i^{(0)} = \log(\piptgt_i / (1 - \piptgt_i))$ (i.e., the logit of the target) is off by at most $\mathcal{O}(1/N)$—a good warm start for the [fitting](#Fitting-Weights-to-Target-Probabilities) optimizer.
 
 
 ## Fitting Weights to Target Probabilities
@@ -3047,7 +3049,7 @@ A common use case: you know the inclusion probabilities you *want* and need to f
 **Objective.**  We maximize
 
 $$
-L(\btheta) \defeq \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
+L(\btheta) \defeq \bpiptgt^{\top} \btheta - \log \Zw{\bw}{n}
 $$
 
 This is concave, so any local maximum is global.
@@ -3058,13 +3060,13 @@ This is concave, so any local maximum is global.
 Maximizing $L(\btheta)$ is the dual of the maximum-entropy problem: find the distribution over size-$n$ subsets with maximum entropy subject to prescribed inclusion probabilities.
 
 $$
-\max_{P \in \triangle^{\binom{\mathcal{S}}{n}}} H(P) \quad \text{subject to} \quad \mathbb{E}_P[\mathbf{1}[i \in S]] = \pip^*_i \;\; \text{for } 1 \le i \le N
+\max_{P \in \triangle^{\binom{\mathcal{S}}{n}}} H(P) \quad \text{subject to} \quad \mathbb{E}_P[\mathbf{1}[i \in S]] = \piptgt_i \;\; \text{for } 1 \le i \le N
 $$
 
 where $H(P) \defeq -\sum_S P(S) \log P(S)$ is the Shannon entropy.  Write the Lagrangian with multipliers $\theta_i$ for each marginal constraint:
 
 $$
-\mathcal{L}(P, \btheta) = H(P) + \sum_i \theta_i \big(\mathbb{E}_P[\mathbf{1}[i \in S]] - \pip^*_i\big)
+\mathcal{L}(P, \btheta) = H(P) + \sum_i \theta_i \big(\mathbb{E}_P[\mathbf{1}[i \in S]] - \piptgt_i\big)
 $$
 
 Maximizing $\mathcal{L}$ over $P$ for fixed $\btheta$ is a standard calculus-of-variations exercise: set the functional derivative $\delta \mathcal{L}/\delta P(S) = -\log P(S) - 1 + \sum_{i \in S} \theta_i = 0$, giving $P(S) \propto \exp\!\big(\sum_{i \in S} \theta_i\big)$.  Normalizing over size-$n$ subsets:
@@ -3073,7 +3075,7 @@ $$
 P(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
 $$
 
-where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n}$ is the normalizing constant—this is precisely the conditional Poisson distribution.  Substituting $P$ back into $\mathcal{L}$ gives $\mathcal{L}(P(\btheta), \btheta) = H(P) + \sum_i \theta_i \big(\pip_i(\btheta) - \pip^*_i\big)$.  The entropy of this exponential-family distribution is
+where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n}$ is the normalizing constant—this is precisely the conditional Poisson distribution.  Substituting $P$ back into $\mathcal{L}$ gives $\mathcal{L}(P(\btheta), \btheta) = H(P) + \sum_i \theta_i \big(\pip_i(\btheta) - \piptgt_i\big)$.  The entropy of this exponential-family distribution is
 
 $$
 \begin{align}
@@ -3088,18 +3090,18 @@ Substituting $H(P)$ into $\mathcal{L}$:
 $$
 \begin{align}
 \mathcal{L}(P(\btheta), \btheta)
-&= \big(\log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta\big) + \bpip(\btheta)^\top \btheta - \bpip^{*\top} \btheta \\
-&= \log \Zw{\bw}{n} - \bpip^{*\top} \btheta
+&= \big(\log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta\big) + \bpip(\btheta)^\top \btheta - \bpiptgt^{\top} \btheta \\
+&= \log \Zw{\bw}{n} - \bpiptgt^{\top} \btheta
 \end{align}
 $$
 
-The dual problem is $\min_{\btheta} \mathcal{L}(P(\btheta), \btheta)$, i.e., $\min_{\btheta} \log \Zw{\bw}{n} - \bpip^{*\top}\btheta$, which is equivalent to $\max_{\btheta} \bpip^{*\top}\btheta - \log \Zw{\bw}{n} = L(\btheta)$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $P$ and the primal is feasible (whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
+The dual problem is $\min_{\btheta} \mathcal{L}(P(\btheta), \btheta)$, i.e., $\min_{\btheta} \log \Zw{\bw}{n} - \bpiptgt^{\top}\btheta$, which is equivalent to $\max_{\btheta} \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n} = L(\btheta)$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $P$ and the primal is feasible (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$).
 
 </details>
 
-**Gradient.**  $\nabla_{\btheta} L(\btheta) = \bpip^* - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpip^*$ exactly, so the gradient is zero.  Each evaluation of $L$ and $\nabla L$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
+**Gradient.**  $\nabla_{\btheta} L(\btheta) = \bpiptgt - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpiptgt$ exactly, so the gradient is zero.  Each evaluation of $L$ and $\nabla L$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
 
-**Optimizer.**  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The [Poisson approximation](#The-Poisson-Approximation) provides a warm start: $\theta_i^{(0)} = \text{logit}(\pip^*_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.
+**Optimizer.**  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The [Poisson approximation](#The-Poisson-Approximation) provides a warm start: $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.
 
 {% notebook conditional-poisson-sampling.ipynb cells[4:5] %}
 
