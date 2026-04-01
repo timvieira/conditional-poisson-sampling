@@ -3096,7 +3096,7 @@ $$
 \end{align}
 $$
 
-The dual problem is to find $\btheta$ maximizing $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$ (the negation of $\mathcal{L}$).  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $\Ps$ and the primal is feasible (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$), so the optimal $\Ps$ from the primal and the optimal $\btheta$ from the dual yield the same distribution.
+The dual problem is to find $\btheta$ maximizing $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$ (the negation of $\mathcal{L}$).  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $\Ps$ and the primal is feasible (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$), so at the optimum, the conditional Poisson distribution parameterized by $\w_i = e^{\theta_i}$ achieves maximum entropy among all distributions over size-$n$ subsets with inclusion probabilities $\bpiptgt$—in particular, $\bpip(\btheta) = \bpiptgt$.
 
 </details>
 
