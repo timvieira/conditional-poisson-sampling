@@ -3096,7 +3096,7 @@ $$
 \end{align}
 $$
 
-The dual problem is $\min_{\btheta} \mathcal{L}$, i.e., $\min_{\btheta} \log \Zw{\bw}{n} - \bpiptgt^{\top}\btheta$, which is equivalent to $\max_{\btheta} \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n} = L(\btheta)$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $\Ps$ and the primal is feasible (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$).
+The dual problem minimizes $\mathcal{L}$ over $\btheta$, which is equivalent to maximizing $L(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$.  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $\Ps$ and the primal is feasible (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$).
 
 </details>
 
