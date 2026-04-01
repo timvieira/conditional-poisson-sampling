@@ -3089,7 +3089,7 @@ H(P) &= -\sum_S P(S) \log P(S) \\
 \end{align}
 $$
 
-Substituting:
+Substituting $H(P)$ into $L(\btheta)$:
 
 $$
 \begin{align}
