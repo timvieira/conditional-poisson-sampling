@@ -3053,7 +3053,7 @@ $$
 where $H(P) \defeq -\sum_S P(S) \log P(S)$ is the Shannon entropy.  We solve this via its dual, which is an unconstrained concave maximization over the log-weights $\btheta$.<footnote>The dual arises by standard exponential-family / Lagrangian duality.  Introduce multipliers $\theta_i$ for each marginal constraint and form the Lagrangian.  The optimal primal distribution has the form $P(S) \propto \exp(\sum_{i \in S} \theta_i)$—exactly the conditional Poisson family—and the dual function to maximize is $L(\btheta) = \bpip^{*\top}\btheta - \log \Zw{\bw}{n}$.  Since the log-partition function $\log \Zw{\bw}{n}$ is convex in $\btheta$, the dual is concave with a unique global maximum.  At the optimum, the inclusion probabilities $\bpip(\btheta)$ match the targets $\bpip^*$ exactly.</footnote>
 
 <details class="derivation">
-<summary>Derivation of the dual (click to expand)</summary>
+<summary>Derivation of the dual</summary>
 
 Write the Lagrangian with multipliers $\theta_i$ for each marginal constraint:
 
@@ -3524,7 +3524,7 @@ $$\Zw{\bw}{k} = \sum_{i=1}^{k} \frac{(-1)^{i-1}}{k}\, \Zw{\bw}{k-i} \cdot g_i$$
 ### Connection to K-DPPs
 
 <details class="derivation">
-<summary>A diagonal K-DPP is exactly a conditional Poisson distribution (click to expand)</summary>
+<summary>A diagonal K-DPP is exactly a conditional Poisson distribution</summary>
 
 A $K$-DPP (fixed-size determinantal point process) on $\{1, \ldots, N\}$ with a **diagonal** kernel matrix $L = \text{diag}(\w_1, \ldots, \w_N)$ is exactly the conditional Poisson distribution:
 
