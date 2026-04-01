@@ -4828,13 +4828,13 @@ $$
 \mathcal{L}(P, \btheta) = H(P) + \sum_i \theta_i \big(\mathbb{E}_P[\mathbf{1}[i \in S]] - \pip^*_i\big)
 $$
 
-Maximizing over $P$ for fixed $\btheta$ gives the exponential-family form
+Maximizing $\mathcal{L}$ over $P$ for fixed $\btheta$ is a standard calculus-of-variations exercise: set the functional derivative $\delta \mathcal{L}/\delta P(S) = -\log P(S) - 1 + \sum_{i \in S} \theta_i = 0$, giving $P(S) \propto \exp\!\big(\sum_{i \in S} \theta_i\big)$.  Normalizing over size-$n$ subsets:
 
 $$
 P(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
 $$
 
-where $\w_i = e^{\theta_i}$—this is precisely the conditional Poisson distribution.  Substituting $P$ back into $\mathcal{L}$:
+where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n}$ is the normalizing constant—this is precisely the conditional Poisson distribution.  Substituting $P$ back into $\mathcal{L}$:
 
 $$
 L(\btheta) = H(P) + \sum_i \theta_i \big(\pip_i(\btheta) - \pip^*_i\big)
