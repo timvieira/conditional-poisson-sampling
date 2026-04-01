@@ -3044,14 +3044,40 @@ We conjecture<a href="test_identities.py#test_poisson_approximation_bound" title
 
 A common use case: you know the inclusion probabilities you *want* and need to find weights that produce them.<a href="test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a>
 
-**Objective.**<footnote>@CLAUDE: the explanation of the objective doesn't make much sense still.  Should the objective be maximize entropy subject to the inclusion probability constraint?  I suppose the objective that we have may be the dual of that (per the usual exponential family duality).<br/><b>claude</b>: Yes, exactly. The primal is: maximize $H(P)$ subject to $\mathbb{E}_P[\mathbf{1}[i \in S]] = \pip^*_i$. The dual (Lagrangian) is $L(\btheta) = \bpip^{*\top}\btheta - \log Z(\btheta)$, where the $\theta_i$ are Lagrange multipliers. This is standard exponential-family duality—maximizing the dual recovers the max-entropy distribution with the prescribed marginals. The current prose jumps straight to the dual without motivating it from the primal; you might want to add a sentence like "This is the dual of the max-entropy problem: find the distribution over size-$n$ subsets with maximum entropy subject to inclusion probabilities $\bpip^*$."</footnote>
-The log-probability of a subset is $\log P(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$, where $\theta_i \defeq \log \w_i$.  Taking the expectation under the target marginals $\bpip^*$ gives the objective:
+**Objective.**  The goal is to find the maximum-entropy distribution over size-$n$ subsets whose inclusion probabilities match a target $\bpip^*$.  The primal problem is
+
+$$
+\max_{P \in \Delta(\binom{\mathcal{S}}{n})} H(P) \quad \text{subject to} \quad \mathbb{E}_P[\mathbf{1}[i \in S]] = \pip^*_i \;\; \forall\, i
+$$
+
+where $H(P) \defeq -\sum_S P(S) \log P(S)$ is the Shannon entropy.  We solve this via its dual, which is an unconstrained concave maximization over the log-weights $\btheta$.<footnote>The dual arises by standard exponential-family / Lagrangian duality.  Introduce multipliers $\theta_i$ for each marginal constraint and form the Lagrangian.  The optimal primal distribution has the form $P(S) \propto \exp(\sum_{i \in S} \theta_i)$—exactly the conditional Poisson family—and the dual function to maximize is $L(\btheta) = \bpip^{*\top}\btheta - \log \Zw{\bw}{n}$.  Since the log-partition function $\log \Zw{\bw}{n}$ is convex in $\btheta$, the dual is concave with a unique global maximum.  At the optimum, the inclusion probabilities $\bpip(\btheta)$ match the targets $\bpip^*$ exactly.</footnote>
+
+<details class="derivation">
+<summary>Derivation of the dual (click to expand)</summary>
+
+Write the Lagrangian with multipliers $\theta_i$ for each marginal constraint:
+
+$$
+\mathcal{L}(P, \btheta) = H(P) + \sum_i \theta_i \big(\mathbb{E}_P[\mathbf{1}[i \in S]] - \pip^*_i\big)
+$$
+
+Maximizing over $P$ for fixed $\btheta$ gives the exponential-family form $P^*(S) = \exp\!\big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\big)$, where $\w_i = e^{\theta_i}$—this is precisely the conditional Poisson distribution.  Substituting back yields the dual objective:
+
+$$
+L(\btheta) = H(P^*) + \sum_i \theta_i (\pip_i(\btheta) - \pip^*_i) = \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
+$$
+
+where the second equality uses $H(P^*) = \log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta$ (the standard entropy-of-an-exponential-family identity).  Since $\log \Zw{\bw}{n}$ is convex as a log-partition function, $L$ is concave, guaranteeing a unique global maximum.  Strong duality holds because Slater's condition is satisfied (there exists a feasible interior point whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
+
+</details>
+
+The log-probability of a subset is $\log P(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$, where $\theta_i \defeq \log \w_i$.  The dual objective is:
 
 $$
 L(\btheta) \defeq \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
 $$
 
-This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function), guaranteeing a unique global maximum.
+This is concave, guaranteeing a unique global maximum.
 
 **Gradient.**  $\nabla_{\btheta} L(\btheta) = \bpip^* - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpip^*$ exactly, so the gradient is zero.  Each evaluation of $L$ and $\nabla L$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
 
