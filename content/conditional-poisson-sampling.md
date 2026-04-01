@@ -3067,7 +3067,7 @@ $$
 L(\btheta) = H(P^*) + \sum_i \theta_i (\pip_i(\btheta) - \pip^*_i) = \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
 $$
 
-where the second equality uses $H(P^*) = \log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta$ (the standard entropy-of-an-exponential-family identity).  Since $\log \Zw{\bw}{n}$ is convex as a log-partition function, $L$ is concave, guaranteeing a unique global maximum.  Strong duality holds because Slater's condition is satisfied (there exists a feasible interior point whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
+where the second equality uses $H(P^*) = \log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta$ (the standard entropy-of-an-exponential-family identity).  Since $\log \Zw{\bw}{n}$ is strictly convex as a log-partition function of a minimal exponential family, $L$ is strictly concave, so any maximizer is the unique global maximum.  Strong duality holds because Slater's condition is satisfied (there exists a feasible interior point whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
 
 </details>
 
@@ -3077,7 +3077,7 @@ $$
 L(\btheta) \defeq \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
 $$
 
-This is concave, guaranteeing a unique global maximum.
+This is strictly concave (since $\log \Zw{\bw}{n}$ is strictly convex as a log-partition function of a minimal exponential family), so any maximizer is the unique global maximum.
 
 **Gradient.**  $\nabla_{\btheta} L(\btheta) = \bpip^* - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpip^*$ exactly, so the gradient is zero.  Each evaluation of $L$ and $\nabla L$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
 
