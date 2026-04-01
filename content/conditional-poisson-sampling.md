@@ -3067,13 +3067,33 @@ $$
 P(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
 $$
 
-where $\w_i = e^{\theta_i}$—this is precisely the conditional Poisson distribution.  Substituting back yields the dual objective:
+where $\w_i = e^{\theta_i}$—this is precisely the conditional Poisson distribution.  Substituting $P$ back into $\mathcal{L}$:
 
 $$
-L(\btheta) = H(P) + \sum_i \theta_i (\pip_i(\btheta) - \pip^*_i) = \bpip^{*\top} \btheta - \log \Zw{\bw}{n}
+L(\btheta) = H(P) + \sum_i \theta_i \big(\pip_i(\btheta) - \pip^*_i\big)
 $$
 
-where the second equality uses $H(P) = \log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta$ (the standard entropy-of-an-exponential-family identity).  $L$ is concave, so any local maximum is global.  Strong duality holds because the marginal constraints are affine in $P$ and the primal is feasible (whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
+The entropy of this exponential-family distribution is
+
+$$
+\begin{align}
+H(P) &= -\sum_S P(S) \log P(S) \\
+      &= -\sum_S P(S)\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big) \\
+      &= \log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta
+\end{align}
+$$
+
+Substituting:
+
+$$
+\begin{align}
+L(\btheta)
+&= \big(\log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta\big) + \bpip(\btheta)^\top \btheta - \bpip^{*\top} \btheta \\
+&= \log \Zw{\bw}{n} - \bpip^{*\top} \btheta
+\end{align}
+$$
+
+Negating (to maximize rather than minimize), we get the dual objective $\bpip^{*\top} \btheta - \log \Zw{\bw}{n}$, which is concave, so any local maximum is global.  Strong duality holds because the marginal constraints are affine in $P$ and the primal is feasible (whenever $0 < \pip^*_i < 1$ and $\sum_i \pip^*_i = n$).
 
 </details>
 
