@@ -3058,45 +3058,45 @@ This is concave, so any local maximum is global.
 <details class="derivation">
 <summary>Why this objective?</summary>
 
-We want the "least biased" distribution over size-$n$ subsets that hits the target inclusion probabilities—that is, the one with maximum entropy.
+<p>We want the "least biased" distribution over size-$n$ subsets that hits the target inclusion probabilities—that is, the one with maximum entropy.</p>
 
-**The primal problem.** Find the distribution $\Ps$ over size-$n$ subsets that maximizes entropy subject to the inclusion-probability constraints:
+<p><b>The primal problem.</b> Find the distribution $\Ps$ over size-$n$ subsets that maximizes entropy subject to the inclusion-probability constraints:</p>
 
 $$
 \max_{\Ps \in \triangle^{\binom{\mathcal{S}}{n}}} H(\Ps) \quad \text{subject to} \quad \mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \piptgt_i \;\; \text{for } 1 \le i \le N
 $$
 
-where $H(\Ps) \defeq -\sum_S \Ps(S) \log \Ps(S)$ is the Shannon entropy.  This is a convex optimization problem (maximizing a concave function over a convex set with linear constraints), so it has a unique solution.  However, the optimization variable $\Ps$ lives in a space with $\binom{N}{n}$ dimensions—one probability per subset—so we cannot solve it directly.
+<p>where $H(\Ps) \defeq -\sum_S \Ps(S) \log \Ps(S)$ is the Shannon entropy.  This is a convex optimization problem (maximizing a concave function over a convex set with linear constraints), so it has a unique solution.  However, the optimization variable $\Ps$ lives in a space with $\binom{N}{n}$ dimensions—one probability per subset—so we cannot solve it directly.</p>
 
-**The Lagrangian.** To handle the $N$ inclusion-probability constraints, introduce a multiplier $\theta_i$ for each one:
+<p><b>The Lagrangian.</b> To handle the $N$ inclusion-probability constraints, introduce a multiplier $\theta_i$ for each one:</p>
 
 $$
 \mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_i \theta_i \big(\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] - \piptgt_i\big)
 $$
 
-The key property: if $\Ps$ violates any constraint, the corresponding $\theta_i$ can be driven to $\pm\infty$ to make $\mathcal{L}(\Ps, \btheta) \to -\infty$.  So $\max_{\Ps} \min_{\btheta} \mathcal{L}(\Ps, \btheta)$ has the same solution as the constrained problem—the constraints are enforced by the multipliers rather than explicitly.
+<p>The key property: if $\Ps$ violates any constraint, the corresponding $\theta_i$ can be driven to $\pm\infty$ to make $\mathcal{L}(\Ps, \btheta) \to -\infty$.  So $\max_{\Ps} \min_{\btheta} \mathcal{L}(\Ps, \btheta)$ has the same solution as the constrained problem—the constraints are enforced by the multipliers rather than explicitly.</p>
 
-**Solving for $\Ps$ given $\btheta$.**  For fixed $\btheta$, we maximize $\mathcal{L}(\Ps, \btheta)$ over distributions $\Ps$.  Writing out the expectation as $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \sum_S \Ps(S)\, \mathbf{1}[i \in S]$ and taking the derivative with respect to each $\Ps(S)$:
+<p><b>Solving for $\Ps$ given $\btheta$.</b>  For fixed $\btheta$, we maximize $\mathcal{L}(\Ps, \btheta)$ over distributions $\Ps$.  Writing out the expectation as $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \sum_S \Ps(S)\, \mathbf{1}[i \in S]$ and taking the derivative with respect to each $\Ps(S)$:</p>
 
 $$
 \frac{\partial \mathcal{L}(\Ps, \btheta)}{\partial \Ps(S)} = -\log \Ps(S) - 1 + \sum_{i \in S} \theta_i
 $$
 
-Setting this to zero gives $\Ps(S) \propto \exp\!\big(\sum_{i \in S} \theta_i\big)$.  (We don't need a separate multiplier for the normalization constraint $\sum_S \Ps(S) = 1$ because we can absorb it into the proportionality constant.)  After normalizing over size-$n$ subsets:
+<p>Setting this to zero gives $\Ps(S) \propto \exp\!\big(\sum_{i \in S} \theta_i\big)$.  (We don't need a separate multiplier for the normalization constraint $\sum_S \Ps(S) = 1$ because we can absorb it into the proportionality constant.)  After normalizing over size-$n$ subsets:</p>
 
 $$
 \Ps(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
 $$
 
-where $\w_i \defeq e^{\theta_i}$ and $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is the normalizing constant.  This is exactly the conditional Poisson distribution!  So the max-entropy distribution with inclusion-probability constraints must be a CPS distribution—the only question is *which* weights.
+<p>where $\w_i \defeq e^{\theta_i}$ and $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is the normalizing constant.  This is exactly the conditional Poisson distribution!  So the max-entropy distribution with inclusion-probability constraints must be a CPS distribution—the only question is <em>which</em> weights.</p>
 
-**Eliminating $\Ps$.**  Now substitute this optimal $\Ps$ back into $\mathcal{L}(\Ps, \btheta)$ to get a function of $\btheta$ alone.  The inclusion probabilities under $\Ps$ are $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \pip_i(\btheta)$, so:
+<p><b>Eliminating $\Ps$.</b>  Now substitute this optimal $\Ps$ back into $\mathcal{L}(\Ps, \btheta)$ to get a function of $\btheta$ alone.  The inclusion probabilities under $\Ps$ are $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \pip_i(\btheta)$, so:</p>
 
 $$
 \mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_i \theta_i \big(\pip_i(\btheta) - \piptgt_i\big)
 $$
 
-We need $H(\Ps)$.  Since $\log \Ps(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$:
+<p>We need $H(\Ps)$.  Since $\log \Ps(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$:</p>
 
 $$
 \begin{align}
@@ -3106,7 +3106,7 @@ H(\Ps) &= -\sum_S \Ps(S) \log \Ps(S) \\
 \end{align}
 $$
 
-where the last step uses $\sum_S \Ps(S) \sum_{i \in S} \theta_i = \sum_i \theta_i \pip_i(\btheta) = \bpip(\btheta)^\top \btheta$.  Substituting $H(\Ps)$ into $\mathcal{L}(\Ps, \btheta)$:
+<p>where the last step uses $\sum_S \Ps(S) \sum_{i \in S} \theta_i = \sum_i \theta_i \pip_i(\btheta) = \bpip(\btheta)^\top \btheta$.  Substituting $H(\Ps)$ into $\mathcal{L}(\Ps, \btheta)$:</p>
 
 $$
 \begin{align}
@@ -3116,11 +3116,11 @@ $$
 \end{align}
 $$
 
-The $\bpip(\btheta)$ terms cancel, leaving a clean function of $\btheta$ alone.
+<p>The $\bpip(\btheta)$ terms cancel, leaving a clean function of $\btheta$ alone.</p>
 
-**The dual problem.**  The dual minimizes $\mathcal{L}(\Ps, \btheta)$ over $\btheta$.  Negating to turn this into a maximization, we get $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$.  This is concave because $\log \Zw{\bw}{n}$ is convex in $\btheta$ (it is a log of a sum of exponentials).
+<p><b>The dual problem.</b>  The dual minimizes $\mathcal{L}(\Ps, \btheta)$ over $\btheta$.  Negating to turn this into a maximization, we get $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$.  This is concave because $\log \Zw{\bw}{n}$ is convex in $\btheta$ (it is a log of a sum of exponentials).</p>
 
-**Why it works.**  Because the inclusion-probability constraints are linear in $\Ps$ and a feasible $\Ps$ exists (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$), there is no gap between the primal and dual optima.  So the optimal $\btheta$ from the dual gives weights $\w_i = e^{\theta_i}$ whose conditional Poisson distribution solves the primal: it achieves maximum entropy among all distributions over size-$n$ subsets, and its inclusion probabilities match the targets exactly, $\bpip(\btheta) = \bpiptgt$.
+<p><b>Why it works.</b>  Because the inclusion-probability constraints are linear in $\Ps$ and a feasible $\Ps$ exists (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$), there is no gap between the primal and dual optima.  So the optimal $\btheta$ from the dual gives weights $\w_i = e^{\theta_i}$ whose conditional Poisson distribution solves the primal: it achieves maximum entropy among all distributions over size-$n$ subsets, and its inclusion probabilities match the targets exactly, $\bpip(\btheta) = \bpiptgt$.</p>
 
 </details>
 
