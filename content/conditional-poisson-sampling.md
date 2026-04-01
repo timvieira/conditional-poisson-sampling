@@ -3070,13 +3070,13 @@ $$
 \mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_i \theta_i \big(\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] - \piptgt_i\big)
 $$
 
-Maximizing $\mathcal{L}$ over $\Ps \in \triangle^{\binom{\mathcal{S}}{n}}$ for fixed $\btheta$: the entropy barrier keeps $\Ps$ in the interior, so we set $\partial \mathcal{L}/\partial \Ps(S) = -\log \Ps(S) - 1 + \sum_{i \in S} \theta_i = 0$, giving $\Ps(S) \propto \exp\!\big(\sum_{i \in S} \theta_i\big)$.  Normalizing over size-$n$ subsets:
+Maximizing $\mathcal{L}(\Ps, \btheta)$ over $\Ps \in \triangle^{\binom{\mathcal{S}}{n}}$ for fixed $\btheta$: the entropy barrier keeps $\Ps$ in the interior, so we set $\partial \mathcal{L}(\Ps, \btheta)/\partial \Ps(S) = -\log \Ps(S) - 1 + \sum_{i \in S} \theta_i = 0$, giving $\Ps(S) \propto \exp\!\big(\sum_{i \in S} \theta_i\big)$.  Normalizing over size-$n$ subsets:
 
 $$
 \Ps(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
 $$
 
-where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n}$ is the normalizing constant—this is precisely the conditional Poisson distribution.  Substituting $\Ps$ back into $\mathcal{L}$: since $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \pip_i(\btheta)$, we get $\mathcal{L} = H(\Ps) + \sum_i \theta_i \big(\pip_i(\btheta) - \piptgt_i\big)$.  The entropy of this exponential-family distribution is
+where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n}$ is the normalizing constant—this is precisely the conditional Poisson distribution.  Substituting $\Ps$ back into $\mathcal{L}(\Ps, \btheta)$: since $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \pip_i(\btheta)$, we get $\mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_i \theta_i \big(\pip_i(\btheta) - \piptgt_i\big)$.  The entropy of this exponential-family distribution is
 
 $$
 \begin{align}
@@ -3086,7 +3086,7 @@ H(\Ps) &= -\sum_S \Ps(S) \log \Ps(S) \\
 \end{align}
 $$
 
-Substituting $H(\Ps)$ into $\mathcal{L}$:
+Substituting $H(\Ps)$ into $\mathcal{L}(\Ps, \btheta)$:
 
 $$
 \begin{align}
@@ -3096,11 +3096,11 @@ $$
 \end{align}
 $$
 
-The dual problem is to find $\btheta$ maximizing $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$ (the negation of $\mathcal{L}$).  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $\Ps$ and the primal is feasible (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$), so at the optimum, the conditional Poisson distribution parameterized by $\w_i = e^{\theta_i}$ achieves maximum entropy among all distributions over size-$n$ subsets with inclusion probabilities $\bpiptgt$—in particular, $\bpip(\btheta) = \bpiptgt$.
+The dual problem is to find $\btheta$ maximizing $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$ (the negation of $\mathcal{L}(\Ps, \btheta)$).  This is concave (since $\log \Zw{\bw}{n}$ is convex as a log-partition function).  Strong duality holds because the marginal constraints are affine in $\Ps$ and the primal is feasible (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$), so at the optimum, the conditional Poisson distribution parameterized by $\w_i = e^{\theta_i}$ achieves maximum entropy among all distributions over size-$n$ subsets with inclusion probabilities $\bpiptgt$—in particular, $\bpip(\btheta) = \bpiptgt$.
 
 </details>
 
-**Gradient.**  $\nabla_{\btheta} \ell(\btheta) = \bpiptgt - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpiptgt$ exactly, so the gradient is zero.  Each evaluation of $\ell$ and $\nabla \ell$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
+**Gradient.**  $\nabla_{\btheta} \ell(\btheta) = \bpiptgt - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpiptgt$ exactly, so the gradient is zero.  Each evaluation of $\ell(\btheta)$ and $\nabla \ell(\btheta)$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
 
 **Optimizer.**  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The [Poisson approximation](#The-Poisson-Approximation) provides a warm start: $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.
 
