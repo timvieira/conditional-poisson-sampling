@@ -27,16 +27,19 @@ def do_build():
         build.build()
     except Exception as e:
         print(f"\n*** Build error: {e} ***\n")
-    # Link to the blog's CSS so stylesheets resolve in preview
-    css_link = OUTPUT_DIR / "css"
-    if not css_link.exists():
-        css_link.symlink_to(BLOG_DIR / "content" / "css")
 
 
 def serve():
+    BLOG_CSS_DIR = BLOG_DIR / "content" / "css"
+
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *a, **kw):
             super().__init__(*a, directory=str(OUTPUT_DIR), **kw)
+        def translate_path(self, path):
+            # Serve /css/* from the blog's CSS directory
+            if path.startswith("/css/"):
+                return str(BLOG_CSS_DIR / path[5:])
+            return super().translate_path(path)
         def log_message(self, fmt, *args):
             pass  # quiet
 
