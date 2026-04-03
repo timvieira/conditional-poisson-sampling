@@ -4,25 +4,15 @@ cd "$(git rev-parse --show-toplevel)"
 
 echo "Building..."
 python3 -c "
-import re, sys; from pathlib import Path
+import sys; from pathlib import Path
 sys.path.insert(0, str(Path.home() / 'projects/blog/main'))
-import build
+import build, postdev
 build.CONTENT_DIR = Path('content')
 build.OUTPUT_DIR = Path('output')
 build.TEMPLATE_DIR = Path.home() / 'projects/blog/main'
 build.STATIC_DIRS = []
 build.build()
-
-# Rewrite CSS references to point to the central blog
-for html in Path('output').rglob('*.html'):
-    text = html.read_text()
-    fixed = re.sub(
-        r'href=\"[^\"]*?/css/blog\.css\"',
-        'href=\"https://timvieira.github.io/blog/css/blog.css\"',
-        text,
-    )
-    if fixed != text:
-        html.write_text(fixed)
+postdev.rewrite_blog_css('output')
 "
 
 echo "Committing output..."
