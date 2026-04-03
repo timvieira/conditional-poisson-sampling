@@ -27,6 +27,10 @@ def do_build():
         build.build()
     except Exception as e:
         print(f"\n*** Build error: {e} ***\n")
+    # Link to the blog's CSS so stylesheets resolve in preview
+    css_link = OUTPUT_DIR / "css"
+    if not css_link.exists():
+        css_link.symlink_to(BLOG_DIR / "content" / "css")
 
 
 def serve():
@@ -36,8 +40,14 @@ def serve():
         def log_message(self, fmt, *args):
             pass  # quiet
 
-    httpd = HTTPServer(("", PORT), Handler)
-    print(f"Serving at http://localhost:{PORT}/conditional-poisson-sampling/")
+    port = PORT
+    while True:
+        try:
+            httpd = HTTPServer(("", port), Handler)
+            break
+        except OSError:
+            port += 1
+    print(f"Serving at http://localhost:{port}/conditional-poisson-sampling/")
     httpd.serve_forever()
 
 

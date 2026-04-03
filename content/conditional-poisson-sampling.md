@@ -1531,7 +1531,7 @@ Drag the weight sliders to change $w_i$ and see how the split distributions upda
   // ── Layout ──
   var ballR = 6;
   var nodeW = 44, nodeH = 28;
-  var pmfBarW = 6, pmfBarH = 20, pmfGap = 2;
+  var pmfBarW = 6, pmfBarH = 40, pmfGap = 2;
   var vGap = 90;
   var sliderH = 50, sliderW, maxW = 3.0;
   var sliderFills = [], sliderLabels = [];

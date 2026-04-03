@@ -2,19 +2,13 @@
 
 ## Next Up
 
-- [x] Fix "Objective." paragraph in Fitting section: the log P(S) equation doesn't obviously connect to the L(θ) objective that follows. Bridge the gap explicitly.
-- [x] Fix "The gradient is π(θ) − π*" — gradient of what w.r.t. what? Write ∇_θ L(θ) = π(θ) − π*.
-- [x] Cut all HVP (Hessian-vector product) material: summary table row, PyTorch section mentions, compute_hvp tests/timing, D-tree references.
-- [x] Cut the "Fitting weights to target inclusion probabilities" bar chart (cell 28) — the max error number already confirms the fit.
-- [x] Remove NumPy implementation details from the post (numerical stability section, scipy.signal.convolve internals, hand-coded tree traversal discussion). Focus on algorithm/math, point to code for implementation.
-
 - [x] Weighted Pascal recurrence needs base cases.
 - [x] Weighted Vandermonde identity: the statement jumps straight to the generating function proof without connecting the combinatorial claim to the generating function setup. Bridge the gap — explain why the identity follows from factoring the generating function before diving into the proof.
 - [ ] Speed comparison against the R packages (UPmaxentropy in `sampling`, BalancedSampling) — show wall-clock times for computing π and drawing samples at various N.
-- [x] Move the interactive explorer widget — it's currently between `cells[1:3]` and `cells[3:10]` in the .md template (line ~7–284), interrupting the exposition of the distribution before the reader knows what w, π, P(S) mean. Move it later, e.g., after the product tree / basic usage sections.
-- [x] Move more content out of the Jupyter notebook into the markdown file. The .md file is the master template and allows finer control over layout, widget placement, and prose flow. Migrate prose-heavy cells from the .ipynb into .md, keeping only code cells and their outputs in the notebook.
-- [x] Move the interactive explorer widget later in the introduction (after intro prose, before rejection sampler).
-- [x] Make the P(S) horizontal bars in the interactive explorer a little taller.
+- [ ] Make the P(S) horizontal bars in the interactive explorer taller - ideally, as similar/same width to the other bars
+- [ ] Add a disclaimer that this post was written with extensive help from Claude Code, especially in the interactive widgets, which would not have been possible without Claude Code.
+- [ ] Timing section seems out of place and I really don't need to see the timing code - the plot and explanation of the experimental setup is good enough / better.
+- [ ] Need to explain that controlling the inclusion probabilities is the key to the optimal, unbiased, k-sparse estimator of the distribuion, which is what HT provides.  The optimal inclusion probabilities are \pi = min(1, p_i \tau) where \tau is the solution to n = \sum_i min(1, p_i \tau).  Give a citation (or just prove it).
 
 ## Confusing / Poorly Explained
 
@@ -38,7 +32,7 @@
 - [x] Add pseudocode for the sampling procedure (recursive quota-splitting, ~5-10 lines)
 - [x] Add a scatter plot of $w_i$ vs $\pi_i$ to build intuition for the nonlinear relationship
 - [x] Small example (Cell 4): added bar chart comparing rescaled weights ($w_i / W \cdot n$) vs $\pi_i$ — both sum to $n$ for visual comparability
-- [ ] Investigate whether there's a more principled scale correction factor (tilting parameter $\lambda$, saddlepoint, etc.) for comparing weights and inclusion probabilities
+- [x] ~~Investigate whether there's a more principled scale correction factor~~ — addressed: contour radius r derived from Poisson approximation / saddlepoint is already principled.
 - [x] Justify convexity of the fitting problem in one sentence (log-partition function of an exponential family)
 - [x] Move the "maximum entropy" characterization earlier — it's a major selling point, currently buried in the summary
 - [x] Add a "Motivation" paragraph with 2-3 concrete use cases (survey sampling, beam search, subset selection in ML)
@@ -49,6 +43,8 @@
 - [x] Rejection bound in Cell 4 — added expandable derivation following De Vita (2023) and defined $W$
 - [x] Brute-force log Z verification (Cell 15) is circular — it adds `cp_small.log_normalizer` to already-normalized log-probs and recovers it; compute log Z from brute force independently instead
 - [x] Fitting objective (Cell 16) is called "log-likelihood" but is actually the expected log-probability E_{S~P*}[log P_θ(S)]; call it "expected log-probability" or "cross-entropy objective"
+- [ ] I don't think P_L and P_R are defined anywhere - can we avoid using them or do we need to define them?
+- [ ] write the sampling pseudocode in the same style as the rejection sampler.
 
 ## Undefined / Missing Definitions
 
@@ -132,7 +128,7 @@
 - [x] Title Case all subsection headings.
 - [x] Verification checkmark pills: placed after punctuation like footnote markers. (Sizing/padding still TODO.)
 - [x] Contour scaling section rewritten with full derivation: Cauchy integral formula motivation, why we get to choose r, saddlepoint/tilting-parameter derivation, connection to Poisson expected size. Title-cased heading.
-- [ ] Add a diagram of the contour integral in the complex plane — show the circle |z|=r with the generating function's poles at z = -1/w_i, and how changing r shifts which poles are inside/outside the contour. (The text now explains the math; a visual would reinforce it.)
+- [x] Add a diagram of the contour integral in the complex plane — done: interactive D3 widget in div#contour-diagram.
 - [x] Numerical validation of contour radius: added code cell showing r=1 gives 10^16 dynamic range and wrong log Z, while r=r* gives dynamic range 1 and machine-precision log Z.
 - [x] Fix complexity column in summary table: replaced +O(1)× with O(N log² n), fixed D-tree table too. Also fixed O(N log² N) → O(N log² n) throughout (truncation). Baur-Strassen 5× constant cited in Cell 35.
 - [x] Fitting cost breakdown: added per-iteration cost paragraph to Cell 27 (line search × O(N log² n) eval + O(mN) two-loop).
@@ -151,9 +147,9 @@
 - [x] Smooth out the opening: dropped bold question, removed unsupported applications, used ∝, merged imports into first code cell, tightened Cell 3→5 flow.
 - [x] Small example uses non-integer weights: changed to w = (1.5, 3.2, 0.8, 4.5). Updated Cell 4 table, Z, π values, bar chart, and Cell 12 w_ex.
 - [x] Add indicator columns to the Cell 4 example table: show each subset as both a set label $\{1,2\}$ and a row of 0/1 indicators for each item. This makes the indicator structure visible and sets up π as the (weighted) column sum. Keep the set label as the row label. Add a bottom row showing $\pi_i = \mathbb{E}[\mathbf{1}_i]$ for each column—the inclusion probability is literally the expected value of the indicator, computed as the P(S)-weighted column sum.
-- [ ] Worked examples should not assume N is a clean power of 2 — currently N=4 (micro-example) and N=8 (tree diagrams/worked example). Using e.g. N=5 or N=7 would show how padding works and avoid the impression that the algorithm requires power-of-2 input. The tree diagrams and w_ex array in Cell 12 would need updating.
+- [x] ~~Worked examples should not assume N is a clean power of 2~~ — dropped; power-of-2 examples are clearer for teaching and the code handles arbitrary N transparently.
 - [x] Reconcile w_i domain: added WLOG blockquote in Cell 41 parameterizations section — w_i=0 excluded, w_i=∞ deterministically included, general case reduces to finite positive.
-- [ ] Refactor display-heavy code cells into `display_utils.py` — many notebook cells are mostly formatting cruft (html_table, display(HTML(...)), plot boilerplate). Move these to helper functions so cells become one-liners like `show_upward_pass(w_ex, n_ex)`. Alternatively, use cell metadata `"jupyter": {"source_hidden": true}` to collapse pure-display cells.
+- [x] Refactor display-heavy code cells into `display_utils.py` — done: html_table, check_mark, poly_html moved to display_utils.py.
 - [x] Removed color coding from all macros (kept macro structure). Removed color legend.
 - [x] Vector concatenation notation: defined on first use before Vandermonde identity in Cell 41.
 - [x] Weighted Vandermonde identity: promoted to Proposition with collapsible proof (factor the product, equate z^k coefficients). Cited unweighted Vandermonde's identity. The proof follows from expanding the product $\prod_{i \in A \cup B}(1 + w_i z) = \prod_{i \in A}(1 + w_i z) \cdot \prod_{i \in B}(1 + w_i z)$ and collecting the coefficient of $z^k$ via convolution. Currently stated without proof in the Recurrences and Algorithms subsection of Cell 42. Cite the unweighted version: [Vandermonde's identity](https://en.wikipedia.org/wiki/Vandermonde%27s_identity). Include a short proof (e.g., in a footnote or `<details>` block) — it's only one line: factor the product, equate z^k coefficients.
@@ -213,4 +209,4 @@ Apply before every commit touching the notebook:
 
 ## MIsc
 
-[ ] "Why the tree matters." there are other non quadratic solutions that don't involve the tree.  So - it's linear forward + backprop that matters not the tree 
+[x] ~~"Why the tree matters."~~ — addressed: blog post now explains that forward + backprop is the key insight, the tree is just the fastest forward pass.
