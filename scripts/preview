@@ -27,10 +27,6 @@ def do_build():
         build.build()
     except Exception as e:
         print(f"\n*** Build error: {e} ***\n")
-    # Link to the blog's CSS so stylesheets resolve in preview
-    css_link = OUTPUT_DIR / "css"
-    if not css_link.exists():
-        css_link.symlink_to(BLOG_DIR / "content" / "css")
 
 
 def serve():
