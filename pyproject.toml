@@ -12,3 +12,5 @@ dependencies = ["numpy"]
 
 [tool.setuptools]
 py-modules = ["conditional_poisson"]
+
+[tool.postdev]
