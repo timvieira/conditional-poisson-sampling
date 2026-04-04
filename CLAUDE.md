@@ -49,16 +49,16 @@ The blog post is assembled from two files:
 
 The build system (`~/projects/blog/main/build.py`) renders the .md file using Python-Markdown with nbconvert for notebook cell inclusions, and a Jinja2 template for the page chrome.
 
-## Scripts
+## Build System
 
-- **`scripts/preview`** — builds the site and serves it at `http://localhost:8000/conditional-poisson-sampling/` with file-watching auto-rebuild.
-- **`scripts/deploy`** — builds, commits `output/`, and pushes to GitHub. The site is served via GitHub Pages from the `main` branch root.
+- **`blog dev`** — builds the site and serves it at `http://localhost:8000/conditional-poisson-sampling/` with file-watching auto-rebuild.
+- **`blog deploy`** — builds, commits `docs/`, and pushes to GitHub. The site is served via GitHub Pages from the `main` branch, `/docs` directory.
 
 **Site URL:** https://timvieira.github.io/conditional-poisson-sampling/
 
 ## Workflow
 
 - Commit and push after every logical change
-- Run `scripts/deploy` to publish changes to the live site
+- Run `blog deploy` to publish changes to the live site
 - Run tests before committing
 - **Never write citations without verifying them** — check title, authors, year, venue, and URL against the actual publication. Hallucinated references are unacceptable.
