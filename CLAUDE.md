@@ -51,7 +51,7 @@ The build system (`~/projects/blog/main/build.py`) renders the .md file using Py
 
 ## Build System
 
-- **`blog dev`** — builds the site and serves it at `http://localhost:8000/conditional-poisson-sampling/` with file-watching auto-rebuild.
+- **`blog dev`** — builds the site and serves it at `http://localhost:8000/` with file-watching auto-rebuild. The dev server proxies `/blog/` to the central blog repo so CSS references work locally.
 - **`blog deploy`** — builds, commits `docs/`, and pushes to GitHub. The site is served via GitHub Pages from the `main` branch, `/docs` directory.
 
 **Site URL:** https://timvieira.github.io/conditional-poisson-sampling/
