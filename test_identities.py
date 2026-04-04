@@ -9,7 +9,7 @@ quoting or paraphrasing the relevant passage.
 import numpy as np
 from itertools import combinations
 from scipy.signal import convolve as poly_mul
-from conditional_poisson import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoisson
 
 
 # ---------------------------------------------------------------------------
@@ -623,7 +623,7 @@ def test_dtree_product_rule():
     wL, wR = w[:mid], w[mid:]
     vL, vR = v[:mid], v[mid:]
 
-    # Build P_L, P_R
+    # Build poly_L, poly_R
     PL = np.array([1.0])
     for wi in wL:
         PL = poly_mul(PL, [1.0, wi])
@@ -652,7 +652,7 @@ def test_dtree_product_rule():
             DR = np.pad(DR, (0, len(term) - len(DR)))
         DR[:len(term)] += term
 
-    # Product rule: D_root = D_L * P_R + P_L * D_R
+    # Product rule: D_root = D_L * poly_R + poly_L * D_R
     D_root = poly_mul(DL, PR) + poly_mul(PL, DR)
 
     # Direct computation: D_root = sum_i v_i w_i prod_{j≠i}(1 + w_j z)

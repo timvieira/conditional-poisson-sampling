@@ -21,6 +21,31 @@ Code and documentation must use identical notation. Stale or inconsistent notati
 - **Notation discipline**: define every symbol before first use, ideally in a consolidated notation box. Never introduce a symbol implicitly or switch parameterizations (w↔θ↔p) without flagging it. Readers should be able to trust that the same symbol means the same thing throughout.
 - **Typesetting**: use MathJax for all mathematical labels and symbols, including in interactive widgets. For SVG, use `<foreignObject>` to embed MathJax-rendered HTML. Never use plain text for math symbols.
 
+## Macros (critical)
+
+The blog post defines LaTeX macros in `<macros>` at the top of `content/conditional-poisson-sampling.md`. **Always use macros instead of bare LaTeX equivalents** in all math contexts—prose, `$$` blocks, and JavaScript-generated MathJax (`.html('$...$')`, `addMathLabel`, etc.).
+
+| Macro | Expands to | Use for |
+|-------|-----------|---------|
+| `\w` | `w` | weight element (e.g., `\w_i`) |
+| `\bw` | `\boldsymbol{w}` | weight vector |
+| `\W` | `W` | sum of weights |
+| `\Z` | `Z` | normalizing constant |
+| `\Zw{a}{b}` | `\binom{a}{b}` | weighted binomial notation |
+| `\pip` | `\pi` | inclusion probability element (e.g., `\pip_i`) |
+| `\bpip` | `\boldsymbol{\pi}` | inclusion probability vector |
+| `\Ps` | `p` | distribution |
+| `\btheta` | `\boldsymbol{\theta}` | parameter vector |
+| `\z` | `z` | formal polynomial variable |
+| `\defeq` | `\overset{\small\text{def}}{=}` | definitional equals |
+| `\llbracket` / `\rrbracket` | `[\![` / `]\!]` | Scott brackets |
+
+**Rules:**
+- Never write bare `$\pi_i$` — write `$\pip_i$`. Never write bare `$w_i$` — write `$\w_i$`. And so on for all macros above.
+- In JavaScript strings, escape the backslash: `'$\\w_i$'`, `'$\\pip_i$'`, `'$\\Ps(S)$'`.
+- When adding new notation, add a macro first, then use it everywhere.
+- Macros make global notation changes a one-line fix. Bare symbols defeat this purpose.
+
 When changing notation or API names, update **all** of these in the same commit:
 1. Code (parameter names, property names)
 2. Docstrings (module, class, method)

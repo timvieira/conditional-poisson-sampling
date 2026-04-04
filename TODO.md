@@ -7,8 +7,14 @@
 - [ ] Speed comparison against the R packages (UPmaxentropy in `sampling`, BalancedSampling) — show wall-clock times for computing π and drawing samples at various N.
 - [ ] Make the P(S) horizontal bars in the interactive explorer taller - ideally, as similar/same width to the other bars
 - [ ] Add a disclaimer that this post was written with extensive help from Claude Code, especially in the interactive widgets, which would not have been possible without Claude Code.
-- [ ] Timing section seems out of place and I really don't need to see the timing code - the plot and explanation of the experimental setup is good enough / better.
+- [ ] Timing section: hide all Python/plotting code—just show the plot. Link to relevant implementations using the checkmark/footnote pill system (e.g., each curve links to its implementation in the repo).
+- [ ] Timing section: add more baselines for computing π — (1) backprop-on-DP at O(Nn), (2) naive loop versions: N × O(Nn) DP and N × O(N log² n) product tree. These show the value of backprop vs. leave-one-out recomputation.
 - [ ] Need to explain that controlling the inclusion probabilities is the key to the optimal, unbiased, k-sparse estimator of the distribuion, which is what HT provides.  The optimal inclusion probabilities are \pi = min(1, p_i \tau) where \tau is the solution to n = \sum_i min(1, p_i \tau).  Give a citation (or just prove it).
+
+- [ ] Should we refer to polynomials more consistently as generating functions here?
+- [ ] Add link to Wikipedia page on [elementary symmetric polynomials](https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial)
+- [ ] Why are there still references to the NumPy implementation in the article? Remove all remaining mentions.
+- [ ] Package up the NumPy, PyTorch, and JavaScript libraries that are byproducts of this post. They should be easy to install or use as single-file libraries, and installable via package managers (pip, npm).
 
 ## Confusing / Poorly Explained
 
@@ -43,7 +49,7 @@
 - [x] Rejection bound in Cell 4 — added expandable derivation following De Vita (2023) and defined $W$
 - [x] Brute-force log Z verification (Cell 15) is circular — it adds `cp_small.log_normalizer` to already-normalized log-probs and recovers it; compute log Z from brute force independently instead
 - [x] Fitting objective (Cell 16) is called "log-likelihood" but is actually the expected log-probability E_{S~P*}[log P_θ(S)]; call it "expected log-probability" or "cross-entropy objective"
-- [ ] I don't think P_L and P_R are defined anywhere - can we avoid using them or do we need to define them?
+- [x] I don't think P_L and P_R are defined anywhere - can we avoid using them or do we need to define them?
 - [ ] write the sampling pseudocode in the same style as the rejection sampler.
 
 ## Undefined / Missing Definitions
@@ -99,7 +105,7 @@
 - [ ] Test GPU performance — both torch_fft_prototype.py (FFT) and torch_prototype.py (direct conv1d) should be benchmarked on GPU. The FFT version is faster on CPU, but direct convolution may have better GPU characteristics (no FFT synchronization, better memory access patterns). Keep both implementations as the benchmark in torch_fft_prototype.py's __main__ compares them. float32 precision risk needs testing (contour scaling helps but may not fully compensate).
 - [x] Compare Newton-CG fitting to simpler optimizers — L-BFGS with gradient only is 2-4x faster than Newton-CG with HVP. D-tree/HVP demoted to bonus appendix in blog post.
 - [x] **Fitting optimizer is a hot mess** — resolved: torch's LBFGS does implement H₀ scaling (sᵀy/yᵀy), and setting `tolerance_grad=tol` gives a principled stopping rule: the gradient is π(θ) - π★, so the optimizer stops when max|π - π★| ≤ tol. Documented in docstring.
-- [ ] Promote torch_fft_prototype.py to the primary library implementation — it's faster (O(N log² n) vs O(N log² N)), simpler (no hand-coded downward pass or D-tree), and supports autograd for integration as a neural network layer. The NumPy implementation (conditional_poisson.py) becomes a pedagogical/reference implementation that makes the algorithm transparent without requiring PyTorch — keep it, but frame it as the teaching version. Need to: add sampling to the torch version, match the full ConditionalPoisson API (fit, log_prob, etc.), add tests, decide on the package structure.
+- [ ] Promote torch_fft_prototype.py to the primary library implementation — it's faster (O(N log² n) vs O(N log² N)), simpler (no hand-coded downward pass or D-tree), and supports autograd for integration as a neural network layer. The NumPy implementation (conditional_poisson_numpy.py) becomes a pedagogical/reference implementation that makes the algorithm transparent without requiring PyTorch — keep it, but frame it as the teaching version. Need to: add sampling to the torch version, match the full ConditionalPoisson API (fit, log_prob, etc.), add tests, decide on the package structure.
 
 ## Bugs
 
@@ -156,6 +162,12 @@
 
 - [ ] Consistently color code math symbols and widgets — use the same colors for $P(S)$ (set probabilities), $\pi$ (inclusion probabilities), and $w$ (weights) in both LaTeX math and the interactive D3 widgets. Previously removed all color coding; bring it back in a principled way with a shared palette.
 
+## Widget UX
+
+- [ ] Inclusion probability widget: hard to distinguish forward values from adjoint (backward) values. Explore different layouts to make this clearer. Also, inclusion probabilities appear at the bottom rather than the top—should keep the forward-value + backward-value visual metaphor consistent (forward on top, adjoint/backward below).
+- [ ] Sampling pseudocode: move the `W=` line outside the loop—currently makes the line too long.
+- [x] Remove stale references to the defunct NumPy implementation.
+
 ## Visualization
 
 - [x] Interactive widget: D3 widget with draggable w and π bars, live subset table, N/n controls. Embedded in blog post, replaces static example. where readers can drag sliders to adjust weights and see the subset probabilities, normalizing constant, inclusion probabilities, and bar chart update in real time. Embed directly in the notebook (Jupyter supports `%%html`/`%%javascript` cells). This would make the relationship between weights and inclusion probabilities tangible—currently it's just a table of numbers. **Bonus:** eliminates the hardcoded-number problem entirely—all values are computed programmatically, so they can never be stale. Should support switching parameterizations: specify w and compute π (forward), or specify target π and fit w (inverse/fitting). This ties the intro example directly to the fitting section and lets readers see both directions interactively.
@@ -182,7 +194,7 @@ Apply before every commit touching the notebook:
 - [x] Fold brute-force verification into a collapsible block or just reference the test suite
 - [x] Sampling cost $O(n \log N)$ assumes $n \ll N$; when $n \approx N$ essentially all nodes are visited — note this or clarify
 - [x] Consider switching from Scott bracket notation to the more standard $[z^k] f(z)$ — keeping Scott brackets (less familiar but avoids ambiguity)
-- [x] Link to `conditional_poisson.py` points to repo root, not the file itself
+- [x] Link to `conditional_poisson_numpy.py` points to repo root, not the file itself
 - [x] HTML acceptance rate table (Cell 5) — kept as HTML because Jupyter doesn't render LaTeX in markdown tables
 - [x] DP baseline in timing section (Cell 25) is $O(N^2 n)$ (recomputes from scratch per leave-one-out), not $O(Nn)$ as stated
 - [x] Color coding (weights blue, π crimson, Z orange) is never explained in the text; invisible to colorblind readers or raw markdown viewers

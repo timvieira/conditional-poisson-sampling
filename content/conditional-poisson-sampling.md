@@ -97,7 +97,7 @@ small { font-size: smaller; }
 
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
-**Interactive explorer.** Drag the weight bars to see how changing $w_i$ affects the subset probabilities $\Ps(S)$ and inclusion probabilities $\pi_i$. Drag the $\pi_i$ bars to solve the inverse problem: find weights that produce given inclusion probabilities. Use the $N$ and $n$ controls to change the problem size.
+**Interactive explorer.** Drag the weight bars to see how changing $\w_i$ affects the subset probabilities $\Ps(S)$ and inclusion probabilities $\pip_i$. Drag the $\pip_i$ bars to solve the inverse problem: find weights that produce given inclusion probabilities. Use the $N$ and $n$ controls to change the problem size.
 
 <div id="cps"></div>
 <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -109,6 +109,7 @@ small { font-size: smaller; }
   var mobile = window.innerWidth < 600;
   var barH = mobile ? 70 : 90;
   var bw = mobile ? 22 : 28;
+  var barGap = mobile ? 4 : 6;  // gap between bars (shared by vertical columns and horizontal rows)
 
   function subs(N,n){var r=[];(function go(s,c){if(c.length===n){r.push(c.slice());return;}if(s>=N)return;c.push(s);go(s+1,c);c.pop();go(s+1,c);})(0,[]);return r;}
   function getPi(w){
@@ -154,8 +155,6 @@ small { font-size: smaller; }
 
   function makeBar(td, val, maxVal, color, draggable, onDrag) {
     var svg = td.append('svg').attr('width',bw).attr('height',barH);
-    svg.append('rect').attr('x',0).attr('y',0).attr('width',bw).attr('height',barH)
-      .attr('fill','#f8f8f8').attr('stroke','#eee').attr('rx',2);
     var frac = Math.min(val/maxVal, 1);
     var fill = svg.append('rect').attr('x',1).attr('width',bw-2).attr('rx',2)
       .attr('y',barH-frac*barH).attr('height',frac*barH)
@@ -199,15 +198,9 @@ small { font-size: smaller; }
     var tbl = root.append('table');
     var cg = tbl.append('colgroup');
     cg.append('col').style('width', 'auto');
-    for (var j=0;j<N;j++) cg.append('col').style('width', (bw+8)+'px');
+    for (var j=0;j<N;j++) cg.append('col').style('width', (bw+barGap)+'px');
     cg.append('col').style('width', '55px');
     var tbody = tbl.append('tbody');
-
-    // --- Weight labels ---
-    var wh = tbody.append('tr');
-    wh.append('td').attr('class','rl');
-    for(var i=0;i<N;i++) wh.append('td').attr('class','ic').style('color',CI).html('$w_'+(i+1)+'$');
-    wh.append('td').attr('class','pc');
 
     // --- Weight bars ---
     var wb = tbody.append('tr');
@@ -225,6 +218,12 @@ small { font-size: smaller; }
     }
     wb.append('td').attr('class','pc');
 
+    // --- Weight labels (below bars) ---
+    var wh = tbody.append('tr');
+    wh.append('td').attr('class','rl');
+    for(var i=0;i<N;i++) wh.append('td').attr('class','ic').style('color',CI).html('$\\w_'+(i+1)+'$');
+    wh.append('td').attr('class','pc');
+
     // --- Spacer ---
     tbody.append('tr').append('td').attr('colspan',N+2).style('height','6px');
 
@@ -239,14 +238,16 @@ small { font-size: smaller; }
       sh.append('td').attr('class','pc').style('text-align','left').style('color',CW).html('$\\Ps(S)$');
 
       // --- Subset rows ---
+      var pBarH = bw;
+      var pRowH = pBarH + barGap;
       tdata.forEach(function(r){
-        var tr = tbody.append('tr');
-        tr.append('td').attr('class','rl').style('color','#333').style('font-style','normal').style('text-align','right').text('{'+r.s.map(function(j){return j+1;}).join(', ')+'}');
-        r.ind.forEach(function(v){tr.append('td').attr('class','ic'+(v?'':' zero')).text(v);});
-        var pc = tr.append('td').attr('class','pc').style('text-align','left').style('padding','1px 2px');
+        var tr = tbody.append('tr').style('height',pRowH+'px').style('line-height',pRowH+'px');
+        tr.append('td').attr('class','rl').style('color','#333').style('font-style','normal').style('text-align','right').style('padding','0 2px').style('vertical-align','middle').text('{'+r.s.map(function(j){return j+1;}).join(', ')+'}');
+        r.ind.forEach(function(v){tr.append('td').attr('class','ic'+(v?'':' zero')).style('padding','0 2px').style('vertical-align','middle').text(v);});
+        var pc = tr.append('td').attr('class','pc').style('text-align','left').style('padding','0 2px').style('vertical-align','middle');
         var barWrap = pc.append('div').style('display','flex').style('align-items','center').style('gap','3px');
         barWrap.append('div').attr('class','prob-bar')
-          .style('height','14px').style('border-radius','2px')
+          .style('height',pBarH+'px').style('border-radius','2px')
           .style('background',CW).style('opacity','0.7')
           .style('min-width','1px');
         barWrap.append('span').attr('class','prob-val')
@@ -260,15 +261,9 @@ small { font-size: smaller; }
     // --- Spacer ---
     tbody.append('tr').append('td').attr('colspan',N+2).style('height','6px');
 
-    // --- Pi header ---
-    var ph = tbody.append('tr');
-    ph.append('td').attr('class','rl').style('color',CP).html('inclusion prob.');
-    for(var i=0;i<N;i++) ph.append('td').attr('class','ic').style('color',CP).style('font-weight','bold').html('$\\pi_'+(i+1)+'$');
-    ph.append('td').attr('class','pc');
-
     // --- Pi bars ---
     var pb = tbody.append('tr');
-    pb.append('td').attr('class','rl').style('font-size','0.7em').style('color','#999').html('drag to set target<br>($\\sum \\pi_i = n$)');
+    pb.append('td').attr('class','rl').style('font-size','0.7em').style('color','#999').html('drag to set target<br>($\\sum_i \\pip_i = n$)');
     for(var i=0;i<N;i++){
       (function(idx){
         var td = pb.append('td').attr('class','bar-td');
@@ -284,6 +279,12 @@ small { font-size: smaller; }
       })(i);
     }
     pb.append('td').attr('class','pc');
+
+    // --- Pi labels (below bars) ---
+    var ph = tbody.append('tr');
+    ph.append('td').attr('class','rl').style('color',CP).html('inclusion prob.');
+    for(var i=0;i<N;i++) ph.append('td').attr('class','ic').style('color',CP).style('font-weight','bold').html('$\\pip_'+(i+1)+'$');
+    ph.append('td').attr('class','pc');
 
     update();
     // Typeset MathJax after DOM is rebuilt
@@ -309,7 +310,7 @@ small { font-size: smaller; }
       tdata.forEach(function(r,i){
         if(!probCells[i])return;
         probCells[i].select('.prob-val').text(r.p.toFixed(3));
-        probCells[i].select('.prob-bar').style('width', Math.max(1, r.p/maxP*60)+'px');
+        probCells[i].select('.prob-bar').style('width', Math.max(1, r.p/maxP*100)+'px');
       });
     }
   }
@@ -358,7 +359,7 @@ svg text { font-family: 'EB Garamond', serif; }
 
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0; width: fit-content; min-width: 100%; max-width: none;">
 
-**Interactive product tree.** Drag the weight sliders to see how changing $w_i$ affects the polynomial coefficients at every node. The tree builds the product $\prod_i(1 + w_i z)$ bottom-up; the $n$<sup>th</sup> coefficient at the root (highlighted in red) is the normalizing constant $Z$. Use the $N$ and $n$ controls to change the problem size.
+**Interactive product tree.** Drag the weight sliders to see how changing $\w_i$ affects the polynomial coefficients at every node. The tree builds the product $\prod_i(1 + \w_i \z)$ bottom-up; the $n$<sup>th</sup> coefficient at the root (highlighted in red) is the normalizing constant $\Z$. Use the $N$ and $n$ controls to change the problem size.
 
 <div id="tw"></div>
 <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -533,9 +534,9 @@ svg text { font-family: 'EB Garamond', serif; }
     var arrowLen = 14;     // connector arrows between zones
     var nodeH = bH + nodePad;
 
-    // Zone 1: inputs (labels + sliders)
+    // Zone 1: inputs (sliders, then labels below)
     var inputZoneTop = topPad;
-    var inputZoneBot = topPad + labelH + sliderH + 4;
+    var inputZoneBot = topPad + sliderH + labelH + 10;
     // Separator 1
     var sep1Y = inputZoneBot + sepGap/2;
     // Zone 2: circuit (tree nodes)
@@ -658,7 +659,7 @@ svg text { font-family: 'EB Garamond', serif; }
           g.append('rect')
             .attr('x', bx).attr('y', by)
             .attr('width', bW).attr('height', bH)
-            .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 2);
+            .attr('fill', 'none').attr('stroke', 'none').attr('rx', 2);
           // Fill
           var cr = g.append('rect')
             .attr('x', bx + 1).attr('width', bW - 2).attr('rx', 2)
@@ -748,7 +749,7 @@ svg text { font-family: 'EB Garamond', serif; }
       if (nd.pad) return;
       (function(idx) {
         var barX = nd._barXs[1];
-        var sliderTop = topPad + labelH;
+        var sliderTop = topPad;
         var isNew = lastAction === 'add' && idx === N - 1;
         var sg = svg.append('g').classed('new-node', isNew);
 
@@ -756,7 +757,7 @@ svg text { font-family: 'EB Garamond', serif; }
         sg.append('rect')
           .attr('x', barX + 1).attr('y', sliderTop)
           .attr('width', bW - 2).attr('height', sliderH)
-          .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
+          .attr('fill', 'none').attr('stroke', 'none').attr('rx', 1);
 
         // Fill
         var frac = Math.min(w[idx] / WMAX, 1);
@@ -774,8 +775,8 @@ svg text { font-family: 'EB Garamond', serif; }
           .text(w[idx].toFixed(2));
         sliderLabels.push(sl);
 
-        // Item label above slider (MathJax)
-        var ml = addMathLabel(svgWrap, barX + bW/2, topPad, '$w_{' + (idx+1) + '}$', {anchor:'middle', color:CI, fontSize:'11px'});
+        // Item label below slider (MathJax)
+        var ml = addMathLabel(svgWrap, barX + bW/2, sliderTop + sliderH - 6, '$\\w_{' + (idx+1) + '}$', {anchor:'middle', color:CI, fontSize:'13px'});
         if (isNew) ml.classed('new-node', true);
 
         // Drag target (wider for touch)
@@ -833,7 +834,7 @@ svg text { font-family: 'EB Garamond', serif; }
   function updateTree() {
     var data = root.datum();
     var levels = data.levels;
-    var sliderTop = 10 + 16; // topPad + labelH
+    var sliderTop = 10; // topPad (label is below slider now)
 
     // Update sliders
     for (var i = 0; i < N; i++) {
@@ -1083,9 +1084,9 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
     var arrowLen = 14;
     var nodeH = halfH * 2 + divider + nodePad;
 
-    // Zone 1: inputs (labels + sliders)
+    // Zone 1: inputs (sliders, then labels below)
     var inputZoneTop = topPad;
-    var inputZoneBot = topPad + labelH + sliderH + 4;
+    var inputZoneBot = topPad + sliderH + labelH + 10;
     var sep1Y = inputZoneBot + sepGap/2;
     // Zone 2: tree (leaves at top, root at bottom â€” same as forward widget)
     var leafY = sep1Y + sepGap/2 + arrowLen;
@@ -1193,7 +1194,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
 
           g.append('rect').attr('x', bx).attr('y', fwdTop)
             .attr('width', bW).attr('height', halfH)
-            .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 2);
+            .attr('fill', 'none').attr('stroke', 'none').attr('rx', 2);
           var fr = g.append('rect')
             .attr('x', bx + 1).attr('width', bW - 2).attr('rx', 2)
             .attr('y', fwdTop + halfH - fPx).attr('height', fPx)
@@ -1216,7 +1217,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
 
           g.append('rect').attr('x', bx).attr('y', adjTop)
             .attr('width', bW).attr('height', halfH)
-            .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 2);
+            .attr('fill', 'none').attr('stroke', 'none').attr('rx', 2);
           var ar = g.append('rect')
             .attr('x', bx + 1).attr('width', bW - 2).attr('rx', 2)
             .attr('y', adjTop + halfH - aPx).attr('height', aPx)
@@ -1268,12 +1269,12 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
       (function(idx) {
         var barIdx = Math.min(1, nd._barXs.length - 1);
         var barX = nd._barXs[barIdx];
-        var sliderTop = topPad + labelH;
+        var sliderTop = topPad;
 
         var sg = svg.append('g');
         sg.append('rect').attr('x', barX + 1).attr('y', sliderTop)
           .attr('width', bW - 2).attr('height', sliderH)
-          .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
+          .attr('fill', 'none').attr('stroke', 'none').attr('rx', 1);
 
         var frac = Math.min(w[idx] / WMAX, 1);
         var sf = sg.append('rect')
@@ -1289,7 +1290,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
           .text(w[idx].toFixed(2));
         sliderLabels.push(sl);
 
-        addMathLabel(svgWrap, barX + bW/2, topPad, '$w_{' + (idx+1) + '}$', {anchor:'middle', color:CI, fontSize:'11px'});
+        addMathLabel(svgWrap, barX + bW/2, sliderTop + sliderH - 6, '$\\w_{' + (idx+1) + '}$', {anchor:'middle', color:CI, fontSize:'13px'});
 
         sg.append('rect')
           .attr('x', barX - 4).attr('y', sliderTop - 2)
@@ -1314,7 +1315,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
       // Track
       svg.append('rect').attr('x', bx + 1).attr('y', outputY)
         .attr('width', piBarW - 2).attr('height', piBarH)
-        .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 2);
+        .attr('fill', 'none').attr('stroke', 'none').attr('rx', 2);
 
       var piFrac = Math.min(pi[idx], 1);
       var pb = svg.append('rect')
@@ -1340,8 +1341,8 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
         .attr('stroke', '#d4a0a0').attr('stroke-width', 1)
         .attr('marker-end', 'url(#bpArrowDown)');
 
-      addMathLabel(svgWrap, bx + piBarW/2, outputY + piBarH + 3,
-        '$\\pi_{' + (idx+1) + '}$', {anchor:'middle', color:CR, fontSize:'11px'});
+      addMathLabel(svgWrap, bx + piBarW/2, outputY + piBarH - 6,
+        '$\\pip_{' + (idx+1) + '}$', {anchor:'middle', color:CR, fontSize:'13px'});
     });
 
     // Seed annotation at root
@@ -1372,7 +1373,7 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
   }
 
   function updateBP() {
-    var sliderTop = 10 + 16;
+    var sliderTop = 10; // topPad (label is below slider now)
 
     // Update sliders
     for (var i = 0; i < N; i++) {
@@ -1443,14 +1444,14 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
 
 ### Drawing Exact Samples
 
-Sampling reuses the product tree (no gradient computation needed).  Starting at the root with a quota of $k = n$ items to select, we walk top-down: at each internal node, randomly split the quota between the left and right subtrees.  The probability of assigning $j$ items to the left is proportional to $\llbracket P_L \rrbracket(\z^j) \cdot \llbracket P_R \rrbracket(\z^{k-j})$.  This is exact, not approximateâ€”it follows from the **weighted Vandermonde identity**: $\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$, which says the number of ways to choose $k$ items from $A \cup B$ is the convolution of the two groups' counts.  Each term in the sum is the conditional probability of a particular left/right split.  At the leaves, quota 1 means "include this item"; quota 0 means "exclude."
+Sampling reuses the product tree (no gradient computation needed).  Starting at the root with a quota of $k = n$ items to select, we walk top-down: at each internal node, randomly split the quota between the left and right subtrees.  The probability of assigning $j$ items to the left is proportional to $\llbracket P_\text{left} \rrbracket(\z^j) \cdot \llbracket P_\text{right} \rrbracket(\z^{k-j})$.  This is exact, not approximateâ€”it follows from the **weighted Vandermonde identity**: $\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$, which says the number of ways to choose $k$ items from $A \cup B$ is the convolution of the two groups' counts.  Each term in the sum is the conditional probability of a particular left/right split.  At the leaves, quota 1 means "include this item"; quota 0 means "exclude."
 
 <style>
 #sampling-anim .sa-widget-box {
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
   border: 1px solid #e0e0e0;
   border-radius: 8px;
-  padding: 16px 20px;
+  padding: 16px 20px 10px;
   margin: 16px 0;
 }
 #sampling-anim .sa-widget-box p.desc { margin-bottom: 12px; font-size: 0.95em; line-height: 1.5; }
@@ -1479,9 +1480,10 @@ Sampling reuses the product tree (no gradient computation needed).  Starting at 
   min-height: 1.4em; line-height: 1.5;
 }
 #sampling-anim #sa-result-bar {
-  margin-top: 6px; font-size: 1em; min-height: 1.6em;
+  margin-top: 6px; font-size: 1em;
   padding: 4px 0;
 }
+#sampling-anim #sa-result-bar:empty { display: none; }
 #sampling-anim svg text { font-family: 'EB Garamond', 'Georgia', serif; }
 #sampling-anim .leaf-icon, #sampling-anim .quota-ball, #sampling-anim .anim-ball,
 #sampling-anim .quota-num, #sampling-anim .hover-overlay, #sampling-anim .split-overlay {
@@ -1495,9 +1497,9 @@ Sampling reuses the product tree (no gradient computation needed).  Starting at 
 <strong>Sampling animation.</strong>
 Starting at the root with a quota of $n$ items, the algorithm walks the product tree top-down.
 At each internal node with quota $k$, it splits $k$ between left and right children with probability
-proportional to $P_L[j] \cdot P_R[k{-}j]$&mdash;the <strong>weighted Vandermonde identity</strong>.
+proportional to $\llbracket P_\text{left} \rrbracket(\z^j) \cdot \llbracket P_\text{right} \rrbracket(\z^{k-j})$&mdash;the <strong>weighted Vandermonde identity</strong>.
 At the leaves, quota 1 = selected, quota 0 = excluded.
-Drag the weight sliders to change $w_i$ and see how the split distributions update.
+Drag the weight sliders to change $\w_i$ and see how the split distributions update.
 </p>
 
 <div id="sa-controls">
@@ -1665,7 +1667,7 @@ Drag the weight sliders to change $w_i$ and see how the split distributions upda
       var nd = leafLevel[i];
       if (nd.pad) { nd.x = -9999; nd.y = -9999; continue; }
       nd.x = 20 + realIdx * hSpacing + hSpacing / 2;
-      nd.y = (treeDepth - 1) * vGap + 36;
+      nd.y = (treeDepth - 1) * vGap + 10;
       realIdx++;
     }
     for (var li = levels.length - 2; li >= 0; li--) {
@@ -1684,7 +1686,7 @@ Drag the weight sliders to change $w_i$ and see how the split distributions upda
           nd.x = -9999; nd.y = -9999;
           continue;
         }
-        nd.y = li * vGap + 36;
+        nd.y = li * vGap + 10;
       }
     }
     flatNodes = [];
@@ -1696,7 +1698,7 @@ Drag the weight sliders to change $w_i$ and see how the split distributions upda
         if (!nd.pad) flatNodes.push(nd);
       }
     }
-    return { svgW: totalW + 40, svgH: treeDepth * vGap + 46 + sliderH + 28 };
+    return { svgW: totalW + 40, svgH: treeDepth * vGap + 20 + sliderH + 10 };
   }
 
   // â”€â”€ Drawing â”€â”€
@@ -1707,6 +1709,11 @@ Drag the weight sliders to change $w_i$ and see how the split distributions upda
     drawScaffolding();
     resetAnimState();
     renderState();
+    if (window.MathJax && MathJax.typesetPromise) {
+      var el = document.getElementById('sa-anim-container');
+      MathJax.typesetClear([el]);
+      MathJax.typesetPromise([el]);
+    }
   }
 
   function drawPMF(g, nd) {
@@ -1752,17 +1759,18 @@ Drag the weight sliders to change $w_i$ and see how the split distributions upda
 
         var sg = svg.append('g').attr('class', 'weight-slider');
 
-        sg.append('text')
-          .attr('x', nd.x).attr('y', sy + sliderH + 12)
-          .attr('text-anchor', 'middle')
-          .style('font-size', '13px').style('fill', CI)
-          .style('font-family', "'EB Garamond', serif")
-          .text('w' + subscript(idx + 1));
+        sg.append('foreignObject')
+          .attr('x', nd.x - 20).attr('y', sy + sliderH - 6)
+          .attr('width', 40).attr('height', 24)
+          .append('xhtml:div')
+          .style('text-align', 'center').style('font-size', '13px')
+          .style('color', CI).style('pointer-events', 'none')
+          .html('$\\w_{' + (idx+1) + '}$');
 
         sg.append('rect')
           .attr('x', sx + 1).attr('y', sy)
           .attr('width', sliderW - 2).attr('height', sliderH)
-          .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
+          .attr('fill', 'none').attr('stroke', 'none').attr('rx', 1);
 
         var frac = Math.min(w[idx] / maxW, 1);
         var sf = sg.append('rect')
@@ -2779,7 +2787,7 @@ In pseudocode:
 def sample(node, quota):
     if node.is_leaf:
         return [node.item] if quota == 1 else []
-    # P_L[j] * P_R[quota-j] for j = 0, ..., quota
+    # poly_left[j] * poly_right[quota-j] for j = 0, ..., quota
     probs = [node.left.poly[j] * node.right.poly[quota - j]
              for j in range(quota + 1)]
     j = categorical(probs)              # how many items from the left subtree
@@ -2798,7 +2806,7 @@ All computations are verified against brute-force enumeration in the [test suite
 Now that we've seen how the product tree works under the hood, here's the library interface.
 
 ```python
-from conditional_poisson import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoisson
 import numpy as np
 
 w = np.array([0.68, 1.02, 0.55, 1.63, 0.67, 2.82])
@@ -2826,7 +2834,7 @@ $$\pip_i \;\approx\; \frac{\w_i \, r}{1 + \w_i \, r}.$$
 
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
-**Weights vs. inclusion probabilities.** The curve shows the Poisson approximation $p_i = w_i r/(1+w_i r)$; the dots show the exact $\pip_i$ (computed via the product tree).  Drag any dot horizontally to change its weight and see both update.  Use the controls to change $N$ and $n$ or resample weights.
+**Weights vs. inclusion probabilities.** The curve shows the Poisson approximation $p_i = \w_i r/(1+\w_i r)$; the dots show the exact $\pip_i$ (computed via the product tree).  Drag any dot horizontally to change its weight and see both update.  Use the controls to change $N$ and $n$ or resample weights.
 
 <div id="pi-scatter"></div>
 <script>
@@ -2936,14 +2944,14 @@ $$\pip_i \;\approx\; \frac{\w_i \, r}{1 + \w_i \, r}.$$
     gRoot.append('foreignObject')
       .attr('x', width/2 - 40).attr('y', height + 26).attr('width', 80).attr('height', 24)
       .append('xhtml:div').style('text-align','center').style('font-size','14px')
-      .html('$w_i$');
+      .html('$\\w_i$');
 
     var yLabelG = gRoot.append('g')
       .attr('transform','translate(-38,'+height/2+') rotate(-90)');
     yLabelG.append('foreignObject')
       .attr('x', -30).attr('y', -10).attr('width', 60).attr('height', 24)
       .append('xhtml:div').style('text-align','center').style('font-size','14px')
-      .html('$\\pi_i$');
+      .html('$\\pip_i$');
 
     curvePath = gRoot.append('path')
       .attr('fill','none').attr('stroke','#5b9bd5').attr('stroke-width',2).attr('opacity',0.8);
@@ -2961,12 +2969,12 @@ $$\pip_i \;\approx\; \frac{\w_i \, r}{1 + \w_i \, r}.$$
       .attr('stroke','#5b9bd5').attr('stroke-width',2);
     lg.append('foreignObject').attr('x',24).attr('y',row1Y-10).attr('width',lgW-30).attr('height',22)
       .append('xhtml:div').style('font-size','12px').style('line-height','20px')
-      .html('Poisson: $w_i r/(1{+}w_i r)$');
+      .html('Poisson: $\\w_i r/(1{+}\\w_i r)$');
     lg.append('circle').attr('cx',9).attr('cy',row2Y).attr('r',4.5)
       .attr('fill','#E91E63').attr('opacity',0.85);
     lg.append('foreignObject').attr('x',24).attr('y',row2Y-10).attr('width',lgW-30).attr('height',22)
       .append('xhtml:div').style('font-size','12px').style('line-height','20px')
-      .html('exact $\\pi_i$');
+      .html('exact $\\pip_i$');
 
     redraw();
     var el = container.node();
@@ -3133,9 +3141,9 @@ The contour scaling (described below) is essential: without it, FFT precision co
 
 ## PyTorch Implementation with Contour Scaling
 
-The NumPy implementation above uses hand-coded tree traversals with `scipy.signal.convolve`.  A natural question: can we use PyTorch's autograd to compute the gradient (inclusion probabilities) automatically, given only the forward pass?
+Can we use PyTorch's autograd to compute the gradient (inclusion probabilities) automatically, given only the forward pass?
 
-The answer is yesâ€”and it's both simpler and faster.  The key insight is that **computing $\bpip$ is just backpropagation** applied to the upward pass.  The [Baur-Strassen theorem](https://timvieira.github.io/blog/evaluating-fx-is-as-fast-as-fx/) guarantees that the gradient costs at most a small constant factor more than the forward pass ([Baur & Strassen, 1983](https://doi.org/10.1016/0304-3975(83)90110-X) prove $3\times$ for nonscalar operations on polynomials; [Griewank & Walther, 2008](https://doi.org/10.1137/1.9780898717761) give $5\times$ for general reverse-mode AD).  [Griewank & Walther (2008)](https://doi.org/10.1137/1.9780898717761) show that the numerical stability of the derivatives is inherited from the forward passâ€”so if we make the forward pass stable, everything else follows.
+Yesâ€”and it's both simpler and faster than a hand-coded downward pass.  The key insight is that **computing $\bpip$ is just backpropagation** applied to the upward pass.  The [Baur-Strassen theorem](https://timvieira.github.io/blog/evaluating-fx-is-as-fast-as-fx/) guarantees that the gradient costs at most a small constant factor more than the forward pass ([Baur & Strassen, 1983](https://doi.org/10.1016/0304-3975(83)90110-X) prove $3\times$ for nonscalar operations on polynomials; [Griewank & Walther, 2008](https://doi.org/10.1137/1.9780898717761) give $5\times$ for general reverse-mode AD).  [Griewank & Walther (2008)](https://doi.org/10.1137/1.9780898717761) show that the numerical stability of the derivatives is inherited from the forward passâ€”so if we make the forward pass stable, everything else follows.
 
 The computation is just the product tree: build $\prod_i (1 + \w_i \z)$ bottom-up using polynomial multiplication, then extract $\llbracket \cdot \rrbracket(\z^n)$ and take the log.  In PyTorch, we batch all multiplications at each tree level into a single operationâ€”$\mathcal{O}(\log N)$ torch calls instead of $\mathcal{O}(N)$.
 
@@ -3215,7 +3223,7 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
       // Track
       sg.append('rect').attr('x', sx + 1).attr('y', 14)
         .attr('width', sliderW - 2).attr('height', sliderH)
-        .attr('fill', '#f8f8f8').attr('stroke', '#eee').attr('rx', 1);
+        .attr('fill', 'none').attr('stroke', 'none').attr('rx', 1);
       // Fill
       var frac = Math.min(w[idx] / WMAX, 1);
       var sf = sg.append('rect')
@@ -3579,7 +3587,7 @@ For non-diagonal $L$, the K-DPP introduces correlations between items (repulsion
 
 There are no problem-specific derivations hereâ€”each row follows from a general theorem in automatic differentiation or computer algebra.
 
-The NumPy implementation ([`conditional_poisson.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson.py)) uses hand-coded tree traversals with $\mathcal{O}(N \log^2 n)$ complexity.  The PyTorch implementation ([`torch_fft_prototype.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py)) uses FFT-based polynomial multiplication with **contour radius scaling**â€”rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stableâ€”achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.
+The PyTorch implementation ([`torch_fft_prototype.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py)) uses FFT-based polynomial multiplication with **contour radius scaling**â€”rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stableâ€”achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.
 
 **References:**
 

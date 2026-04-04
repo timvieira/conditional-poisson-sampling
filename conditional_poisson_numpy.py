@@ -1,5 +1,5 @@
 """
-conditional_poisson.py
+conditional_poisson_numpy.py
 ======================
 
 Conditional Poisson distribution over fixed-size subsets.
@@ -36,7 +36,7 @@ Sampling
 The P-tree is cached and reused for sampling.
 At each internal node with quota k, sample the left/right quota split:
 
-  P(j items from L | k, T) ∝ P_L[j] * P_R[k-j]
+  P(j items from L | k, T) ∝ poly_L[j] * poly_R[k-j]
 
 Recurse down the tree; each sample costs O(n log N) in expectation.
 
