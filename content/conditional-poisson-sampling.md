@@ -2798,7 +2798,7 @@ $S \leftarrow \text{sample}(\text{root}, n)$
 
 The tree is built once ($\mathcal{O}(N \log^2 N)$) and reused for each sample ($\mathcal{O}(n \log N)$ per sample)—at each of the $\mathcal{O}(\log N)$ levels, only nodes whose quota is nonzero are visited, and there are at most $n$ such nodes.  (When $n \approx N$, nearly all nodes are visited, so the per-sample cost approaches $\mathcal{O}(N \log N)$.)  No $\binom{N}{n}$-sized table is ever constructed.
 
-All computations are verified against brute-force enumeration in the [test suite](test_identities.py).
+All computations are verified against brute-force enumeration in the test suite.<a href="test_identities.py" class="verified" target="_blank">✓</a>
 
 
 ## Basic Usage
