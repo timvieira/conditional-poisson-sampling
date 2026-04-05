@@ -590,6 +590,53 @@ def test_contour_r_solves_expected_size():
     assert np.isclose(np.sum(w * r / (1 + w * r)), n, rtol=1e-10)
 
 
+def test_rescaling_dynamic_range():
+    """Numerical validation table: r=1 has DR~10^16, r=r* has DR~1."""
+    N, n = 200, 10
+    rng = np.random.default_rng(123)
+
+    for regime in ['mild', 'heavy']:
+        if regime == 'mild':
+            w = rng.exponential(1.0, N)
+        else:
+            # Heavy tails: mix of very small and very large weights
+            w = np.exp(rng.normal(0, 4, N))
+
+        # Compute exact log Z via ConditionalPoisson (uses optimal r internally)
+        cp = ConditionalPoisson.from_weights(n, w)
+        log_Z_exact = cp.log_normalizer
+
+        # Find optimal r
+        from scipy.optimize import brentq
+        def expected_size(log_r):
+            r = np.exp(log_r)
+            return np.sum(w * r / (1 + w * r)) - n
+        log_r_star = brentq(expected_size, -50, 50)
+        r_star = np.exp(log_r_star)
+
+        for r, expect_good in [(1.0, False), (n / np.sum(w), True), (r_star, True)]:
+            # Build product polynomial with scaled weights
+            poly = np.array([1.0])
+            for wi in w:
+                poly = poly_mul(poly, [1.0, wi * r])
+                if len(poly) > n + 1:
+                    poly = poly[:n + 1]
+
+            c_n = poly[n]
+            dr = np.max(np.abs(poly)) / np.abs(c_n)
+            log_Z_fft = np.log(c_n) - n * np.log(r)
+            err = np.abs(log_Z_fft - log_Z_exact)
+
+            if expect_good:
+                # r=n/W and r=r* should give small error
+                assert err < 1e-6, \
+                    f"{regime} r={r:.2g}: err={err:.1e} too large"
+            # r=r* should have DR close to 1
+            if r == r_star:
+                assert dr < 100, \
+                    f"{regime} r=r*: DR={dr:.1e} too large"
+
+
 # ===========================================================================
 # 20. Exponential family structure (Cell 2)
 # ===========================================================================
