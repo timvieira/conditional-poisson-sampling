@@ -154,7 +154,7 @@ def main():
 
         t0 = time.perf_counter()
         cp = ConditionalPoisson.from_weights(n, w)
-        pi_tree = cp.pi
+        pi_tree = cp.incl_prob
         tree_ms = (time.perf_counter() - t0) * 1000
 
         t0 = time.perf_counter()
@@ -300,7 +300,7 @@ cat(sprintf('{"weights":[%s]}\\n', paste(sprintf("%.15e", w), collapse=",")))
 
             # Our implementations
             cp = ConditionalPoisson.from_weights(n, w)
-            pi_tree = cp.pi
+            pi_tree = cp.incl_prob
             tree_sum_err = abs(pi_tree.sum() - n)
 
             theta = torch.tensor(np.log(w), dtype=torch.float64)

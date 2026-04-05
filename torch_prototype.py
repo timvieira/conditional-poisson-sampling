@@ -195,7 +195,7 @@ if __name__ == "__main__":
         cp = ConditionalPoisson(n, theta_np)
 
         # ── Correctness ──
-        pi_np = cp.pi
+        pi_np = cp.incl_prob
         pi_t = compute_pi(theta_t, n).detach().numpy()
         err_pi = np.max(np.abs(pi_np - pi_t))
 
@@ -208,10 +208,10 @@ if __name__ == "__main__":
 
         # NumPy pi
         for _ in range(3):
-            cp._cache.clear(); cp.pi
+            cp._cache.clear(); cp.incl_prob
         t0 = time.perf_counter()
         for _ in range(reps):
-            cp._cache.clear(); cp.pi
+            cp._cache.clear(); cp.incl_prob
         t_np_pi = (time.perf_counter() - t0) / reps
 
         # Torch pi
@@ -223,7 +223,7 @@ if __name__ == "__main__":
         t_t_pi = (time.perf_counter() - t0) / reps
 
         # NumPy hvp
-        _ = cp.pi  # ensure tree cached
+        _ = cp.incl_prob  # ensure tree cached
         for _ in range(3):
             cp.hvp(v_np)
         t0 = time.perf_counter()

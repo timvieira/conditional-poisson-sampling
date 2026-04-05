@@ -150,14 +150,14 @@ def test_pi_sums_to_n():
     """sum(pi_i) = n."""
     w, n = W_MED, N_MED
     cp = ConditionalPoisson.from_weights(n, w)
-    assert np.isclose(cp.pi.sum(), n, rtol=1e-12)
+    assert np.isclose(cp.incl_prob.sum(), n, rtol=1e-12)
 
 
 def test_pi_in_unit_interval():
     """Each pi_i in [0, 1]."""
     w, n = W_MED, N_MED
     cp = ConditionalPoisson.from_weights(n, w)
-    assert np.all(cp.pi >= -1e-15) and np.all(cp.pi <= 1 + 1e-15)
+    assert np.all(cp.incl_prob >= -1e-15) and np.all(cp.incl_prob <= 1 + 1e-15)
 
 
 def test_pi_matches_brute_force():
@@ -165,7 +165,7 @@ def test_pi_matches_brute_force():
     w, n = W_SMALL, N_SMALL
     cp = ConditionalPoisson.from_weights(n, w)
     pi_exact = pi_bf(w, n)
-    assert np.allclose(cp.pi, pi_exact, rtol=1e-10)
+    assert np.allclose(cp.incl_prob, pi_exact, rtol=1e-10)
 
 
 def test_pi_is_gradient_of_log_Z():
@@ -182,8 +182,8 @@ def test_pi_is_gradient_of_log_Z():
         log_Z_plus = np.log(Z_bf(w_plus, n))
         grad_numerical[i] = (log_Z_plus - log_Z_0) / eps
     cp = ConditionalPoisson.from_weights(n, w)
-    assert np.allclose(cp.pi, grad_numerical, rtol=1e-5), \
-        f"max err = {np.max(np.abs(cp.pi - grad_numerical))}"
+    assert np.allclose(cp.incl_prob, grad_numerical, rtol=1e-5), \
+        f"max err = {np.max(np.abs(cp.incl_prob - grad_numerical))}"
 
 
 # ===========================================================================
@@ -199,8 +199,8 @@ def test_pi_leave_one_out():
         w_minus_i = np.delete(w, i)
         Z_leave = Z_bf(w_minus_i, n - 1)
         pi_formula = w[i] * Z_leave / Z_full
-        assert np.isclose(cp.pi[i], pi_formula, rtol=1e-10), \
-            f"i={i}: cp.pi={cp.pi[i]}, formula={pi_formula}"
+        assert np.isclose(cp.incl_prob[i], pi_formula, rtol=1e-10), \
+            f"i={i}: cp.incl_prob={cp.incl_prob[i]}, formula={pi_formula}"
 
 
 # ===========================================================================
@@ -472,7 +472,7 @@ def test_horvitz_thompson_unbiased():
     M = 200_000
     samples = cp.sample(M, rng=rng)
     ht_estimates = np.array([
-        np.sum(p_dist[s] / cp.pi[s] * f[s]) for s in samples
+        np.sum(p_dist[s] / cp.incl_prob[s] * f[s]) for s in samples
     ])
     mu_ht = ht_estimates.mean()
     se = ht_estimates.std() / np.sqrt(M)
@@ -527,7 +527,7 @@ def test_fitting_gradient():
 
     # L(theta) = pi*^T theta - log Z(w, n)
     theta = np.log(w)
-    grad = pi_star - cp.pi
+    grad = pi_star - cp.incl_prob
     # Numerical gradient
     eps = 1e-7
     grad_num = np.empty(len(w))
@@ -551,8 +551,8 @@ def test_fitting_recovers_target():
     pi_star = np.clip(pi_star, 0.05, 0.95)
     pi_star *= n / pi_star.sum()
     cp = ConditionalPoisson.fit(pi_star, n)
-    assert np.allclose(cp.pi, pi_star, atol=1e-10), \
-        f"max err = {np.max(np.abs(cp.pi - pi_star))}"
+    assert np.allclose(cp.incl_prob, pi_star, atol=1e-10), \
+        f"max err = {np.max(np.abs(cp.incl_prob - pi_star))}"
 
 
 # ===========================================================================
@@ -708,16 +708,16 @@ def test_boundary_zero_weight_pi():
     """w_i = 0 implies pi_i = 0 (item never selected); pi still sums to n."""
     w = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
     cp = ConditionalPoisson.from_weights(n=2, w=w)
-    assert cp.pi[0] == 0.0, f"pi[0] should be 0 when w[0]=0, got {cp.pi[0]}"
-    assert np.isclose(np.sum(cp.pi), 2), f"pi should sum to n=2, got {np.sum(cp.pi)}"
+    assert cp.incl_prob[0] == 0.0, f"pi[0] should be 0 when w[0]=0, got {cp.incl_prob[0]}"
+    assert np.isclose(np.sum(cp.incl_prob), 2), f"pi should sum to n=2, got {np.sum(cp.incl_prob)}"
 
 
 def test_boundary_inf_weight_pi():
     """w_i = inf implies pi_i = 1 (item always selected); pi still sums to n."""
     w = np.array([np.inf, 1.0, 2.0, 3.0, 4.0])
     cp = ConditionalPoisson.from_weights(n=3, w=w)
-    assert cp.pi[0] == 1.0, f"pi[0] should be 1 when w[0]=inf, got {cp.pi[0]}"
-    assert np.isclose(np.sum(cp.pi), 3), f"pi should sum to n=3, got {np.sum(cp.pi)}"
+    assert cp.incl_prob[0] == 1.0, f"pi[0] should be 1 when w[0]=inf, got {cp.incl_prob[0]}"
+    assert np.isclose(np.sum(cp.incl_prob), 3), f"pi should sum to n=3, got {np.sum(cp.incl_prob)}"
 
 
 def test_boundary_mixed_zero_inf():
@@ -725,21 +725,21 @@ def test_boundary_mixed_zero_inf():
     w = np.array([np.inf, 0.0, 1.0, 2.0, 3.0, np.inf, 0.0])
     n = 4
     cp = ConditionalPoisson.from_weights(n=n, w=w)
-    assert cp.pi[0] == 1.0
-    assert cp.pi[5] == 1.0
-    assert cp.pi[1] == 0.0
-    assert cp.pi[6] == 0.0
-    assert np.isclose(np.sum(cp.pi), n)
+    assert cp.incl_prob[0] == 1.0
+    assert cp.incl_prob[5] == 1.0
+    assert cp.incl_prob[1] == 0.0
+    assert cp.incl_prob[6] == 0.0
+    assert np.isclose(np.sum(cp.incl_prob), n)
     # Remaining pi should sum to n - #inf = 2
     finite_mask = np.isfinite(w) & (w > 0)
-    assert np.isclose(np.sum(cp.pi[finite_mask]), n - 2)
+    assert np.isclose(np.sum(cp.incl_prob[finite_mask]), n - 2)
 
 
 def test_boundary_all_determined():
     """n items have w=inf, rest have w=0 — fully determined subset."""
     w = np.array([np.inf, np.inf, 0.0, 0.0, 0.0])
     cp = ConditionalPoisson.from_weights(n=2, w=w)
-    assert np.allclose(cp.pi, [1, 1, 0, 0, 0])
+    assert np.allclose(cp.incl_prob, [1, 1, 0, 0, 0])
     # Only one possible subset, so log_prob = 0
     assert np.isclose(cp.log_prob(np.array([0, 1])), 0.0, atol=1e-12)
 
@@ -769,7 +769,7 @@ def test_poisson_approximation_bound():
         n = rng.integers(1, N)
         w = np.exp(rng.uniform(-5, 5, N))
         cp = ConditionalPoisson.from_weights(n, w)
-        pi = cp.pi
+        pi = cp.incl_prob
         def f(logr):
             r = np.exp(logr)
             return np.sum(w * r / (1 + w * r)) - n

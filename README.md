@@ -29,7 +29,7 @@ w = np.array([1.0, 2.0, 3.0, 0.5, 1.5])
 cp = ConditionalPoisson.from_weights(n=2, w=w)
 
 # Inclusion probabilities: P(item i is in the sample)
-print(cp.pi)          # shape (5,), sums to n=2
+print(cp.incl_prob)          # shape (5,), sums to n=2
 
 # Log-normalizer
 print(cp.log_normalizer)
@@ -58,14 +58,14 @@ print(cp.hvp(v))
 ```python
 pi_star = np.array([0.6, 0.4, 0.8, 0.3, 0.9])  # must sum to n
 cp = ConditionalPoisson.fit(pi_star, n=3, tol=1e-10, verbose=True)
-print(np.max(np.abs(cp.pi - pi_star)))  # should be < tol
+print(np.max(np.abs(cp.incl_prob - pi_star)))  # should be < tol
 ```
 
 ### Complexity
 
 | Operation | Time |
 |---|---|
-| `pi` / `log_normalizer` | $O(N \log^2 N)$ (cached) |
+| `incl_prob` / `log_normalizer` | $O(N \log^2 N)$ (cached) |
 | `hvp(v)` | $O(N \log^2 N)$ (P-tree cached; D-tree rebuilt) |
 | `sample(M)` | $O(N \log^2 N + M n \log N)$ |
 | `fit(pi_star)` | $O(N \log^2 N \cdot T_{\text{Newton}} \cdot T_{\text{CG}})$ |

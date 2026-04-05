@@ -29,6 +29,10 @@
 - [ ] Consistently color code math symbols and widgets — use the same colors for $P(S)$, $\pi$, and $w$ in both LaTeX and D3 widgets. Previously removed all color coding; bring it back in a principled way with a shared palette.
 - [x] Make the $P(S)$ horizontal bars in the interactive explorer taller — ideally same width as the other bars.
 
+## Interactive Documentation
+
+- [ ] Integrate Pyodide-based interactive Python cells into the blog post so readers can edit and run code in the browser. Prototype in `mockup_pyodide.html`. Uses a pure-NumPy `ConditionalPoisson` class (O(N²n) DP—fine for demo sizes). Basic Usage section is the obvious first candidate; fitting and sampling sections could follow.
+
 ## Widget UX
 
 - [ ] Inclusion probability widget: hard to distinguish forward values from adjoint (backward) values. Explore different layouts. Also, inclusion probabilities appear at the bottom rather than the top—keep the forward-value + backward-value visual metaphor consistent.

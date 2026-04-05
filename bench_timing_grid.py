@@ -62,7 +62,7 @@ def run_grid(quick=False):
             ms = time_fn(lambda: sequential_pi(w, n), reps=reps)
             add("Fwd-bwd DP", "pi", N, n, ms)
 
-            ms = time_fn(lambda: ConditionalPoisson.from_weights(n, w).pi, reps=reps)
+            ms = time_fn(lambda: ConditionalPoisson.from_weights(n, w).incl_prob, reps=reps)
             add("NumPy tree", "pi", N, n, ms)
 
             ms = time_fn(lambda: compute_pi(theta, n), reps=reps)

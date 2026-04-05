@@ -195,7 +195,7 @@ def bench_accuracy():
         w = rng.exponential(1.0, N)
 
         cp = ConditionalPoisson.from_weights(n, w)
-        pi_tree = cp.pi
+        pi_tree = cp.incl_prob
         pi_seq = sequential_pi(w, n)
 
         tree_sum_err = abs(pi_tree.sum() - n)
@@ -313,7 +313,7 @@ def bench_verify_sampling():
         rng = np.random.default_rng(42)
         w = w_fn(rng)
         cp = ConditionalPoisson.from_weights(n, w)
-        exact = cp.pi
+        exact = cp.incl_prob
 
         tree_pi = np.bincount(cp.sample(M, rng=0).ravel(), minlength=N) / M
         seq_pi = np.bincount(

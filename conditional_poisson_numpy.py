@@ -58,7 +58,7 @@ where the O(N log N) term is FFT-based polynomial multiplication.
 
   _build_p_tree          O(N (log N)^2)
   _downward_pass         O(N (log N)^2)
-  pi / log_normalizer    O(N (log N)^2)  [cached]
+  incl_prob / log_normalizer    O(N (log N)^2)  [cached]
   hvp(v)                 O(N (log N)^2)  [P-tree cached; D-tree + downward fresh]
   sample(M)              O(N (log N)^2 + M n log N)
   fit(pi_star)           O(N (log N)^2 * Newton_iters * CG_iters)
@@ -412,7 +412,7 @@ class ConditionalPoisson:
 
     Properties  (all cached; cache invalidated when theta changes)
     ----------
-    pi              (N,) inclusion probabilities
+    incl_prob       (N,) inclusion probabilities
     w               (N,) weights (= exp(theta))
     log_normalizer  log normalizing constant  — never overflows
 
@@ -551,12 +551,12 @@ class ConditionalPoisson:
     # ── Public properties ─────────────────────────────────────────────────────
 
     @property
-    def pi(self) -> np.ndarray:
+    def incl_prob(self) -> np.ndarray:
         """Inclusion probabilities pi_i = P(i in S).  O(N (log N)^2), cached."""
         if self._reduced is not None:
             pi = np.zeros(self.N)
             pi[self._forced_in] = 1.0
-            pi[self._interior] = self._reduced.pi
+            pi[self._interior] = self._reduced.incl_prob
             return pi
         if len(self._forced_in) > 0:
             # Fully degenerate: all forced-in, rest forced-out
@@ -724,7 +724,7 @@ class ConditionalPoisson:
         converged = False
         for it in range(max_iter):
             self.theta  = theta          # sets theta, clears cache
-            pi          = self._cache.get("pi") or self.pi
+            pi          = self._cache.get("pi") or self.incl_prob
             log_Z       = self._cache["log_Z"]
             grad        = pi_star - pi
             err         = float(np.max(np.abs(grad)))

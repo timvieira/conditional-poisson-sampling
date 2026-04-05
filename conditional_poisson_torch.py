@@ -308,7 +308,7 @@ class ConditionalPoissonTorch:
 
     Properties
     ----------
-    pi              (N,) inclusion probabilities
+    incl_prob       (N,) inclusion probabilities
     w               (N,) weights (= exp(theta))
     log_normalizer  log normalizing constant
 
@@ -416,7 +416,7 @@ class ConditionalPoissonTorch:
         return torch.exp(self._theta)
 
     @property
-    def pi(self) -> torch.Tensor:
+    def incl_prob(self) -> torch.Tensor:
         """Inclusion probabilities pi_i = P(i in S)."""
         return compute_pi(self._theta, self._n).detach()
 

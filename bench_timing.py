@@ -106,7 +106,7 @@ def fwd_bwd_dp_pi(w, n):
 def numpy_tree_pi(w, n):
     """O(N log^2 N) product tree + backprop for inclusion probabilities."""
     cp = ConditionalPoisson.from_weights(n, w)
-    return cp.pi
+    return cp.incl_prob
 
 
 def fft_autograd_pi(theta, n):

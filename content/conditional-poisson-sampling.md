@@ -2806,19 +2806,26 @@ All computations are verified against brute-force enumeration in the [test suite
 Now that we've seen how the product tree works under the hood, here's the library interface.
 
 ```python
-from conditional_poisson_torch import ConditionalPoissonTorch
+>>> from conditional_poisson_torch import ConditionalPoissonTorch
+>>> cp = ConditionalPoissonTorch.from_weights(n=3, w=[0.68, 1.02, 0.55, 1.63, 0.67, 2.82])
 
-w = [0.68, 1.02, 0.55, 1.63, 0.67, 2.82]
-n = 3
+>>> cp.log_normalizer
+3.362122
 
-cp = ConditionalPoissonTorch.from_weights(n, w)
+>>> cp.incl_prob
+tensor([0.3813, 0.5038, 0.3236, 0.6424, 0.3771, 0.7718])
 
-cp.log_normalizer       # 3.362122
-cp.pi                   # [0.3813, 0.5038, 0.3236, 0.6424, 0.3771, 0.7718]
-cp.sample(5)            # tensor([[0, 3, 5], [1, 3, 5], ...])
+>>> cp.sample(5)
+tensor([[0, 3, 5],
+        [1, 3, 5],
+        [0, 1, 5],
+        [1, 3, 4],
+        [0, 3, 5]])
 
-# Inverse problem: find weights from target inclusion probabilities
-cp_fit = ConditionalPoissonTorch.fit(cp.pi, n)
+>>> # Inverse problem: find weights from target inclusion probabilities
+>>> cp_fit = ConditionalPoissonTorch.fit(cp.incl_prob, n=3)
+>>> (cp_fit.incl_prob - cp.incl_prob).abs().max()
+tensor(6.53e-08)
 ```
 
 ## The Poisson Approximation
@@ -3147,7 +3154,7 @@ This is the main event.  The naive approach computes each $\pip_i$ independently
 <a href="bench_timing.py#tree_loo_pi" title="tree_loo_pi" class="verified" target="_blank">✓</a> $N \times$ Tree leave-one-out $\mathcal{O}(N^2 \log^2 n)$ ·
 <a href="bench_samplers.py#sequential_pi" title="sequential_pi" class="verified" target="_blank">✓</a> Forward-backward DP $\mathcal{O}(Nn)$ ·
 <a href="bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R `sampling` package ·
-<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.pi" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
+<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.incl_prob" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
 <a href="conditional_poisson_torch.py#compute_pi" title="compute_pi" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$
 
 <figure>

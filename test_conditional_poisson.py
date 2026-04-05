@@ -11,7 +11,7 @@ def test_forward_pass():
     N, n = 20, 7
     q_true = rng.exponential(1.0, N)
     cp = ConditionalPoisson.from_weights(n, q_true)
-    pi = cp.pi
+    pi = cp.incl_prob
     assert abs(pi.sum() - n) < 1e-6
     assert np.all((pi > 0) & (pi < 1))
     assert np.isfinite(cp.log_normalizer)
@@ -22,8 +22,8 @@ def test_fitting():
     N, n = 20, 7
     q_true = rng.exponential(1.0, N)
     cp = ConditionalPoisson.from_weights(n, q_true)
-    cp_fit = ConditionalPoisson.fit(cp.pi, n)
-    assert np.max(np.abs(cp.pi - cp_fit.pi)) < 1e-8
+    cp_fit = ConditionalPoisson.fit(cp.incl_prob, n)
+    assert np.max(np.abs(cp.incl_prob - cp_fit.incl_prob)) < 1e-8
 
 
 def test_log_prob_normalizes():
@@ -46,7 +46,7 @@ def test_sampling():
     assert S.shape == (M, n)
     assert np.all(np.diff(S, axis=1) > 0), "samples not sorted"
     pi_emp = np.bincount(S.ravel(), minlength=N) / M
-    assert np.max(np.abs(pi_emp - cp.pi)) < 0.02
+    assert np.max(np.abs(pi_emp - cp.incl_prob)) < 0.02
 
 
 def test_hvp():
@@ -54,15 +54,15 @@ def test_hvp():
     N, n = 20, 7
     q_true = rng.exponential(1.0, N)
     cp = ConditionalPoisson.from_weights(n, q_true)
-    cp_fit = ConditionalPoisson.fit(cp.pi, n)
+    cp_fit = ConditionalPoisson.fit(cp.incl_prob, n)
     v = rng.standard_normal(N)
     Hv = cp_fit.hvp(v)
     eps = 1e-5
     J = np.zeros((N, N))
     for j in range(N):
         ej = np.zeros(N); ej[j] = 1.0
-        J[:, j] = (ConditionalPoisson(n, cp_fit.theta + eps * ej).pi -
-                    ConditionalPoisson(n, cp_fit.theta - eps * ej).pi) / (2 * eps)
+        J[:, j] = (ConditionalPoisson(n, cp_fit.theta + eps * ej).incl_prob -
+                    ConditionalPoisson(n, cp_fit.theta - eps * ej).incl_prob) / (2 * eps)
     assert np.max(np.abs(Hv - J @ v)) < 1e-5
     assert np.linalg.norm(cp_fit.hvp(np.ones(N))) < 1e-8
 
@@ -79,7 +79,7 @@ def test_numerical_stability():
     ]
     for n, theta in cases:
         cp = ConditionalPoisson(n, theta)
-        pi = cp.pi
+        pi = cp.incl_prob
         assert np.isfinite(pi).all(), f"non-finite pi for n={n}"
         assert np.isfinite(cp.log_normalizer), f"non-finite log_normalizer for n={n}"
         assert abs(pi.sum() - n) < 1e-4, f"pi.sum()={pi.sum()} != {n}"
@@ -91,7 +91,7 @@ def test_n_equals_1():
     rng = np.random.default_rng(1)
     N = 10
     cp = ConditionalPoisson.from_weights(1, rng.exponential(1.0, N))
-    pi = cp.pi
+    pi = cp.incl_prob
     assert abs(pi.sum() - 1.0) < 1e-10
     assert np.all((pi > 0) & (pi < 1))
     S = cp.sample(1000, rng=rng)
@@ -103,7 +103,7 @@ def test_n_equals_N_minus_1():
     rng = np.random.default_rng(2)
     N = 6
     cp = ConditionalPoisson.from_weights(N - 1, rng.exponential(1.0, N))
-    pi = cp.pi
+    pi = cp.incl_prob
     assert abs(pi.sum() - (N - 1)) < 1e-10
     assert np.all((pi > 0) & (pi < 1))
     # brute force: C(6,5) = 6 subsets
@@ -114,7 +114,7 @@ def test_n_equals_N_minus_1():
 
 def test_small_N():
     cp = ConditionalPoisson.from_weights(1, np.array([2.0, 3.0]))
-    pi = cp.pi
+    pi = cp.incl_prob
     assert abs(pi.sum() - 1.0) < 1e-10
     assert abs(pi[0] - 2.0 / 5.0) < 1e-10
     assert abs(pi[1] - 3.0 / 5.0) < 1e-10
@@ -124,7 +124,7 @@ def test_small_N():
 
 def test_uniform():
     cp = ConditionalPoisson.from_weights(3, np.ones(10))
-    pi = cp.pi
+    pi = cp.incl_prob
     assert np.allclose(pi, 0.3)
     assert abs(pi.sum() - 3.0) < 1e-10
 
@@ -132,7 +132,7 @@ def test_uniform():
 def test_from_weights():
     q = np.array([1.0, 1.0, 1.0, 1.0])
     cp = ConditionalPoisson.from_weights(2, q)
-    assert np.allclose(cp.pi, 0.5)
+    assert np.allclose(cp.incl_prob, 0.5)
     assert np.allclose(cp.theta, 0.0)
 
 
@@ -141,11 +141,11 @@ def test_from_weights():
 def test_theta_setter_invalidates_cache():
     rng = np.random.default_rng(3)
     cp = ConditionalPoisson.from_weights(3, rng.exponential(1.0, 8))
-    pi_old = cp.pi.copy()
+    pi_old = cp.incl_prob.copy()
     log_en_old = cp.log_normalizer
 
     cp.theta = rng.standard_normal(8)
-    pi_new = cp.pi
+    pi_new = cp.incl_prob
     assert not np.allclose(pi_old, pi_new), "pi should change after theta update"
     assert cp.log_normalizer != log_en_old
 
@@ -176,8 +176,8 @@ def test_boundary_w_zero():
     """w_i = 0 means item i is never selected."""
     w = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
     cp = ConditionalPoisson.from_weights(2, w)
-    assert cp.pi[0] == 0.0
-    assert abs(cp.pi.sum() - 2) < 1e-10
+    assert cp.incl_prob[0] == 0.0
+    assert abs(cp.incl_prob.sum() - 2) < 1e-10
     # Samples never contain item 0
     samples = cp.sample(1000, rng=42)
     assert not np.any(samples == 0)
@@ -191,8 +191,8 @@ def test_boundary_w_inf():
     """w_i = inf means item i is always selected."""
     w = np.array([np.inf, 1.0, 2.0, 3.0, 4.0])
     cp = ConditionalPoisson.from_weights(3, w)
-    assert cp.pi[0] == 1.0
-    assert abs(cp.pi.sum() - 3) < 1e-10
+    assert cp.incl_prob[0] == 1.0
+    assert abs(cp.incl_prob.sum() - 3) < 1e-10
     # Samples always contain item 0
     samples = cp.sample(1000, rng=42)
     assert np.all(samples[:, 0] == 0) or np.all(np.any(samples == 0, axis=1))
@@ -206,14 +206,14 @@ def test_boundary_mixed():
     """Mix of w=0, w=inf, and finite weights."""
     w = np.array([np.inf, 0.0, 1.0, 2.0, 3.0, np.inf, 0.0])
     cp = ConditionalPoisson.from_weights(3, w)
-    assert cp.pi[0] == 1.0
-    assert cp.pi[5] == 1.0
-    assert cp.pi[1] == 0.0
-    assert cp.pi[6] == 0.0
-    assert abs(cp.pi.sum() - 3) < 1e-10
+    assert cp.incl_prob[0] == 1.0
+    assert cp.incl_prob[5] == 1.0
+    assert cp.incl_prob[1] == 0.0
+    assert cp.incl_prob[6] == 0.0
+    assert abs(cp.incl_prob.sum() - 3) < 1e-10
     # The remaining 1 item is chosen from {2, 3, 4} with weights {1, 2, 3}
     # pi should be proportional to weights for interior items
-    interior_pi = cp.pi[[2, 3, 4]]
+    interior_pi = cp.incl_prob[[2, 3, 4]]
     assert abs(interior_pi.sum() - 1) < 1e-10
 
 
@@ -221,7 +221,7 @@ def test_boundary_all_forced():
     """All items determined: n items have w=inf, rest have w=0."""
     w = np.array([np.inf, np.inf, 0.0, 0.0, 0.0])
     cp = ConditionalPoisson.from_weights(2, w)
-    assert np.allclose(cp.pi, [1, 1, 0, 0, 0])
+    assert np.allclose(cp.incl_prob, [1, 1, 0, 0, 0])
     samples = cp.sample(100, rng=42)
     assert np.all(samples == np.array([[0, 1]]))
 
@@ -320,8 +320,8 @@ def test_brute_force_pi():
         theta = rng.standard_normal(N)
         cp = ConditionalPoisson(n, theta)
         _, pi_bf, _, _, _ = _brute_force(theta, n)
-        assert np.allclose(cp.pi, pi_bf, atol=1e-10), \
-            f"pi mismatch for N={N}, n={n}: max err={np.max(np.abs(cp.pi - pi_bf)):.2e}"
+        assert np.allclose(cp.incl_prob, pi_bf, atol=1e-10), \
+            f"pi mismatch for N={N}, n={n}: max err={np.max(np.abs(cp.incl_prob - pi_bf)):.2e}"
 
 
 def test_brute_force_log_normalizer():
