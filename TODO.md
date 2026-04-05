@@ -99,6 +99,7 @@
 
 ## Implementation
 
+- [ ] NumPy tree timing slopes (~1.15–1.45 in N) are higher than expected for O(N log² N). The implementation has complicated dispatching that may switch between convolution methods (direct vs FFT) at different sizes. Investigate whether forcing FFT throughout gives cleaner scaling. May also be a truncation issue.
 - [x] ~~Batch polynomial multiplications in NumPy~~ — dropped. The NumPy implementation is the pedagogical/reference version; optimize for readability, not speed. The torch implementation is the fast path.
 - [x] Recover sub-O(Nn) complexity with numerical stability — **solved via contour radius scaling** (torch_fft_prototype.py). Rescale weights w_i -> w_i*r where r shifts the product polynomial's peak to degree n. FFT rounding errors are now relative to the coefficient we need, not a distant peak. r = exp(t) where t is the Poisson sampling Lagrange multiplier (sum sigmoid(log w_i + t) = n). Result: O(N log² n), machine-epsilon precision, 10-16x faster than NumPy, fully differentiable.
     - The earlier obstacle (FFT/Karatsuba subtractions cancelling small coefficients) was a dynamic range problem, not a fundamental algebraic one — contour scaling eliminates the dynamic range.

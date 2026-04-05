@@ -10,3 +10,4 @@ node_modules/
 docs/css
 .claude/
 timing_data.json
+timing_grid.json
