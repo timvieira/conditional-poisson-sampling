@@ -50,7 +50,7 @@
 - [x] Brute-force log Z verification (Cell 15) is circular — it adds `cp_small.log_normalizer` to already-normalized log-probs and recovers it; compute log Z from brute force independently instead
 - [x] Fitting objective (Cell 16) is called "log-likelihood" but is actually the expected log-probability E_{S~P*}[log P_θ(S)]; call it "expected log-probability" or "cross-entropy objective"
 - [x] I don't think P_L and P_R are defined anywhere - can we avoid using them or do we need to define them?
-- [ ] write the sampling pseudocode in the same style as the rejection sampler.
+- [x] write the sampling pseudocode in the same style as the rejection sampler.
 
 ## Undefined / Missing Definitions
 
@@ -100,6 +100,7 @@
 ## Implementation
 
 - [ ] NumPy tree timing slopes (~1.15–1.45 in N) are higher than expected for O(N log² N). The implementation has complicated dispatching that may switch between convolution methods (direct vs FFT) at different sizes. Investigate whether forcing FFT throughout gives cleaner scaling. May also be a truncation issue.
+- [ ] Add a programmatically generated empirical slope table to the timing section. For each method, fit log-log slopes (time vs N at fixed n, and time vs n at fixed N) from the grid sweep data and display them alongside the theoretical complexity bounds. **Crucially, this table must be generated from the timing data (not hardcoded)** so it stays correct when benchmarks are re-run. Automatically flag rows where the empirical slope deviates significantly from the theoretical prediction (e.g., DP forward should have slope ~1 in N at fixed n; if it's 1.5, that's a red flag). This catches both implementation bugs and stale claims. Could be a Python script that reads `timing_grid.json` and emits an HTML table, or a JS widget that computes slopes client-side from the inline data.
 - [x] ~~Batch polynomial multiplications in NumPy~~ — dropped. The NumPy implementation is the pedagogical/reference version; optimize for readability, not speed. The torch implementation is the fast path.
 - [x] Recover sub-O(Nn) complexity with numerical stability — **solved via contour radius scaling** (torch_fft_prototype.py). Rescale weights w_i -> w_i*r where r shifts the product polynomial's peak to degree n. FFT rounding errors are now relative to the coefficient we need, not a distant peak. r = exp(t) where t is the Poisson sampling Lagrange multiplier (sum sigmoid(log w_i + t) = n). Result: O(N log² n), machine-epsilon precision, 10-16x faster than NumPy, fully differentiable.
     - The earlier obstacle (FFT/Karatsuba subtractions cancelling small coefficients) was a dynamic range problem, not a fundamental algebraic one — contour scaling eliminates the dynamic range.
@@ -168,8 +169,12 @@
 ## Widget UX
 
 - [ ] Inclusion probability widget: hard to distinguish forward values from adjoint (backward) values. Explore different layouts to make this clearer. Also, inclusion probabilities appear at the bottom rather than the top—should keep the forward-value + backward-value visual metaphor consistent (forward on top, adjoint/backward below).
-- [ ] Sampling pseudocode: move the `W=` line outside the loop—currently makes the line too long.
+- [x] Sampling pseudocode: move the `W=` line outside the loop—currently makes the line too long.
 - [x] Remove stale references to the defunct NumPy implementation.
+- [ ] Several widgets overflow their containers on mobile. The content column itself doesn't fill the viewport width on small screens—fix the layout first, then add horizontal scroll for wide SVGs.
+- [ ] Centralize widget/layout styles into the blog's CSS (`~/projects/blog/main/content/css/blog.css`) instead of inline styles in the .md file. Requires careful integration and testing across all blog posts.
+- [ ] Clicking "Gradient Descent" and "Archive" in the header should navigate to the blog's archive page.
+- [ ] 3D timing plots: replace the single dropdown plot with three separate 3D plots (computing Z, computing π, drawing samples). Sampling timing is currently only a static 2D SVG—it has two variables (N, n) just like the others, so it should be 3D too.
 
 ## Visualization
 
