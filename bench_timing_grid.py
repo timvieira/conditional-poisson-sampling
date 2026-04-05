@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Grid sweep of (N, n) for timing benchmarks.
-Outputs timing_grid.json for use by plot_timing_3d.py.
+Outputs timing_grid.json for use by the 3D widget in the blog post.
 
 Usage:
     python3 bench_timing_grid.py              # full grid
@@ -75,17 +75,28 @@ def run_grid(quick=False):
                 ms = time_fn(lambda: tree_loo_pi(w, n), reps=3, warmup=1)
                 add("N×Tree loo", "pi", N, n, ms)
 
-            # R benchmarks (pi + samples)
+            # Fitting benchmarks
+            pi_target = sequential_pi(w, n)
+            ms = time_fn(lambda: ConditionalPoisson.fit(pi_target, n), reps=reps)
+            add("NumPy tree (Newton-CG)", "fit", N, n, ms)
+
+            # R benchmarks (pi + fit + samples)
             r_results = run_r_benchmark(N, n, seed, reps)
             for r in r_results:
                 if "(pi)" in r["method"]:
                     add(r["method"], "pi", N, n, r["time_ms"])
+                elif "(fit)" in r["method"]:
+                    add(r["method"], "fit", N, n, r["time_ms"])
                 else:
                     add(r["method"], "samples", N, n, r["time_ms"])
 
             # Sampling benchmarks
             cp = ConditionalPoisson.from_weights(n, w)
             sample_rng = np.random.RandomState(seed)
+
+            ms = time_fn(lambda: ConditionalPoisson.from_weights(n, w).sample(1, rng=sample_rng), reps=reps)
+            add("NumPy tree (1 sample, incl. build)", "samples", N, n, ms)
+
             ms = time_fn(lambda: cp.sample(1, rng=sample_rng), reps=reps)
             add("NumPy tree (1 sample)", "samples", N, n, ms)
 
