@@ -3,7 +3,7 @@
 import numpy as np
 import time
 import pylab as pl
-from conditional_poisson import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoisson
 
 
 def time_op(fn, min_reps=5, min_seconds=0.5):

@@ -3125,19 +3125,51 @@ $$
 
 ## Timing
 
-The tree-based approach scales to moderately large $N$ comfortably.  For comparison, the naive $\mathcal{O}(N^2 n)$ dynamic programming (DP) baseline is also shown.  (The PyTorch FFT implementation in the next section is significantly faster—see below.)
+The plots below compare wall-clock time across methods for the three main operations: computing the normalizing constant $\Z$, computing inclusion probabilities $\bpip$, and drawing samples.  All timings use $n = 0.4N$ with weights drawn from $\text{Exp}(1)$.  Source code for each method is linked via the ✓ pills; the full benchmark script is <a href="bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.
 
-{% notebook conditional-poisson-sampling.ipynb cells[5:6] %}
+### Computing $\Z$
 
-The PyTorch FFT implementation (next section) is faster for three reasons:
+Three methods for computing the normalizing constant:
+<a href="bench_timing.py#dp_forward_Z" title="dp_forward_Z" class="verified" target="_blank">✓</a> DP forward pass $\mathcal{O}(Nn)$ ·
+<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
+<a href="torch_fft_prototype.py#forward_log_Z" title="forward_log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$
 
-1. **FFT-based polynomial multiplication**: $\mathcal{O}(d \log d)$ per multiply instead of $\mathcal{O}(d^2)$, giving $\mathcal{O}(N \log^2 n)$ total with truncation to degree $n$.
+<figure>
+<img src="../figures/timing_Z.svg" alt="Log-log plot: computing Z" style="width:100%">
+</figure>
 
-2. **Batched execution**: all multiplications at each tree level are batched into a single torch operation ($\mathcal{O}(\log N)$ torch calls, not $\mathcal{O}(N)$).
+The DP approach is fastest at small $N$ (no overhead), but the FFT tree overtakes it by $N \approx 200$ and is $\sim\!100\times$ faster by $N = 5000$.
 
-3. **Autograd**: the gradient (inclusion probabilities) comes from backpropagation—no hand-coded downward pass needed.
+### Computing $\bpip$
 
-The contour scaling (described below) is essential: without it, FFT precision collapses at $N \gtrsim 1000$.  With it, the implementation achieves machine-epsilon accuracy at all tested sizes ($N$ up to 10,000) and handles extreme weight ranges ($r$ from $10^{-10}$ to $10^{8}$).
+This is the main event.  The naive approach computes each $\pip_i$ independently via a leave-one-out forward pass; backpropagation replaces $N$ forward passes with a single backward pass, giving a factor-of-$N$ speedup:
+
+<a href="bench_timing.py#dp_loo_pi" title="dp_loo_pi" class="verified" target="_blank">✓</a> $N \times$ DP leave-one-out $\mathcal{O}(N^2 n)$ ·
+<a href="bench_timing.py#tree_loo_pi" title="tree_loo_pi" class="verified" target="_blank">✓</a> $N \times$ Tree leave-one-out $\mathcal{O}(N^2 \log^2 n)$ ·
+<a href="bench_samplers.py#sequential_pi" title="sequential_pi" class="verified" target="_blank">✓</a> Forward-backward DP $\mathcal{O}(Nn)$ ·
+<a href="bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R `sampling` package ·
+<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.pi" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
+<a href="torch_fft_prototype.py#compute_pi" title="compute_pi" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$
+
+<figure>
+<img src="../figures/timing_pi.svg" alt="Log-log plot: computing inclusion probabilities" style="width:100%">
+</figure>
+
+The leave-one-out methods (gray, dashed) are $\sim\!N\times$ slower than their backprop counterparts—this is the Baur-Strassen theorem in action.  The PyTorch FFT implementation is the fastest overall, combining FFT-based polynomial multiplication ($\mathcal{O}(d \log d)$ per multiply), batched execution ($\mathcal{O}(\log N)$ torch calls), and autograd.
+
+### Drawing Samples
+
+<a href="bench_timing_r.R" title="UPmaxentropy" class="verified" target="_blank">✓</a> R `sampling::UPmaxentropy` (1 sample) ·
+<a href="bench_timing_r.R" title="lpm2" class="verified" target="_blank">✓</a> R `BalancedSampling::lpm2` (1 sample) ·
+<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (1 and 10k samples)
+
+<figure>
+<img src="../figures/timing_samples.svg" alt="Log-log plot: drawing samples" style="width:100%">
+</figure>
+
+The R `sampling` package draws one conditional Poisson sample per call at $\mathcal{O}(Nn)$ cost.  The product tree's quota-splitting sampler costs $\mathcal{O}(n \log N)$ per sample after a one-time $\mathcal{O}(N \log^2 n)$ tree build—the amortized cost drops rapidly with more samples.  `BalancedSampling::lpm2` (local pivotal method) is very fast but is a different algorithm; it does not sample from the conditional Poisson distribution.
+
+The contour scaling (described below) is essential for the PyTorch FFT implementation: without it, FFT precision collapses at $N \gtrsim 1000$.  With it, the implementation achieves machine-epsilon accuracy at all tested sizes ($N$ up to 10,000) and handles extreme weight ranges ($r$ from $10^{-10}$ to $10^{8}$).
 
 ## PyTorch Implementation with Contour Scaling
 

@@ -9,7 +9,7 @@ Brute-force enumeration is used as ground truth for small instances.
 import numpy as np
 import time
 from itertools import combinations
-from conditional_poisson import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoisson
 
 
 # ── Sequential forward-backward DP ────────────────────────────────────────────

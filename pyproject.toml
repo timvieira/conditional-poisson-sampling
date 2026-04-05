@@ -11,6 +11,7 @@ license = "MIT"
 dependencies = ["numpy"]
 
 [tool.setuptools]
-py-modules = ["conditional_poisson"]
+py-modules = ["conditional_poisson_numpy"]
 
 [tool.blog]
+static = ["figures"]

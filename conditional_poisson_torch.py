@@ -2,7 +2,7 @@
 conditional_poisson_torch.py
 ============================
 
-Drop-in PyTorch replacement for ConditionalPoisson (conditional_poisson.py).
+Drop-in PyTorch replacement for ConditionalPoisson (conditional_poisson_numpy.py).
 
 Uses FFT-based polynomial product tree with contour radius scaling for
 O(N log² n) complexity and full autograd support.  Gradients (π), HVP

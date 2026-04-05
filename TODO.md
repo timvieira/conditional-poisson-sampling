@@ -109,6 +109,8 @@
 
 ## Bugs
 
+- [ ] Implementation pill links are broken — the pills render fine but their href targets don't resolve to anything. Fix the links to point at the actual implementations. Make the linking robust/future-proof so links don't rot when code moves (e.g., link to a function name search or a stable anchor rather than fragile line numbers).
+
 - [x] HT section (Cell 40): orphaned sentence — rewrote section, moved unbiasedness right after formula
 - [x] HT section (Cell 40): redundant "advantage over MC" paragraph — removed, covered by Setup
 - [x] Speedup discussion (Cell 39): fixed `torch_fft_prototype.py` link to `/blob/main/`

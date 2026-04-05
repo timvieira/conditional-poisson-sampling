@@ -16,7 +16,7 @@ This script compares:
 import numpy as np
 import time
 from itertools import combinations
-from conditional_poisson import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoisson
 
 
 # ── Sequential O(NK) DP ──────────────────────────────────────────────────────

@@ -279,7 +279,7 @@ def compute_hvp(theta, n, v):
 if __name__ == "__main__":
     import numpy as np
     import time
-    from conditional_poisson import ConditionalPoisson
+    from conditional_poisson_numpy import ConditionalPoisson
 
     rng = np.random.default_rng(42)
 

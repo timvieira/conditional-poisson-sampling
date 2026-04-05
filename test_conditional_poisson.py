@@ -1,9 +1,9 @@
-"""Tests for conditional_poisson.py"""
+"""Tests for conditional_poisson_numpy.py"""
 
 import numpy as np
 import pytest
 from itertools import combinations
-from conditional_poisson import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoisson
 
 
 def test_forward_pass():

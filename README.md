@@ -10,7 +10,7 @@ All operations use a polynomial product tree running in $O(N \log^2 N)$ time.
 
 ## Installation
 
-Single-file library — copy `conditional_poisson.py` into your project, or install from a local clone:
+Single-file library — copy `conditional_poisson_numpy.py` into your project, or install from a local clone:
 
 ```bash
 pip install .
@@ -22,7 +22,7 @@ Requires Python 3.8+, NumPy, and SciPy.
 
 ```python
 import numpy as np
-from conditional_poisson import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoisson
 
 # From weights (Bernoulli odds)
 w = np.array([1.0, 2.0, 3.0, 0.5, 1.5])
@@ -74,7 +74,7 @@ print(np.max(np.abs(cp.pi - pi_star)))  # should be < tol
 
 ```bash
 pytest                              # with pytest
-python test_conditional_poisson.py  # standalone
+python test_conditional_poisson_numpy.py  # standalone
 ```
 
 ## References
