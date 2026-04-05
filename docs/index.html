@@ -96,7 +96,7 @@ Poisson can be used for sampling without replacement.  Draw $n$ items
 independently from the categorical distribution over weights, and keep only the
 samples where all draws are distinct:</p>
 <div class="pseudocode">
-<p>$\W \leftarrow \sum_i \w_i$, $\quad \bw' \leftarrow \bw / \W$<br>
+<p>$\W \leftarrow \sum_i \w_i$; $\quad \bw' \leftarrow \bw / \W$<br>
 <b>repeat</b><br>
 $\quad$ Draw $s_1, \ldots, s_n \overset{\text{i.i.d.}}{\sim} \text{Categorical}(\bw')$<br>
 $\quad$ $S \leftarrow \{s_1, \ldots, s_n\}$<br>
