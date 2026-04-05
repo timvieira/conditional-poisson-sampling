@@ -2806,10 +2806,6 @@ Drag the weight sliders to change $\w_i$ and see how the split distributions upd
 </script>
 
 <p>In pseudocode:</p>
-<div style="background:#fff3cd; border:1px solid #ffc107; border-radius:4px; padding:8px 12px; margin:8px 0; font-size:0.9em;">
-<p><b>TODO:</b> Compare these two pseudocode styles side by side, then remove the old Python version.</p>
-</div>
-
 <div class="pseudocode">
 <p><b>def</b> $\text{sample}(a, k)$: <span style="color:#888; font-size:0.85em">// sample $k$ items from subtree $a$</span><br>
 $\quad$ <b>if</b> $a$ is a leaf: <b>return</b> $\{a\text{.item}\}$ if $k = 1$, else $\emptyset$<br>
@@ -2820,18 +2816,6 @@ $\quad$ <b>return</b> $\text{sample}(b, j) \cup \text{sample}(c, k{-}j)$<br>
 <br>
 $S \leftarrow \text{sample}(\text{root}, n)$</p>
 </div>
-
-<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">quota</span><span class="p">):</span>
-    <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">is_leaf</span><span class="p">:</span>
-        <span class="k">return</span> <span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">item</span><span class="p">]</span> <span class="k">if</span> <span class="n">quota</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="p">[]</span>
-    <span class="c1"># poly_left[j] * poly_right[quota-j] for j = 0, ..., quota</span>
-    <span class="n">probs</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">left</span><span class="o">.</span><span class="n">poly</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">node</span><span class="o">.</span><span class="n">right</span><span class="o">.</span><span class="n">poly</span><span class="p">[</span><span class="n">quota</span> <span class="o">-</span> <span class="n">j</span><span class="p">]</span>
-             <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">quota</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
-    <span class="n">j</span> <span class="o">=</span> <span class="n">categorical</span><span class="p">(</span><span class="n">probs</span><span class="p">)</span>              <span class="c1"># how many items from the left subtree</span>
-    <span class="k">return</span> <span class="n">sample</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">left</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="o">+</span> <span class="n">sample</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">right</span><span class="p">,</span> <span class="n">quota</span> <span class="o">-</span> <span class="n">j</span><span class="p">)</span>
-
-<span class="n">S</span> <span class="o">=</span> <span class="n">sample</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>                     <span class="c1"># exactly n items</span>
-</code></pre></div>
 
 <p>The tree is built once ($\mathcal{O}(N \log^2 N)$) and reused for each sample ($\mathcal{O}(n \log N)$ per sample)—at each of the $\mathcal{O}(\log N)$ levels, only nodes whose quota is nonzero are visited, and there are at most $n$ such nodes.  (When $n \approx N$, nearly all nodes are visited, so the per-sample cost approaches $\mathcal{O}(N \log N)$.)  No $\binom{N}{n}$-sized table is ever constructed.</p>
 <p>All computations are verified against brute-force enumeration in the <a href="test_identities.py">test suite</a>.</p>
