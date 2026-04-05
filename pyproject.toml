@@ -15,3 +15,4 @@ py-modules = ["conditional_poisson_numpy"]
 
 [tool.blog]
 static = ["figures"]
+preprocess = ["python extract_snippets.py"]
