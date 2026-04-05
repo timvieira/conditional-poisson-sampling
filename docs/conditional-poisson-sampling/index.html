@@ -3660,16 +3660,16 @@ Plotly.react('timing-3d', makeTraces('pi'), layout);
   var colors = {'$r = 1$':'#c0504d', '$r = n/\\W$':'#999', '$r = r^\\star$':'#5b9bd5'};
   var yPos = 0;
 
-  function drHtml(dr) {
-    if (dr >= 1e3) return '$10^{' + Math.round(Math.log10(dr)) + '}$';
-    return '$' + dr.toFixed(0) + '$';
+  function drTeX(dr) {
+    if (dr >= 1e3) return '10^{' + Math.round(Math.log10(dr)) + '}';
+    return dr.toFixed(0);
   }
-  function errHtml(err) {
+  function errTeX(err) {
     var exp = Math.floor(Math.log10(Math.abs(err)));
     var coef = err / Math.pow(10, exp);
     var coefStr = Math.round(coef);
-    if (exp === 0) return '$' + coefStr + '$';
-    return '$' + coefStr + '\\!\\times\\! 10^{' + exp + '}$';
+    if (exp === 0) return coefStr;
+    return coefStr + '\\!\\times\\! 10^{' + exp + '}';
   }
 
   groups.forEach(function(grp, gi) {
@@ -3692,7 +3692,7 @@ Plotly.react('timing-3d', makeTraces('pi'), layout);
         .style('color','#333').style('line-height', rowH + 'px')
         .html(d.label);
       // Annotation (MathJax via foreignObject)
-      var annotHtml = 'DR$\\,{=}\\,$' + drHtml(d.dr).slice(1,-1) + ',\u2003$|$err$|\\,{=}\\,$' + errHtml(d.err).slice(1,-1);
+      var annotHtml = '$\\text{DR}{=}' + drTeX(d.dr) + ',\\;|\\text{err}|{=}' + errTeX(d.err) + '$';
       g.append('foreignObject').attr('x', barW + 5).attr('y', yPos).attr('width', 200).attr('height', rowH)
         .append('xhtml:div').style('font-size','12px').style('color','#666')
         .style('line-height', rowH + 'px').style('white-space','nowrap')
@@ -3724,7 +3724,7 @@ $$</p>
 <p>This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.</p>
 <p><strong>Example.</strong> With $N = 100$ items and $n = 5$, set weights proportional to $p(i)$ so that high-probability items are more likely to be selected.  Each sample gives 5 distinct evaluations of $f$; the HT formula reweights them to produce an unbiased estimate of the full sum.</p>
 <p>For more on SWOR-based estimation (including the near-optimal priority sampling scheme), see my earlier post on <a href="../post/2017/07/03/estimating-means-in-a-finite-universe/">estimating means in a finite universe</a>.</p>
-<h2 id="identities-for-math172-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
+<h2 id="identities-for-math166-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
 <p>The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> <a href="https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial">elementary symmetric polynomial</a> $e_n(\bw)$.  Here are some useful identities.</p>
 <h3 id="differential-identities">Differential Identities</h3>
 <p>The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:</p>
