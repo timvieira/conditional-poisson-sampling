@@ -2815,7 +2815,7 @@ Drag the weight sliders to change $\w_i$ and see how the split distributions upd
 $\quad$ <b>if</b> $v$ is a leaf: <b>return</b> $\{v\text{.item}\}$ if $k = 1$, else $\emptyset$<br>
 $\quad$ Let $L, R$ be the children of $v$<br>
 $\quad$ $p_j \leftarrow L\text{.poly}[j] \cdot R\text{.poly}[k{-}j]$ <b>for</b> $j = 0, \ldots, k$<br>
-$\quad$ Draw $j \sim \text{Categorical}(p_0, \ldots, p_k)$<br>
+$\quad$ Draw $j \sim \text{Categorical}(\boldsymbol{p})$<br>
 $\quad$ <b>return</b> $\text{Sample}(L, j) \cup \text{Sample}(R, k{-}j)$<br>
 <br>
 $S \leftarrow \text{Sample}(\text{root}, n)$</p>
