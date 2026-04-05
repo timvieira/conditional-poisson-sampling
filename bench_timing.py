@@ -2,7 +2,7 @@
 """
 Timing benchmarks for conditional Poisson sampling.
 
-Benchmarks three operations (Z, pi, samples) across multiple methods and
+Benchmarks four operations (Z, pi, fit, samples) across multiple methods and
 problem sizes. Outputs timing_data.json for use by plot_timing.py.
 
 Usage:
@@ -242,12 +242,23 @@ def run_benchmarks(quick=False):
         add("PyTorch FFT + autograd", "pi", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 
-        # ── R benchmarks (pi + samples) ─────────────────────────────
+        # ── Fitting benchmarks ───────────────────────────────────────
+        # Use pi from current weights as the fitting target
+        pi_target = sequential_pi(w, n)
+
+        print("  fit: NumPy tree...", file=sys.stderr, end="", flush=True)
+        ms = time_fn(lambda: ConditionalPoisson.fit(pi_target, n), reps=reps)
+        add("NumPy tree (Newton-CG)", "fit", N, n, ms)
+        print(f" {ms:.1f}ms", file=sys.stderr)
+
+        # ── R benchmarks (pi + fit + samples) ──────────────────────
         print("  R benchmarks...", file=sys.stderr, end="", flush=True)
         r_results = run_r_benchmark(N, n, seed, reps)
         for r in r_results:
             if "(pi)" in r["method"]:
                 experiment = "pi"
+            elif "(fit)" in r["method"]:
+                experiment = "fit"
             else:
                 experiment = "samples"
             add(r["method"], experiment, N, n, r["time_ms"])
@@ -256,6 +267,11 @@ def run_benchmarks(quick=False):
         # ── Sampling benchmarks ─────────────────────────────────────
         cp = ConditionalPoisson.from_weights(n, w)
         sample_rng = np.random.RandomState(seed)
+
+        print("  samples: NumPy tree (1, incl. build)...", file=sys.stderr, end="", flush=True)
+        ms = time_fn(lambda: ConditionalPoisson.from_weights(n, w).sample(1, rng=sample_rng), reps=reps)
+        add("NumPy tree (1 sample, incl. build)", "samples", N, n, ms)
+        print(f" {ms:.1f}ms", file=sys.stderr)
 
         print("  samples: NumPy tree (1)...", file=sys.stderr, end="", flush=True)
         ms = time_fn(lambda: numpy_tree_sample(cp, 1, sample_rng), reps=reps)

@@ -3131,7 +3131,7 @@ $$
 
 ## Timing
 
-The plots below compare wall-clock time across methods for the three main operations: computing the normalizing constant $\Z$, computing inclusion probabilities $\bpip$, and drawing samples.  All timings use $n = 0.4N$ with weights drawn from $\text{Exp}(1)$.  Source code for each method is linked via the ✓ pills; the full benchmark script is <a href="bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.
+The plots below compare wall-clock time across methods for four operations: computing the normalizing constant $\Z$, computing inclusion probabilities $\bpip$, fitting target $\bpip$ to weights, and drawing samples.  All timings use $n = 0.4N$ with weights drawn from $\text{Exp}(1)$.  Source code for each method is linked via the ✓ pills; the full benchmark script is <a href="bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.
 
 ### Computing $\Z$
 
@@ -3163,20 +3163,35 @@ This is the main event.  The naive approach computes each $\pip_i$ independently
 
 The leave-one-out methods (gray, dashed) are $\sim\!N\times$ slower than their backprop counterparts—this is the Baur-Strassen theorem in action.  The PyTorch FFT implementation is the fastest overall, combining FFT-based polynomial multiplication ($\mathcal{O}(d \log d)$ per multiply), batched execution ($\mathcal{O}(\log N)$ torch calls), and autograd.
 
+### Fitting
+
+Given target inclusion probabilities $\bpiptgt$, find weights $\bw$ such that $\bpip(\bw) = \bpiptgt$:
+
+<a href="conditional_poisson_numpy.py#fit" title="ConditionalPoisson.fit" class="verified" target="_blank">✓</a> Product tree + Newton-CG ·
+<a href="bench_timing_r.R" title="UPMEpiktildefrompik" class="verified" target="_blank">✓</a> R `sampling::UPMEpiktildefrompik` (fixed-point iteration)
+
+<figure>
+<img src="../figures/timing_fit.svg" alt="Log-log plot: fitting target pi to weights" style="width:100%">
+</figure>
+
+Our Newton-CG optimizer uses true Hessian-vector products computed via the product tree, giving superlinear convergence.  R's [`UPMEpiktildefrompik`](https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R) uses $J = I$ rather than the true Jacobian, making it a fixed-point iteration ($\tilde{p} \mathrel{+}= \bpiptgt - \bpip(\tilde{p})$) despite the [docs](https://cran.r-project.org/web/packages/sampling/sampling.pdf) calling it Newton's method.  Each R iteration requires a full $\mathcal{O}(Nn)$ DP pass to recompute $\bpip$.
+
 ### Drawing Samples
 
-<a href="bench_timing_r.R" title="UPmaxentropy" class="verified" target="_blank">✓</a> R `sampling::UPmaxentropy` (1 sample) ·
-<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (1 and 10k samples)
+<a href="bench_timing_r.R" title="UPMEqfromw + UPMEsfromq" class="verified" target="_blank">✓</a> R `sampling` (1 sample, with and without DP rebuild) ·
+<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (with and without tree build; 10k amortized)
 
 <figure>
 <img src="../figures/timing_samples.svg" alt="Log-log plot: drawing samples" style="width:100%">
 </figure>
 
-The R [`sampling`](https://github.com/cran/sampling) package draws one conditional Poisson sample per call via [`UPmaxentropy`](https://github.com/cran/sampling/blob/master/R/UPmaxentropy.R) at $\mathcal{O}(Nn)$ cost.  The product tree's quota-splitting sampler costs $\mathcal{O}(n \log N)$ per sample after a one-time $\mathcal{O}(N \log^2 n)$ tree build—the amortized cost drops rapidly with more samples.  The R `sampling` package includes [fitting](https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R) (target $\bpip \to \bw$) via what the [docs](https://cran.r-project.org/web/packages/sampling/sampling.pdf) call Newton's method (though the code uses $J = I$ rather than the true Jacobian, making it a fixed-point iteration $\tilde{p} \mathrel{+}= \bpip_{\text{target}} - \bpip(\tilde{p})$), but does not expose the normalizing constant $\Z$.  The R `sampling` package also has numerical stability limitations: its [DP recurrence](https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R#L11) operates in linear space without log-scaling, producing NaN at moderate sizes or when weights span several orders of magnitude.  Our FFT implementation maintains machine-epsilon accuracy at all tested sizes and weight ranges.<a href="bench_accuracy.py#r_accuracy" title="R vs tree vs FFT accuracy comparison" class="verified" target="_blank">✓</a>
+For fair comparison, the plot shows both "including setup" and "excluding setup" variants.  R's [`UPMEqfromw`](https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R) computes the $\mathcal{O}(Nn)$ DP table; [`UPMEsfromq`](https://github.com/cran/sampling/blob/master/R/UPMEsfromq.R) draws one $\mathcal{O}(N)$ sequential sample from it.  Our product tree costs $\mathcal{O}(N \log^2 n)$ to build, then $\mathcal{O}(n \log N)$ per sample via quota splitting—the amortized cost drops rapidly with more samples.  The "incl. build/DP" lines give apples-to-apples single-sample cost; the "excl." lines show the marginal cost of additional samples from a precomputed structure.
+
+The R `sampling` package does not expose the normalizing constant $\Z$, and has numerical stability limitations: its [DP recurrence](https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R#L11) operates in linear space without log-scaling, producing NaN at moderate sizes or when weights span several orders of magnitude.  Our FFT implementation maintains machine-epsilon accuracy at all tested sizes and weight ranges.<a href="bench_accuracy.py#r_accuracy" title="R vs tree vs FFT accuracy comparison" class="verified" target="_blank">✓</a>
 
 ### Scaling in $N$ and $n$
 
-The static plots above fix $n = 0.4N$.  The interactive 3D plots below sweep $N$ and $n$ independently, confirming the claimed complexities.  Drag to rotate, scroll to zoom, hover for values.  Use the dropdown to switch between computing $\Z$ and computing $\bpip$.
+The static plots above fix $n = 0.4N$.  The interactive 3D plots below sweep $N$ and $n$ independently, confirming the claimed complexities.  Drag to rotate, scroll to zoom, hover for values.  Use the dropdown to switch between operations.
 
 <div id="timing-3d"></div>
 <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
@@ -3188,14 +3203,19 @@ var COLORS = {
   'DP forward': '#E91E63', 'NumPy tree': '#5b9bd5', 'PyTorch FFT': '#c0504d',
   'Fwd-bwd DP': '#E91E63', 'PyTorch FFT + autograd': '#c0504d',
   'N\u00d7DP loo': '#999', 'N\u00d7Tree loo': '#bbb', 'R:sampling (pi)': '#FF9800',
-  'R:sampling (1 sample)': '#FF9800',
+  'NumPy tree (Newton-CG)': '#5b9bd5', 'R:sampling (fit)': '#FF9800',
+  'R:sampling (1 sample, incl. DP)': '#FF9800', 'R:sampling (1 sample, excl. DP)': '#FF9800',
+  'NumPy tree (1 sample, incl. build)': '#5b9bd5',
   'NumPy tree (1 sample)': '#5b9bd5', 'NumPy tree (10k samples)': '#2196F3'
 };
 var COMPLEXITY = {
   'DP forward': 'O(Nn)', 'NumPy tree': 'O(N log\u00b2 N)', 'PyTorch FFT': 'O(N log\u00b2 n)',
   'Fwd-bwd DP': 'O(Nn)', 'PyTorch FFT + autograd': 'O(N log\u00b2 n)',
   'N\u00d7DP loo': 'O(N\u00b2n)', 'N\u00d7Tree loo': 'O(N\u00b2 log\u00b2 n)',
-  'R:sampling (pi)': 'O(Nn)', 'R:sampling (1 sample)': '',
+  'R:sampling (pi)': 'O(Nn)',
+  'NumPy tree (Newton-CG)': 'Newton-CG', 'R:sampling (fit)': 'fixed-point',
+  'R:sampling (1 sample, incl. DP)': 'incl. DP', 'R:sampling (1 sample, excl. DP)': 'excl. DP',
+  'NumPy tree (1 sample, incl. build)': 'incl. build',
   'NumPy tree (1 sample)': 'O(n log N)',
   'NumPy tree (10k samples)': 'O(n log N) ea.'
 };
@@ -3295,10 +3315,10 @@ Plotly.newPlot('timing-3d', makeTraces('pi'), layout, {responsive: true});
 var container = document.getElementById('timing-3d');
 var select = document.createElement('select');
 select.style.cssText = 'margin-bottom:8px; font-size:14px; padding:4px 8px;';
-['Z', 'pi', 'samples'].forEach(function(exp) {
+['Z', 'pi', 'fit', 'samples'].forEach(function(exp) {
   var opt = document.createElement('option');
   opt.value = exp;
-  opt.text = exp === 'Z' ? 'Computing Z' : exp === 'pi' ? 'Computing \u03c0' : 'Drawing samples';
+  opt.text = exp === 'Z' ? 'Computing Z' : exp === 'pi' ? 'Computing \u03c0' : exp === 'fit' ? 'Fitting \u03c0 \u2192 weights' : 'Drawing samples';
   if (exp === 'pi') opt.selected = true;
   select.appendChild(opt);
 });

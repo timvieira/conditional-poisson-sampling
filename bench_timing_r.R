@@ -63,16 +63,28 @@ ms <- time_it(function() {
 }, reps)
 emit("R:sampling (pi)", ms)
 
-# Save pik for sampling benchmarks
+# Save pik for fitting and sampling benchmarks
 q <- UPMEqfromw(w, n)
 pik <- UPMEpikfromq(q)
 
-# --- Drawing 1 sample via sampling internals (from weights) ---
-# UPmaxentropy(pik) includes fitting (pik -> w), which is unfair to compare
-# against our sampler that starts from weights.  Instead, time the DP + sample
-# steps directly: UPMEqfromw (O(Nn) DP) + UPMEsfromq (O(N) sequential sample).
+# --- Fitting: target pi -> weights via UPMEpiktildefrompik ---
+ms <- time_it(function() {
+    UPMEpiktildefrompik(pik)
+}, reps)
+emit("R:sampling (fit)", ms)
+
+# --- Drawing 1 sample (DP + sample, from weights) ---
+# Includes the O(Nn) DP rebuild every call.
 ms <- time_it(function() {
     q2 <- UPMEqfromw(w, n)
     UPMEsfromq(q2)
 }, reps)
-emit("R:sampling (1 sample)", ms)
+emit("R:sampling (1 sample, incl. DP)", ms)
+
+# --- Drawing 1 sample (sample step only, from precomputed DP) ---
+# Fair comparison against our tree sampler: pre-compute DP outside timing loop.
+q_pre <- UPMEqfromw(w, n)
+ms <- time_it(function() {
+    UPMEsfromq(q_pre)
+}, reps)
+emit("R:sampling (1 sample, excl. DP)", ms)
