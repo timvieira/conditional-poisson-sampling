@@ -96,8 +96,9 @@ Poisson can be used for sampling without replacement.  Draw $n$ items
 independently from the categorical distribution over weights, and keep only the
 samples where all draws are distinct:</p>
 <div class="pseudocode">
-<p><b>repeat</b><br>
-$\quad$ Draw $s_1, \ldots, s_n \overset{\text{i.i.d.}}{\sim} \text{Categorical}(\bw / \W)$ where $\W \defeq \sum_i \w_i$<br>
+<p>$\W \leftarrow \sum_i \w_i$<br>
+<b>repeat</b><br>
+$\quad$ Draw $s_1, \ldots, s_n \overset{\text{i.i.d.}}{\sim} \text{Categorical}(\bw / \W)$<br>
 $\quad$ $S \leftarrow \{s_1, \ldots, s_n\}$<br>
 <b>until</b> $|S| = n$ (all draws are distinct)<br>
 <b>return</b> $S$</p>
@@ -3222,6 +3223,137 @@ $$
 </figure>
 
 <p>The R <code>sampling</code> package draws one conditional Poisson sample per call at $\mathcal{O}(Nn)$ cost.  The product tree's quota-splitting sampler costs $\mathcal{O}(n \log N)$ per sample after a one-time $\mathcal{O}(N \log^2 n)$ tree build—the amortized cost drops rapidly with more samples.  <code>BalancedSampling::lpm2</code> (local pivotal method) is very fast but is a different algorithm; it does not sample from the conditional Poisson distribution.</p>
+<h3 id="scaling-in-math39-and-math40">Scaling in $N$ and $n$</h3>
+<p>The static plots above fix $n = 0.4N$.  The interactive 3D plots below sweep $N$ and $n$ independently, confirming the claimed complexities.  Drag to rotate, scroll to zoom, hover for values.  Use the dropdown to switch between computing $\Z$ and computing $\bpip$.</p>
+<div id="timing-3d">
+
+</div>
+<script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<script>
+(function() {
+var raw = [["DP forward","Z",50,5,0.0978],["NumPy tree","Z",50,5,4.9113],["PyTorch FFT","Z",50,5,1.6511],["Fwd-bwd DP","pi",50,5,1.8981],["NumPy tree","pi",50,5,4.8624],["PyTorch FFT + autograd","pi",50,5,3.8967],["N\u00d7DP loo","pi",50,5,4.6483],["DP forward","Z",50,10,0.2355],["NumPy tree","Z",50,10,4.906],["PyTorch FFT","Z",50,10,1.3152],["Fwd-bwd DP","pi",50,10,2.7444],["NumPy tree","pi",50,10,5.0459],["PyTorch FFT + autograd","pi",50,10,4.4282],["N\u00d7DP loo","pi",50,10,8.7774],["DP forward","Z",50,20,0.3182],["NumPy tree","Z",50,20,5.0181],["PyTorch FFT","Z",50,20,1.2675],["Fwd-bwd DP","pi",50,20,3.6839],["NumPy tree","pi",50,20,5.0302],["PyTorch FFT + autograd","pi",50,20,3.8632],["N\u00d7DP loo","pi",50,20,16.5633],["DP forward","Z",100,5,0.2156],["NumPy tree","Z",100,5,10.1517],["PyTorch FFT","Z",100,5,2.0554],["Fwd-bwd DP","pi",100,5,3.9737],["NumPy tree","pi",100,5,10.1061],["PyTorch FFT + autograd","pi",100,5,5.1573],["N\u00d7DP loo","pi",100,5,20.5421],["DP forward","Z",100,10,0.387],["NumPy tree","Z",100,10,10.2925],["PyTorch FFT","Z",100,10,1.8076],["Fwd-bwd DP","pi",100,10,5.9719],["NumPy tree","pi",100,10,10.6048],["PyTorch FFT + autograd","pi",100,10,5.4467],["N\u00d7DP loo","pi",100,10,39.3261],["DP forward","Z",100,20,0.7079],["NumPy tree","Z",100,20,10.1952],["PyTorch FFT","Z",100,20,2.2217],["Fwd-bwd DP","pi",100,20,9.0214],["NumPy tree","pi",100,20,10.0254],["PyTorch FFT + autograd","pi",100,20,5.37],["N\u00d7DP loo","pi",100,20,67.8731],["DP forward","Z",100,50,1.4295],["NumPy tree","Z",100,50,9.9787],["PyTorch FFT","Z",100,50,1.9056],["Fwd-bwd DP","pi",100,50,13.3254],["NumPy tree","pi",100,50,10.0107],["PyTorch FFT + autograd","pi",100,50,6.2804],["N\u00d7DP loo","pi",100,50,145.6575],["DP forward","Z",200,5,0.4295],["NumPy tree","Z",200,5,20.5921],["PyTorch FFT","Z",200,5,2.6133],["Fwd-bwd DP","pi",200,5,8.0915],["NumPy tree","pi",200,5,20.9802],["PyTorch FFT + autograd","pi",200,5,7.4745],["N\u00d7DP loo","pi",200,5,75.3882],["DP forward","Z",200,10,0.7905],["NumPy tree","Z",200,10,21.0867],["PyTorch FFT","Z",200,10,2.669],["Fwd-bwd DP","pi",200,10,12.513],["NumPy tree","pi",200,10,20.8388],["PyTorch FFT + autograd","pi",200,10,7.266],["N\u00d7DP loo","pi",200,10,146.1474],["DP forward","Z",200,20,1.4386],["NumPy tree","Z",200,20,20.2893],["PyTorch FFT","Z",200,20,2.6267],["Fwd-bwd DP","pi",200,20,19.5273],["NumPy tree","pi",200,20,21.237],["PyTorch FFT + autograd","pi",200,20,7.4363],["N\u00d7DP loo","pi",200,20,293.7203],["DP forward","Z",200,50,3.3125],["NumPy tree","Z",200,50,20.4377],["PyTorch FFT","Z",200,50,2.9074],["Fwd-bwd DP","pi",200,50,36.5533],["NumPy tree","pi",200,50,20.6541],["PyTorch FFT + autograd","pi",200,50,8.1441],["N\u00d7DP loo","pi",200,50,676.4155],["DP forward","Z",200,100,5.601],["NumPy tree","Z",200,100,20.6449],["PyTorch FFT","Z",200,100,2.7862],["Fwd-bwd DP","pi",200,100,49.3357],["NumPy tree","pi",200,100,21.0746],["PyTorch FFT + autograd","pi",200,100,8.4195],["N\u00d7DP loo","pi",200,100,1176.87],["DP forward","Z",500,5,1.0748],["NumPy tree","Z",500,5,46.4958],["PyTorch FFT","Z",500,5,4.7735],["Fwd-bwd DP","pi",500,5,20.631],["NumPy tree","pi",500,5,46.7452],["PyTorch FFT + autograd","pi",500,5,12.8887],["N\u00d7DP loo","pi",500,5,468.0346],["DP forward","Z",500,10,4.1972],["NumPy tree","Z",500,10,64.1748],["PyTorch FFT","Z",500,10,5.3869],["Fwd-bwd DP","pi",500,10,34.6202],["NumPy tree","pi",500,10,51.3763],["PyTorch FFT + autograd","pi",500,10,15.1257],["N\u00d7DP loo","pi",500,10,1159.7747],["DP forward","Z",500,20,4.4531],["NumPy tree","Z",500,20,61.4259],["PyTorch FFT","Z",500,20,6.3854],["Fwd-bwd DP","pi",500,20,63.5572],["NumPy tree","pi",500,20,51.6762],["PyTorch FFT + autograd","pi",500,20,13.8559],["N\u00d7DP loo","pi",500,20,2001.4638],["DP forward","Z",500,50,9.4599],["NumPy tree","Z",500,50,51.2763],["PyTorch FFT","Z",500,50,7.3076],["Fwd-bwd DP","pi",500,50,119.2066],["NumPy tree","pi",500,50,55.3545],["PyTorch FFT + autograd","pi",500,50,17.018],["N\u00d7DP loo","pi",500,50,4622.714],["DP forward","Z",500,100,17.947],["NumPy tree","Z",500,100,48.0385],["PyTorch FFT","Z",500,100,6.2984],["Fwd-bwd DP","pi",500,100,191.0857],["NumPy tree","pi",500,100,47.4112],["PyTorch FFT + autograd","pi",500,100,15.4201],["N\u00d7DP loo","pi",500,100,8900.57],["DP forward","Z",500,200,31.8161],["NumPy tree","Z",500,200,49.976],["PyTorch FFT","Z",500,200,5.258],["Fwd-bwd DP","pi",500,200,304.7237],["NumPy tree","pi",500,200,52.4031],["PyTorch FFT + autograd","pi",500,200,16.2739],["DP forward","Z",1000,5,2.4995],["NumPy tree","Z",1000,5,121.4106],["PyTorch FFT","Z",1000,5,9.2714],["Fwd-bwd DP","pi",1000,5,44.7926],["NumPy tree","pi",1000,5,118.6404],["PyTorch FFT + autograd","pi",1000,5,25.0746],["DP forward","Z",1000,10,4.5725],["NumPy tree","Z",1000,10,119.0112],["PyTorch FFT","Z",1000,10,9.0757],["Fwd-bwd DP","pi",1000,10,68.6109],["NumPy tree","pi",1000,10,118.6681],["PyTorch FFT + autograd","pi",1000,10,24.0416],["DP forward","Z",1000,20,8.7861],["NumPy tree","Z",1000,20,117.3631],["PyTorch FFT","Z",1000,20,9.2511],["Fwd-bwd DP","pi",1000,20,116.8814],["NumPy tree","pi",1000,20,121.3678],["PyTorch FFT + autograd","pi",1000,20,25.4587],["DP forward","Z",1000,50,21.6578],["NumPy tree","Z",1000,50,120.9752],["PyTorch FFT","Z",1000,50,9.4139],["Fwd-bwd DP","pi",1000,50,253.5188],["NumPy tree","pi",1000,50,113.6239],["PyTorch FFT + autograd","pi",1000,50,24.3006],["DP forward","Z",1000,100,42.1472],["NumPy tree","Z",1000,100,128.5708],["PyTorch FFT","Z",1000,100,9.9644],["Fwd-bwd DP","pi",1000,100,457.2452],["NumPy tree","pi",1000,100,115.8606],["PyTorch FFT + autograd","pi",1000,100,24.816],["DP forward","Z",1000,200,71.1104],["NumPy tree","Z",1000,200,114.493],["PyTorch FFT","Z",1000,200,9.1496],["Fwd-bwd DP","pi",1000,200,762.9467],["NumPy tree","pi",1000,200,130.423],["PyTorch FFT + autograd","pi",1000,200,28.4329],["DP forward","Z",1000,500,170.2516],["NumPy tree","Z",1000,500,123.9666],["PyTorch FFT","Z",1000,500,9.676],["Fwd-bwd DP","pi",1000,500,1253.0605],["NumPy tree","pi",1000,500,107.36],["PyTorch FFT + autograd","pi",1000,500,25.4333],["DP forward","Z",2000,5,4.6603],["NumPy tree","Z",2000,5,267.0368],["PyTorch FFT","Z",2000,5,15.9322],["Fwd-bwd DP","pi",2000,5,86.6025],["NumPy tree","pi",2000,5,272.1776],["PyTorch FFT + autograd","pi",2000,5,41.2277],["DP forward","Z",2000,10,8.6999],["NumPy tree","Z",2000,10,273.3668],["PyTorch FFT","Z",2000,10,17.2265],["Fwd-bwd DP","pi",2000,10,136.0261],["NumPy tree","pi",2000,10,270.8337],["PyTorch FFT + autograd","pi",2000,10,43.5911],["DP forward","Z",2000,20,16.9141],["NumPy tree","Z",2000,20,273.866],["PyTorch FFT","Z",2000,20,16.0245],["Fwd-bwd DP","pi",2000,20,239.3954],["NumPy tree","pi",2000,20,273.4912],["PyTorch FFT + autograd","pi",2000,20,42.9221],["DP forward","Z",2000,50,40.5001],["NumPy tree","Z",2000,50,272.5198],["PyTorch FFT","Z",2000,50,16.3851],["Fwd-bwd DP","pi",2000,50,501.1922],["NumPy tree","pi",2000,50,271.1925],["PyTorch FFT + autograd","pi",2000,50,50.1735],["DP forward","Z",2000,100,92.3406],["NumPy tree","Z",2000,100,274.6345],["PyTorch FFT","Z",2000,100,16.2632],["Fwd-bwd DP","pi",2000,100,949.3208],["NumPy tree","pi",2000,100,299.6277],["PyTorch FFT + autograd","pi",2000,100,47.7099],["DP forward","Z",2000,200,155.9212],["NumPy tree","Z",2000,200,265.2419],["PyTorch FFT","Z",2000,200,16.0206],["Fwd-bwd DP","pi",2000,200,1738.4554],["NumPy tree","pi",2000,200,265.5287],["PyTorch FFT + autograd","pi",2000,200,48.9426],["DP forward","Z",2000,500,350.856],["NumPy tree","Z",2000,500,266.9779],["PyTorch FFT","Z",2000,500,18.4078],["Fwd-bwd DP","pi",2000,500,3435.0803],["NumPy tree","pi",2000,500,273.7993],["PyTorch FFT + autograd","pi",2000,500,47.1455],["DP forward","Z",2000,1000,610.6301],["NumPy tree","Z",2000,1000,253.8019],["PyTorch FFT","Z",2000,1000,17.8035],["Fwd-bwd DP","pi",2000,1000,4713.8418],["NumPy tree","pi",2000,1000,247.3087],["PyTorch FFT + autograd","pi",2000,1000,42.4137],["DP forward","Z",5000,5,11.5172],["NumPy tree","Z",5000,5,1099.1776],["PyTorch FFT","Z",5000,5,37.8172],["Fwd-bwd DP","pi",5000,5,210.8224],["NumPy tree","pi",5000,5,1094.4904],["PyTorch FFT + autograd","pi",5000,5,96.2571],["DP forward","Z",5000,10,23.2295],["NumPy tree","Z",5000,10,1248.5316],["PyTorch FFT","Z",5000,10,45.9716],["Fwd-bwd DP","pi",5000,10,391.001],["NumPy tree","pi",5000,10,1084.5208],["PyTorch FFT + autograd","pi",5000,10,91.6438],["DP forward","Z",5000,20,40.1038],["NumPy tree","Z",5000,20,1086.2168],["PyTorch FFT","Z",5000,20,39.0681],["Fwd-bwd DP","pi",5000,20,545.8648],["NumPy tree","pi",5000,20,1165.351],["PyTorch FFT + autograd","pi",5000,20,95.7991],["DP forward","Z",5000,50,97.1092],["NumPy tree","Z",5000,50,1086.7954],["PyTorch FFT","Z",5000,50,47.4919],["Fwd-bwd DP","pi",5000,50,1445.7316],["NumPy tree","pi",5000,50,1225.9618],["PyTorch FFT + autograd","pi",5000,50,102.9487],["DP forward","Z",5000,100,194.567],["NumPy tree","Z",5000,100,1247.4851],["PyTorch FFT","Z",5000,100,36.7652],["Fwd-bwd DP","pi",5000,100,2484.143],["NumPy tree","pi",5000,100,1347.9459],["PyTorch FFT + autograd","pi",5000,100,98.8206],["DP forward","Z",5000,200,391.9086],["NumPy tree","Z",5000,200,1129.721],["PyTorch FFT","Z",5000,200,38.4462],["Fwd-bwd DP","pi",5000,200,4593.8287],["NumPy tree","pi",5000,200,1087.2797],["PyTorch FFT + autograd","pi",5000,200,96.4183],["DP forward","Z",5000,500,961.5933],["NumPy tree","Z",5000,500,1244.3861],["PyTorch FFT","Z",5000,500,43.8929],["Fwd-bwd DP","pi",5000,500,6505.4309],["NumPy tree","pi",5000,500,1065.3156],["PyTorch FFT + autograd","pi",5000,500,101.4952],["DP forward","Z",5000,1000,1757.9098],["NumPy tree","Z",5000,1000,1228.2807],["PyTorch FFT","Z",5000,1000,40.4465],["Fwd-bwd DP","pi",5000,1000,8195.4478],["NumPy tree","pi",5000,1000,1062.0761],["PyTorch FFT + autograd","pi",5000,1000,92.391],["DP forward","Z",5000,2000,3104.3419],["NumPy tree","Z",5000,2000,1089.7347],["PyTorch FFT","Z",5000,2000,39.8394],["Fwd-bwd DP","pi",5000,2000,21178.1623],["NumPy tree","pi",5000,2000,1091.8147],["PyTorch FFT + autograd","pi",5000,2000,101.0829]];
+
+var COLORS = {
+  'DP forward': '#E91E63', 'NumPy tree': '#5b9bd5', 'PyTorch FFT': '#c0504d',
+  'Fwd-bwd DP': '#E91E63', 'PyTorch FFT + autograd': '#c0504d', 'N\u00d7DP loo': '#999'
+};
+var COMPLEXITY = {
+  'DP forward': 'O(Nn)', 'NumPy tree': 'O(N log\u00b2 N)', 'PyTorch FFT': 'O(N log\u00b2 n)',
+  'Fwd-bwd DP': 'O(Nn)', 'PyTorch FFT + autograd': 'O(N log\u00b2 n)', 'N\u00d7DP loo': 'O(N\u00b2n)'
+};
+
+// Parse into {experiment: {method: {Ns, ns, ts}}}
+var byExp = {};
+raw.forEach(function(r) {
+  var m = r[0], exp = r[1], N = r[2], n = r[3], t = r[4];
+  if (!byExp[exp]) byExp[exp] = {};
+  if (!byExp[exp][m]) byExp[exp][m] = {N:[], n:[], t:[]};
+  byExp[exp][m].N.push(N);
+  byExp[exp][m].n.push(n);
+  byExp[exp][m].t.push(t);
+});
+
+function makeTraces(exp) {
+  var methods = byExp[exp];
+  var traces = [];
+  Object.keys(methods).forEach(function(m) {
+    var d = methods[m];
+    var color = COLORS[m] || '#888';
+    var cplx = COMPLEXITY[m] || '';
+    traces.push({
+      type: 'scatter3d', mode: 'markers',
+      x: d.N.map(Math.log10), y: d.n.map(Math.log10),
+      z: d.t.map(Math.log10),
+      marker: {size: 3, color: color, opacity: 0.9},
+      name: m + '  ' + cplx,
+      hovertemplate: m + '<br>N=%{customdata[0]}, n=%{customdata[1]}<br>%{customdata[2]:.2f} ms<extra></extra>',
+      customdata: d.N.map(function(_,i){return [d.N[i], d.n[i], d.t[i]]})
+    });
+    // Add surface: build z-matrix on the (N, n) grid
+    var uN = Array.from(new Set(d.N)).sort(function(a,b){return a-b});
+    var un = Array.from(new Set(d.n)).sort(function(a,b){return a-b});
+    var lookup = {};
+    d.N.forEach(function(_,i){ lookup[d.N[i]+','+d.n[i]] = d.t[i]; });
+    // z_matrix[i][j] = log10(time) for uN[i], un[j]; null where missing
+    var z_matrix = uN.map(function(N) {
+      return un.map(function(n) {
+        var v = lookup[N+','+n];
+        return v !== undefined ? Math.log10(v) : null;
+      });
+    });
+    if (uN.length >= 2 && un.length >= 2) {
+      // surface: z[i][j] maps to (x[j], y[i]), so rows=N, cols=n
+      // but scatter3d has x=N, y=n — transpose so x=N (cols), y=n (rows)
+      var z_T = un.map(function(_,j) {
+        return uN.map(function(_,i) { return z_matrix[i][j]; });
+      });
+      traces.push({
+        type: 'surface',
+        x: uN.map(Math.log10),   // N axis (columns of z_T)
+        y: un.map(Math.log10),   // n axis (rows of z_T)
+        z: z_T,
+        colorscale: [[0, color], [1, color]],
+        opacity: 0.35, showscale: false,
+        name: m + ' (surface)', showlegend: false,
+        hoverinfo: 'skip', connectgaps: false
+      });
+    }
+  });
+  return traces;
+}
+
+var layout = {
+  scene: {
+    xaxis: {title: 'log\u2081\u2080 N'},
+    yaxis: {title: 'log\u2081\u2080 n'},
+    zaxis: {title: 'log\u2081\u2080 time (ms)'},
+    camera: {eye: {x: 1.5, y: -1.5, z: 0.8}}
+  },
+  margin: {l: 0, r: 0, t: 40, b: 0},
+  height: 500,
+  legend: {x: 0, y: 1, font: {size: 11}},
+  updatemenus: [{
+    type: 'dropdown', x: 0.0, y: 1.15, xanchor: 'left',
+    buttons: [
+      {label: 'Computing Z', method: 'restyle',
+       args: [makeTraces('Z').reduce(function(a,t,i){
+         Object.keys(t).forEach(function(k){ if(!a[k]) a[k]=[]; a[k].push(t[k]); });
+         return a;
+       }, {})]},
+      {label: 'Computing \u03c0', method: 'restyle',
+       args: [makeTraces('pi').reduce(function(a,t,i){
+         Object.keys(t).forEach(function(k){ if(!a[k]) a[k]=[]; a[k].push(t[k]); });
+         return a;
+       }, {})]},
+    ]
+  }]
+};
+
+// Start with pi (the main event)
+Plotly.newPlot('timing-3d', makeTraces('pi'), layout, {responsive: true});
+
+// Fix dropdown: simpler approach — just replace data on click
+var container = document.getElementById('timing-3d');
+var select = document.createElement('select');
+select.style.cssText = 'margin-bottom:8px; font-size:14px; padding:4px 8px;';
+['Z', 'pi'].forEach(function(exp) {
+  var opt = document.createElement('option');
+  opt.value = exp;
+  opt.text = exp === 'Z' ? 'Computing Z' : 'Computing \u03c0';
+  if (exp === 'pi') opt.selected = true;
+  select.appendChild(opt);
+});
+container.parentNode.insertBefore(select, container);
+select.addEventListener('change', function() {
+  Plotly.react('timing-3d', makeTraces(this.value), layout);
+});
+
+// Remove the plotly dropdown since we have our own
+layout.updatemenus = [];
+Plotly.react('timing-3d', makeTraces('pi'), layout);
+})();
+</script>
+
 <p>The contour scaling (described below) is essential for the PyTorch FFT implementation: without it, FFT precision collapses at $N \gtrsim 1000$.  With it, the implementation achieves machine-epsilon accuracy at all tested sizes ($N$ up to 10,000) and handles extreme weight ranges ($r$ from $10^{-10}$ to $10^{8}$).</p>
 <h2 id="pytorch-implementation-with-contour-scaling">PyTorch Implementation with Contour Scaling</h2>
 <p>Can we use PyTorch's autograd to compute the gradient (inclusion probabilities) automatically, given only the forward pass?</p>
@@ -3563,7 +3695,7 @@ $$</p>
 <p>This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.</p>
 <p><strong>Example.</strong> With $N = 100$ items and $n = 5$, set weights proportional to $p(i)$ so that high-probability items are more likely to be selected.  Each sample gives 5 distinct evaluations of $f$; the HT formula reweights them to produce an unbiased estimate of the full sum.</p>
 <p>For more on SWOR-based estimation (including the near-optimal priority sampling scheme), see my earlier post on <a href="./post/2017/07/03/estimating-means-in-a-finite-universe/">estimating means in a finite universe</a>.</p>
-<h2 id="identities-for-math145-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
+<h2 id="identities-for-math152-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
 <p>The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> elementary symmetric polynomial $e_n(\bw)$.  Here are some useful identities.</p>
 <h3 id="differential-identities">Differential Identities</h3>
 <p>The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:</p>
