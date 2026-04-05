@@ -21,7 +21,7 @@
 - [ ] Test GPU performance — both `conditional_poisson_torch.py` (FFT) and `torch_prototype.py` (direct conv1d) should be benchmarked on GPU. Float32 precision risk needs testing (contour scaling helps but may not fully compensate).
 - [x] Promote `conditional_poisson_torch.py` to the primary library implementation — merged `torch_fft_prototype.py` into it with full `ConditionalPoissonTorch` class (from_weights, fit, sample, log_prob, pi, hvp). Blog post Basic Usage updated.
 - [ ] Package up the NumPy, PyTorch, and JavaScript libraries as easy-to-install single-file libraries via pip/npm. (`pyproject.toml` and `package.json` exist but are not polished for distribution.)
-- [ ] The maximum-entropy test could be strengthened by actually optimizing over the space of all distributions over size-$n$ sets, rather than just checking against a few specific alternatives.
+- [x] The maximum-entropy test could be strengthened by actually optimizing over the space of all distributions over size-$n$ sets, rather than just checking against a few specific alternatives.
 
 ## Blog Polish
 

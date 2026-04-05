@@ -486,33 +486,56 @@ def test_horvitz_thompson_unbiased():
 
 def test_max_entropy():
     """CPS is the max-entropy distribution over size-n subsets with given pi."""
+    from scipy.optimize import minimize
+
     w, n = W_SMALL[:6], 2
     N = len(w)
-    cp = ConditionalPoisson.from_weights(n, w)
     probs_cps, _ = all_probs_bf(w, n)
     pi_target = pi_bf(w, n)
 
     # CPS entropy
     H_cps = -sum(p * np.log(p) for p in probs_cps.values() if p > 0)
 
-    # Generate a random alternative distribution with the same marginals
-    # by perturbing CPS and projecting onto the marginal constraint
-    # (we just verify CPS has higher entropy than a few random perturbations)
+    # Enumerate all size-n subsets and build the membership matrix A
+    # where A[i, j] = 1 if item i is in subset j.
     all_S = sorted(probs_cps.keys(), key=lambda s: tuple(sorted(s)))
-    p_vec = np.array([probs_cps[S] for S in all_S])
-    rng = np.random.default_rng(99)
-    for _ in range(20):
-        noise = rng.standard_normal(len(p_vec)) * 0.01
-        # Project: maintain marginals using iterative proportional fitting
-        q = p_vec + noise
-        q = np.maximum(q, 1e-12)
-        q /= q.sum()
-        H_q = -np.sum(q * np.log(q))
-        # CPS should have >= entropy (it's the max)
-        # Note: q doesn't exactly match marginals, so this is approximate
-        # We just check CPS is near the top
-    # The real test: CPS entropy should be achievable
-    assert H_cps > 0  # basic sanity
+    M = len(all_S)
+    A = np.zeros((N, M))
+    for j, S in enumerate(all_S):
+        for i in S:
+            A[i, j] = 1.0
+
+    # Maximize entropy subject to: A @ q = pi_target.
+    # Softmax parameterization q = softmax(u) ensures q > 0 and sum(q) = 1,
+    # leaving only the marginal constraint, enforced via penalty.
+    def softmax(u):
+        u = u - u.max()
+        e = np.exp(u)
+        return e / e.sum()
+
+    p_cps = np.array([probs_cps[S] for S in all_S])
+
+    # Penalty method: minimize -H(softmax(u)) + mu * ||A @ softmax(u) - pi||^2
+    # Increasing mu drives the constraint violation to zero.
+    u = np.zeros(M)
+    for mu in [1e2, 1e4, 1e6, 1e8]:
+        def objective(u):
+            q = softmax(u)
+            neg_H = np.sum(q * np.log(q))
+            violation = A @ q - pi_target
+            return neg_H + mu * np.dot(violation, violation)
+        result = minimize(objective, u, method='L-BFGS-B',
+                          options={'ftol': 1e-15, 'maxiter': 2000})
+        u = result.x
+
+    q_opt = softmax(u)
+    H_opt = -np.sum(q_opt * np.log(q_opt))
+    assert np.allclose(A @ q_opt, pi_target, atol=1e-6), \
+        f"Marginal constraint violated: max err {np.max(np.abs(A @ q_opt - pi_target)):.2e}"
+    assert np.isclose(H_opt, H_cps, rtol=1e-6), \
+        f"CPS entropy {H_cps:.10f} != optimal {H_opt:.10f}"
+    assert np.allclose(q_opt, p_cps, atol=1e-4), \
+        f"Optimal distribution differs from CPS: max diff {np.max(np.abs(q_opt - p_cps)):.2e}"
 
 
 # ===========================================================================
