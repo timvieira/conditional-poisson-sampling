@@ -59,7 +59,7 @@ def numpy_tree_Z(w, n):
 
 def fft_Z(theta, n):
     """O(N log^2 n) FFT product tree Z via PyTorch."""
-    from torch_fft_prototype import forward_log_Z
+    from conditional_poisson_torch import forward_log_Z
     return forward_log_Z(theta, n).item()
 
 
@@ -111,7 +111,7 @@ def numpy_tree_pi(w, n):
 
 def fft_autograd_pi(theta, n):
     """O(N log^2 n) FFT product tree + autograd for inclusion probabilities."""
-    from torch_fft_prototype import compute_pi
+    from conditional_poisson_torch import compute_pi
     return compute_pi(theta, n).detach().numpy()
 
 

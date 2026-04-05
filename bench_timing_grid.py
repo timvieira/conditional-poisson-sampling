@@ -19,7 +19,7 @@ from bench_timing import (dp_forward_Z, dp_loo_pi, tree_loo_pi,
                           run_r_benchmark, time_fn)
 
 import torch
-from torch_fft_prototype import forward_log_Z, compute_pi
+from conditional_poisson_torch import forward_log_Z, compute_pi
 
 
 def run_grid(quick=False):

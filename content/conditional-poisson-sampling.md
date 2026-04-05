@@ -2806,20 +2806,19 @@ All computations are verified against brute-force enumeration in the [test suite
 Now that we've seen how the product tree works under the hood, here's the library interface.
 
 ```python
-from conditional_poisson_numpy import ConditionalPoisson
-import numpy as np
+from conditional_poisson_torch import ConditionalPoissonTorch
 
-w = np.array([0.68, 1.02, 0.55, 1.63, 0.67, 2.82])
+w = [0.68, 1.02, 0.55, 1.63, 0.67, 2.82]
 n = 3
 
-cp = ConditionalPoisson.from_weights(n, w)
+cp = ConditionalPoissonTorch.from_weights(n, w)
 
-cp.log_normalizer       # log Z(w, n)
-cp.pi                   # inclusion probabilities (sum to n)
-cp.sample(10_000)       # draw 10k exact samples
+cp.log_normalizer       # 3.362122
+cp.pi                   # [0.3813, 0.5038, 0.3236, 0.6424, 0.3771, 0.7718]
+cp.sample(5)            # tensor([[0, 3, 5], [1, 3, 5], ...])
 
 # Inverse problem: find weights from target inclusion probabilities
-cp_fit = ConditionalPoisson.fit(cp.pi, n)
+cp_fit = ConditionalPoissonTorch.fit(cp.pi, n)
 ```
 
 ## The Poisson Approximation
@@ -3132,7 +3131,7 @@ The plots below compare wall-clock time across methods for the three main operat
 Three methods for computing the normalizing constant:
 <a href="bench_timing.py#dp_forward_Z" title="dp_forward_Z" class="verified" target="_blank">✓</a> DP forward pass $\mathcal{O}(Nn)$ ·
 <a href="conditional_poisson_numpy.py" title="ConditionalPoisson.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
-<a href="torch_fft_prototype.py#forward_log_Z" title="forward_log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$
+<a href="conditional_poisson_torch.py#forward_log_Z" title="forward_log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$
 
 <figure>
 <img src="../figures/timing_Z.svg" alt="Log-log plot: computing Z" style="width:100%">
@@ -3149,7 +3148,7 @@ This is the main event.  The naive approach computes each $\pip_i$ independently
 <a href="bench_samplers.py#sequential_pi" title="sequential_pi" class="verified" target="_blank">✓</a> Forward-backward DP $\mathcal{O}(Nn)$ ·
 <a href="bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R `sampling` package ·
 <a href="conditional_poisson_numpy.py" title="ConditionalPoisson.pi" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
-<a href="torch_fft_prototype.py#compute_pi" title="compute_pi" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$
+<a href="conditional_poisson_torch.py#compute_pi" title="compute_pi" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$
 
 <figure>
 <img src="../figures/timing_pi.svg" alt="Log-log plot: computing inclusion probabilities" style="width:100%">
@@ -3658,7 +3657,7 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
 
 </div>
 
-Code: [`torch_fft_prototype.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py)
+Code: [`conditional_poisson_torch.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson_torch.py)
 
 ## Application: Horvitz-Thompson Estimation
 
@@ -3757,7 +3756,7 @@ For non-diagonal $L$, the K-DPP introduces correlations between items (repulsion
 
 There are no problem-specific derivations here—each row follows from a general theorem in automatic differentiation or computer algebra.
 
-The PyTorch implementation ([`torch_fft_prototype.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py)) uses FFT-based polynomial multiplication with **contour radius scaling**—rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stable—achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.
+The PyTorch implementation ([`conditional_poisson_torch.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson_torch.py)) uses FFT-based polynomial multiplication with **contour radius scaling**—rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stable—achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.
 
 **Acknowledgment.** This post was written with extensive help from [Claude Code](https://claude.ai/claude-code)—especially the interactive widgets, which would not have been possible without it.
 

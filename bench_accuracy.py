@@ -217,7 +217,7 @@ def r_accuracy():
         return
 
     import torch
-    from torch_fft_prototype import compute_pi
+    from conditional_poisson_torch import compute_pi
 
     # Write a temporary R script that computes pi and prints JSON
     r_script = """\

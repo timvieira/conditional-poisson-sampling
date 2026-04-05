@@ -18,8 +18,8 @@
 ## Implementation
 
 - [ ] NumPy tree timing slopes (~1.15–1.45 in $N$) are higher than expected for $O(N \log^2 N)$. Investigate whether forcing FFT throughout gives cleaner scaling.
-- [ ] Test GPU performance — both `torch_fft_prototype.py` (FFT) and `torch_prototype.py` (direct conv1d) should be benchmarked on GPU. Float32 precision risk needs testing (contour scaling helps but may not fully compensate).
-- [ ] Promote `torch_fft_prototype.py` to the primary library implementation — it's faster ($O(N \log^2 n)$ vs $O(N \log^2 N)$), simpler, and supports autograd. Need to: add sampling, match the full `ConditionalPoisson` API (fit, log_prob, etc.), add tests, decide on package structure. The NumPy implementation becomes the pedagogical/reference version.
+- [ ] Test GPU performance — both `conditional_poisson_torch.py` (FFT) and `torch_prototype.py` (direct conv1d) should be benchmarked on GPU. Float32 precision risk needs testing (contour scaling helps but may not fully compensate).
+- [ ] Promote `conditional_poisson_torch.py` to the primary library implementation — it's faster ($O(N \log^2 n)$ vs $O(N \log^2 N)$), simpler, and supports autograd. Need to: add sampling, match the full `ConditionalPoisson` API (fit, log_prob, etc.), add tests, decide on package structure. The NumPy implementation becomes the pedagogical/reference version.
 - [ ] Package up the NumPy, PyTorch, and JavaScript libraries as easy-to-install single-file libraries via pip/npm. (`pyproject.toml` and `package.json` exist but are not polished for distribution.)
 - [ ] The maximum-entropy test could be strengthened by actually optimizing over the space of all distributions over size-$n$ sets, rather than just checking against a few specific alternatives.
 
@@ -27,7 +27,7 @@
 
 - [ ] Why are there still references to the NumPy implementation in the article? The timing section legitimately benchmarks the NumPy tree, but it should be framed as the reference/pedagogical implementation, not the recommended one.
 - [ ] Consistently color code math symbols and widgets — use the same colors for $P(S)$, $\pi$, and $w$ in both LaTeX and D3 widgets. Previously removed all color coding; bring it back in a principled way with a shared palette.
-- [ ] Make the $P(S)$ horizontal bars in the interactive explorer taller — ideally same width as the other bars.
+- [x] Make the $P(S)$ horizontal bars in the interactive explorer taller — ideally same width as the other bars.
 
 ## Widget UX
 
@@ -51,5 +51,5 @@
 
 ## Bugs
 
-- [ ] Implementation pill links are broken — the pills render fine but their href targets don't resolve to anything. Fix the links to point at actual implementations. Make the linking robust/future-proof (e.g., link to a function name search or a stable anchor rather than fragile line numbers).
+(none)
 

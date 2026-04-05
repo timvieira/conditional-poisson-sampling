@@ -23,7 +23,7 @@ PYTHON_FILES = [
     "test_identities.py",
     "bench_timing.py",
     "bench_samplers.py",
-    "torch_fft_prototype.py",
+    "conditional_poisson_torch.py",
     "conditional_poisson_numpy.py",
 ]
 
