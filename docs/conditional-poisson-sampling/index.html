@@ -2811,10 +2811,10 @@ Drag the weight sliders to change $\w_i$ and see how the split distributions upd
 </div>
 
 <div class="pseudocode">
-<p><b>function</b> $\text{Sample}(v, k)$: <span style="color:#888; font-size:0.85em">// sample $k$ items from subtree $v$</span><br>
+<p><b>def</b> $\text{Sample}(v, k)$: <span style="color:#888; font-size:0.85em">// sample $k$ items from subtree $v$</span><br>
 $\quad$ <b>if</b> $v$ is a leaf: <b>return</b> $\{v\text{.item}\}$ if $k = 1$, else $\emptyset$<br>
 $\quad$ Let $L, R$ be the children of $v$<br>
-$\quad$ $p_j \leftarrow L\text{.poly}[j] \cdot R\text{.poly}[k{-}j]$ for $j = 0, \ldots, k$<br>
+$\quad$ $p_j \leftarrow L\text{.poly}[j] \cdot R\text{.poly}[k{-}j]$ <b>for</b> $j = 0, \ldots, k$<br>
 $\quad$ Draw $j \sim \text{Categorical}(p_0, \ldots, p_k)$<br>
 $\quad$ <b>return</b> $\text{Sample}(L, j) \cup \text{Sample}(R, k{-}j)$<br>
 <br>
