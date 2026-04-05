@@ -49,10 +49,10 @@
 
 <body>
   <header role="banner"><hgroup>
-    <h1><a href="../index.html">Graduate Descent</a></h1>
+    <h1><a href="https://timvieira.github.io/blog/">Graduate Descent</a></h1>
     <nav role="navigation">
       <a href="https://timvieira.github.io/">About</a>
-      <a href="../index.html">Archive</a>
+      <a href="https://timvieira.github.io/blog/">Archive</a>
     </nav>
   </hgroup></header>
   <div id="main">
@@ -2819,7 +2819,7 @@ $S \leftarrow \text{sample}(\text{root}, n)$</p>
 </div>
 
 <p>The tree is built once ($\mathcal{O}(N \log^2 N)$) and reused for each sample ($\mathcal{O}(n \log N)$ per sample)—at each of the $\mathcal{O}(\log N)$ levels, only nodes whose quota is nonzero are visited, and there are at most $n$ such nodes.  (When $n \approx N$, nearly all nodes are visited, so the per-sample cost approaches $\mathcal{O}(N \log N)$.)  No $\binom{N}{n}$-sized table is ever constructed.</p>
-<p>All computations are verified against brute-force enumeration in the <a href="test_identities.py">test suite</a>.</p>
+<p>All computations are verified against brute-force enumeration in the test suite.<a href="test_identities.py" class="verified" target="_blank">✓</a></p>
 <h2 id="basic-usage">Basic Usage</h2>
 <p>Now that we've seen how the product tree works under the hood, here's the library interface.</p>
 <div class="highlight"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="kn">from</span><span class="w"> </span><span class="nn">conditional_poisson_torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConditionalPoissonTorch</span>
@@ -3196,8 +3196,8 @@ $$
 </main>
 
 <h2 id="timing">Timing</h2>
-<p>The plots below compare wall-clock time across methods for the three main operations: computing the normalizing constant $\Z$, computing inclusion probabilities $\bpip$, and drawing samples.  All timings use $n = 0.4N$ with weights drawn from $\text{Exp}(1)$.  Source code for each method is linked via the ✓ pills; the full benchmark script is <a href="bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.</p>
-<h3 id="computing-math13">Computing $\Z$</h3>
+<p>The plots below compare wall-clock time across methods for four operations: computing the normalizing constant $\Z$, computing inclusion probabilities $\bpip$, fitting target $\bpip$ to weights, and drawing samples.  All timings use $n = 0.4N$ with weights drawn from $\text{Exp}(1)$.  Source code for each method is linked via the ✓ pills; the full benchmark script is <a href="bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.</p>
+<h3 id="computing-math14">Computing $\Z$</h3>
 <p>Three methods for computing the normalizing constant:
 <a href="bench_timing.py#dp_forward_Z" title="dp_forward_Z" class="verified" target="_blank">✓</a> DP forward pass $\mathcal{O}(Nn)$ ·
 <a href="conditional_poisson_numpy.py" title="ConditionalPoisson.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
@@ -3207,7 +3207,7 @@ $$
 </figure>
 
 <p>The DP approach is fastest at small $N$ (no overhead), but the FFT tree overtakes it by $N \approx 200$ and is $\sim\!100\times$ faster by $N = 5000$.</p>
-<h3 id="computing-math21">Computing $\bpip$</h3>
+<h3 id="computing-math22">Computing $\bpip$</h3>
 <p>This is the main event.  The naive approach computes each $\pip_i$ independently via a leave-one-out forward pass; backpropagation replaces $N$ forward passes with a single backward pass, giving a factor-of-$N$ speedup:</p>
 <p><a href="bench_timing.py#dp_loo_pi" title="dp_loo_pi" class="verified" target="_blank">✓</a> $N \times$ DP leave-one-out $\mathcal{O}(N^2 n)$ ·
 <a href="bench_timing.py#tree_loo_pi" title="tree_loo_pi" class="verified" target="_blank">✓</a> $N \times$ Tree leave-one-out $\mathcal{O}(N^2 \log^2 n)$ ·
@@ -3220,16 +3220,26 @@ $$
 </figure>
 
 <p>The leave-one-out methods (gray, dashed) are $\sim\!N\times$ slower than their backprop counterparts—this is the Baur-Strassen theorem in action.  The PyTorch FFT implementation is the fastest overall, combining FFT-based polynomial multiplication ($\mathcal{O}(d \log d)$ per multiply), batched execution ($\mathcal{O}(\log N)$ torch calls), and autograd.</p>
+<h3 id="fitting">Fitting</h3>
+<p>Given target inclusion probabilities $\bpiptgt$, find weights $\bw$ such that $\bpip(\bw) = \bpiptgt$:</p>
+<p><a href="conditional_poisson_numpy.py#fit" title="ConditionalPoisson.fit" class="verified" target="_blank">✓</a> Product tree + Newton-CG ·
+<a href="bench_timing_r.R" title="UPMEpiktildefrompik" class="verified" target="_blank">✓</a> R <code>sampling::UPMEpiktildefrompik</code> (fixed-point iteration)</p>
+<figure>
+<p><img src="../figures/timing_fit.svg" alt="Log-log plot: fitting target pi to weights" style="width:100%"></p>
+</figure>
+
+<p>Our Newton-CG optimizer uses true Hessian-vector products computed via the product tree, giving superlinear convergence.  R's <a href="https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R"><code>UPMEpiktildefrompik</code></a> uses $J = I$ rather than the true Jacobian, making it a fixed-point iteration ($\tilde{p} \mathrel{+}= \bpiptgt - \bpip(\tilde{p})$) despite the <a href="https://cran.r-project.org/web/packages/sampling/sampling.pdf">docs</a> calling it Newton's method.  Each R iteration requires a full $\mathcal{O}(Nn)$ DP pass to recompute $\bpip$.</p>
 <h3 id="drawing-samples">Drawing Samples</h3>
-<p><a href="bench_timing_r.R" title="UPmaxentropy" class="verified" target="_blank">✓</a> R <code>sampling::UPmaxentropy</code> (1 sample) ·
-<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (1 and 10k samples)</p>
+<p><a href="bench_timing_r.R" title="UPMEqfromw + UPMEsfromq" class="verified" target="_blank">✓</a> R <code>sampling</code> (1 sample, with and without DP rebuild) ·
+<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (with and without tree build; 10k amortized)</p>
 <figure>
 <p><img src="../figures/timing_samples.svg" alt="Log-log plot: drawing samples" style="width:100%"></p>
 </figure>
 
-<p>The R <a href="https://github.com/cran/sampling"><code>sampling</code></a> package draws one conditional Poisson sample per call via <a href="https://github.com/cran/sampling/blob/master/R/UPmaxentropy.R"><code>UPmaxentropy</code></a> at $\mathcal{O}(Nn)$ cost.  The product tree's quota-splitting sampler costs $\mathcal{O}(n \log N)$ per sample after a one-time $\mathcal{O}(N \log^2 n)$ tree build—the amortized cost drops rapidly with more samples.  The R <code>sampling</code> package includes <a href="https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R">fitting</a> (target $\bpip \to \bw$) via what the <a href="https://cran.r-project.org/web/packages/sampling/sampling.pdf">docs</a> call Newton's method (though the code uses $J = I$ rather than the true Jacobian, making it a fixed-point iteration $\tilde{p} \mathrel{+}= \bpip_{\text{target}} - \bpip(\tilde{p})$), but does not expose the normalizing constant $\Z$.  The R <code>sampling</code> package also has numerical stability limitations: its <a href="https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R#L11">DP recurrence</a> operates in linear space without log-scaling, producing NaN at moderate sizes or when weights span several orders of magnitude.  Our FFT implementation maintains machine-epsilon accuracy at all tested sizes and weight ranges.<a href="bench_accuracy.py#r_accuracy" title="R vs tree vs FFT accuracy comparison" class="verified" target="_blank">✓</a></p>
-<h3 id="scaling-in-math43-and-math44">Scaling in $N$ and $n$</h3>
-<p>The static plots above fix $n = 0.4N$.  The interactive 3D plots below sweep $N$ and $n$ independently, confirming the claimed complexities.  Drag to rotate, scroll to zoom, hover for values.  Use the dropdown to switch between computing $\Z$ and computing $\bpip$.</p>
+<p>For fair comparison, the plot shows both "including setup" and "excluding setup" variants.  R's <a href="https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R"><code>UPMEqfromw</code></a> computes the $\mathcal{O}(Nn)$ DP table; <a href="https://github.com/cran/sampling/blob/master/R/UPMEsfromq.R"><code>UPMEsfromq</code></a> draws one $\mathcal{O}(N)$ sequential sample from it.  Our product tree costs $\mathcal{O}(N \log^2 n)$ to build, then $\mathcal{O}(n \log N)$ per sample via quota splitting—the amortized cost drops rapidly with more samples.  The "incl. build/DP" lines give apples-to-apples single-sample cost; the "excl." lines show the marginal cost of additional samples from a precomputed structure.</p>
+<p>The R <code>sampling</code> package does not expose the normalizing constant $\Z$, and has numerical stability limitations: its <a href="https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R#L11">DP recurrence</a> operates in linear space without log-scaling, producing NaN at moderate sizes or when weights span several orders of magnitude.  Our FFT implementation maintains machine-epsilon accuracy at all tested sizes and weight ranges.<a href="bench_accuracy.py#r_accuracy" title="R vs tree vs FFT accuracy comparison" class="verified" target="_blank">✓</a></p>
+<h3 id="scaling-in-math49-and-math50">Scaling in $N$ and $n$</h3>
+<p>The static plots above fix $n = 0.4N$.  The interactive 3D plots below sweep $N$ and $n$ independently, confirming the claimed complexities.  Drag to rotate, scroll to zoom, hover for values.  Use the dropdown to switch between operations.</p>
 <div id="timing-3d">
 
 </div>
@@ -3242,14 +3252,19 @@ var COLORS = {
   'DP forward': '#E91E63', 'NumPy tree': '#5b9bd5', 'PyTorch FFT': '#c0504d',
   'Fwd-bwd DP': '#E91E63', 'PyTorch FFT + autograd': '#c0504d',
   'N\u00d7DP loo': '#999', 'N\u00d7Tree loo': '#bbb', 'R:sampling (pi)': '#FF9800',
-  'R:sampling (1 sample)': '#FF9800',
+  'NumPy tree (Newton-CG)': '#5b9bd5', 'R:sampling (fit)': '#FF9800',
+  'R:sampling (1 sample, incl. DP)': '#FF9800', 'R:sampling (1 sample, excl. DP)': '#FF9800',
+  'NumPy tree (1 sample, incl. build)': '#5b9bd5',
   'NumPy tree (1 sample)': '#5b9bd5', 'NumPy tree (10k samples)': '#2196F3'
 };
 var COMPLEXITY = {
   'DP forward': 'O(Nn)', 'NumPy tree': 'O(N log\u00b2 N)', 'PyTorch FFT': 'O(N log\u00b2 n)',
   'Fwd-bwd DP': 'O(Nn)', 'PyTorch FFT + autograd': 'O(N log\u00b2 n)',
   'N\u00d7DP loo': 'O(N\u00b2n)', 'N\u00d7Tree loo': 'O(N\u00b2 log\u00b2 n)',
-  'R:sampling (pi)': 'O(Nn)', 'R:sampling (1 sample)': '',
+  'R:sampling (pi)': 'O(Nn)',
+  'NumPy tree (Newton-CG)': 'Newton-CG', 'R:sampling (fit)': 'fixed-point',
+  'R:sampling (1 sample, incl. DP)': 'incl. DP', 'R:sampling (1 sample, excl. DP)': 'excl. DP',
+  'NumPy tree (1 sample, incl. build)': 'incl. build',
   'NumPy tree (1 sample)': 'O(n log N)',
   'NumPy tree (10k samples)': 'O(n log N) ea.'
 };
@@ -3349,10 +3364,10 @@ Plotly.newPlot('timing-3d', makeTraces('pi'), layout, {responsive: true});
 var container = document.getElementById('timing-3d');
 var select = document.createElement('select');
 select.style.cssText = 'margin-bottom:8px; font-size:14px; padding:4px 8px;';
-['Z', 'pi', 'samples'].forEach(function(exp) {
+['Z', 'pi', 'fit', 'samples'].forEach(function(exp) {
   var opt = document.createElement('option');
   opt.value = exp;
-  opt.text = exp === 'Z' ? 'Computing Z' : exp === 'pi' ? 'Computing \u03c0' : 'Drawing samples';
+  opt.text = exp === 'Z' ? 'Computing Z' : exp === 'pi' ? 'Computing \u03c0' : exp === 'fit' ? 'Fitting \u03c0 \u2192 weights' : 'Drawing samples';
   if (exp === 'pi') opt.selected = true;
   select.appendChild(opt);
 });
@@ -3724,7 +3739,7 @@ $$</p>
 <p>This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.</p>
 <p><strong>Example.</strong> With $N = 100$ items and $n = 5$, set weights proportional to $p(i)$ so that high-probability items are more likely to be selected.  Each sample gives 5 distinct evaluations of $f$; the HT formula reweights them to produce an unbiased estimate of the full sum.</p>
 <p>For more on SWOR-based estimation (including the near-optimal priority sampling scheme), see my earlier post on <a href="../post/2017/07/03/estimating-means-in-a-finite-universe/">estimating means in a finite universe</a>.</p>
-<h2 id="identities-for-math166-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
+<h2 id="identities-for-math170-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
 <p>The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> <a href="https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial">elementary symmetric polynomial</a> $e_n(\bw)$.  Here are some useful identities.</p>
 <h3 id="differential-identities">Differential Identities</h3>
 <p>The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:</p>
