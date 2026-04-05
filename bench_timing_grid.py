@@ -8,14 +8,15 @@ Usage:
     python3 bench_timing_grid.py --quick      # smaller grid for testing
 """
 
-import json, os, sys, time
+import json, os, sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
 
 from conditional_poisson_numpy import ConditionalPoisson
 from bench_samplers import sequential_pi
-from bench_timing import dp_forward_Z, dp_loo_pi, tree_loo_pi, time_fn
+from bench_timing import (dp_forward_Z, dp_loo_pi, tree_loo_pi,
+                          run_r_benchmark, time_fn)
 
 import torch
 from torch_fft_prototype import forward_log_Z, compute_pi
@@ -70,6 +71,27 @@ def run_grid(quick=False):
             if N <= 500 and n <= 100:
                 ms = time_fn(lambda: dp_loo_pi(w, n), reps=3, warmup=1)
                 add("N×DP loo", "pi", N, n, ms)
+
+                ms = time_fn(lambda: tree_loo_pi(w, n), reps=3, warmup=1)
+                add("N×Tree loo", "pi", N, n, ms)
+
+            # R benchmarks (pi + samples)
+            r_results = run_r_benchmark(N, n, seed, reps)
+            for r in r_results:
+                if "(pi)" in r["method"]:
+                    add(r["method"], "pi", N, n, r["time_ms"])
+                else:
+                    add(r["method"], "samples", N, n, r["time_ms"])
+
+            # Sampling benchmarks
+            cp = ConditionalPoisson.from_weights(n, w)
+            sample_rng = np.random.RandomState(seed)
+            ms = time_fn(lambda: cp.sample(1, rng=sample_rng), reps=reps)
+            add("NumPy tree (1 sample)", "samples", N, n, ms)
+
+            ms = time_fn(lambda: cp.sample(10_000, rng=sample_rng),
+                         reps=max(1, reps // 2), warmup=1)
+            add("NumPy tree (10k samples)", "samples", N, n, ms)
 
             print(f" done", file=sys.stderr)
 
