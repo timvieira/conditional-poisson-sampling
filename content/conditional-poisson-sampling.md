@@ -3166,7 +3166,7 @@ The leave-one-out methods (gray, dashed) are $\sim\!N\times$ slower than their b
 <img src="../figures/timing_samples.svg" alt="Log-log plot: drawing samples" style="width:100%">
 </figure>
 
-The R `sampling` package draws one conditional Poisson sample per call at $\mathcal{O}(Nn)$ cost.  The product tree's quota-splitting sampler costs $\mathcal{O}(n \log N)$ per sample after a one-time $\mathcal{O}(N \log^2 n)$ tree build—the amortized cost drops rapidly with more samples.  The R `sampling` package does not support computing the normalizing constant $\Z$, or fitting the distribution to target inclusion probabilities (i.e., solving for $\bw$ given $\bpip$)—both require the product tree or FFT machinery developed here.  The R `sampling` package also has numerical stability limitations: its DP operates in linear space without log-scaling, producing NaN at moderate sizes or when weights span several orders of magnitude.  Our FFT implementation maintains machine-epsilon accuracy at all tested sizes and weight ranges.<a href="bench_accuracy.py#r_accuracy" title="R vs tree vs FFT accuracy comparison" class="verified" target="_blank">✓</a>
+The R [`sampling`](https://github.com/cran/sampling) package draws one conditional Poisson sample per call via [`UPmaxentropy`](https://github.com/cran/sampling/blob/master/R/UPmaxentropy.R) at $\mathcal{O}(Nn)$ cost.  The product tree's quota-splitting sampler costs $\mathcal{O}(n \log N)$ per sample after a one-time $\mathcal{O}(N \log^2 n)$ tree build—the amortized cost drops rapidly with more samples.  The R `sampling` package includes [fitting](https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R) (target $\bpip \to \bw$) via what the [docs](https://cran.r-project.org/web/packages/sampling/sampling.pdf) call Newton's method (though the code uses $J = I$ rather than the true Jacobian, making it a fixed-point iteration $\tilde{p} \mathrel{+}= \bpip_{\text{target}} - \bpip(\tilde{p})$), but does not expose the normalizing constant $\Z$.  The R `sampling` package also has numerical stability limitations: its [DP recurrence](https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R#L11) operates in linear space without log-scaling, producing NaN at moderate sizes or when weights span several orders of magnitude.  Our FFT implementation maintains machine-epsilon accuracy at all tested sizes and weight ranges.<a href="bench_accuracy.py#r_accuracy" title="R vs tree vs FFT accuracy comparison" class="verified" target="_blank">✓</a>
 
 ### Scaling in $N$ and $n$
 
@@ -3680,7 +3680,7 @@ For more on SWOR-based estimation (including the near-optimal priority sampling 
 
 ## Identities for $\Z$ and Its Relatives
 
-The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> elementary symmetric polynomial $e_n(\bw)$.  Here are some useful identities.
+The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> [elementary symmetric polynomial](https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial) $e_n(\bw)$.  Here are some useful identities.
 
 
 ### Differential Identities
@@ -3758,6 +3758,8 @@ For non-diagonal $L$, the K-DPP introduces correlations between items (repulsion
 There are no problem-specific derivations here—each row follows from a general theorem in automatic differentiation or computer algebra.
 
 The PyTorch implementation ([`torch_fft_prototype.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py)) uses FFT-based polynomial multiplication with **contour radius scaling**—rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stable—achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.
+
+**Acknowledgment.** This post was written with extensive help from [Claude Code](https://claude.ai/claude-code)—especially the interactive widgets, which would not have been possible without it.
 
 **References:**
 

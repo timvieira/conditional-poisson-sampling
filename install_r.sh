@@ -34,9 +34,9 @@ RSCRIPT="$(conda run -n "$ENV_NAME" which Rscript)"
 echo "Using Rscript: $RSCRIPT"
 
 # Install R packages from CRAN
-echo "Installing R packages: sampling, BalancedSampling..."
+echo "Installing R package: sampling..."
 conda run -n "$ENV_NAME" Rscript -e '
-pkgs <- c("sampling", "BalancedSampling")
+pkgs <- c("sampling")
 missing <- pkgs[!pkgs %in% installed.packages()[,"Package"]]
 if (length(missing) > 0) {
     install.packages(missing, repos="https://cloud.r-project.org", quiet=TRUE)

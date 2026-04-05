@@ -37,7 +37,6 @@ STYLE = {
     "PyTorch FFT + autograd":    {"color": "#c0504d", "marker": "^", "ls": "-",  "lw": 2,   "ms": 6},
     # Samples experiment
     "R:sampling (1 sample)":     {"color": "#FF9800", "marker": "p", "ls": "-.", "lw": 1.5, "ms": 7},
-    "R:BalancedSampling (1 sample)": {"color": "#9C27B0", "marker": "h", "ls": "-.", "lw": 1.5, "ms": 7},
     "NumPy tree (1 sample)":     {"color": "#5b9bd5", "marker": "o", "ls": "--", "lw": 1.5, "ms": 5},
     "NumPy tree (10k samples)":  {"color": "#5b9bd5", "marker": "o", "ls": "-",  "lw": 2,   "ms": 6},
 }
@@ -62,7 +61,6 @@ COMPLEXITY = {
     "PyTorch FFT + autograd":    r"$\mathcal{O}(N \log^2 n)$",
     # Samples
     "R:sampling (1 sample)":     r"R sampling (1 sample)",
-    "R:BalancedSampling (1 sample)": r"R BalancedSampling (1 sample)",
     "NumPy tree (1 sample)":     r"product tree (1 sample)",
     "NumPy tree (10k samples)":  r"product tree (10k samples)",
 }

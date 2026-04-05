@@ -88,7 +88,6 @@ def extract_r_blocks(filepath):
     targets = {
         "UPMEqfromw + UPMEpikfromq": ["UPMEqfromw", "UPMEpikfromq"],
         "UPmaxentropy": ["UPmaxentropy"],
-        "lpm2": ["lpm2"],
     }
 
     for title, keywords in targets.items():

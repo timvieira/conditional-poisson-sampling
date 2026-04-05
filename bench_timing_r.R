@@ -8,7 +8,6 @@
 # Output: JSON lines to stdout, one per method/operation.
 
 library(sampling)
-library(BalancedSampling)
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 4) {
@@ -68,12 +67,12 @@ emit("R:sampling (pi)", ms)
 q <- UPMEqfromw(w, n)
 pik <- UPMEpikfromq(q)
 
-# --- Drawing 1 sample via sampling::UPmaxentropy ---
-# UPmaxentropy draws 1 sample per call at O(Nn) cost.
-ms <- time_it(function() UPmaxentropy(pik), reps)
+# --- Drawing 1 sample via sampling internals (from weights) ---
+# UPmaxentropy(pik) includes fitting (pik -> w), which is unfair to compare
+# against our sampler that starts from weights.  Instead, time the DP + sample
+# steps directly: UPMEqfromw (O(Nn) DP) + UPMEsfromq (O(N) sequential sample).
+ms <- time_it(function() {
+    q2 <- UPMEqfromw(w, n)
+    UPMEsfromq(q2)
+}, reps)
 emit("R:sampling (1 sample)", ms)
-
-# --- Drawing 1 sample via BalancedSampling::lpm2 ---
-X <- matrix(runif(N), ncol = 1)
-ms <- time_it(function() lpm2(pik, X), reps)
-emit("R:BalancedSampling (1 sample)", ms)
