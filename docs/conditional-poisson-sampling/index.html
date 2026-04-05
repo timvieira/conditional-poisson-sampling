@@ -2822,20 +2822,26 @@ $S \leftarrow \text{sample}(\text{root}, n)$</p>
 <p>All computations are verified against brute-force enumeration in the <a href="test_identities.py">test suite</a>.</p>
 <h2 id="basic-usage">Basic Usage</h2>
 <p>Now that we've seen how the product tree works under the hood, here's the library interface.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">conditional_poisson_numpy</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConditionalPoisson</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<div class="highlight"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="kn">from</span><span class="w"> </span><span class="nn">conditional_poisson_torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConditionalPoissonTorch</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">cp</span> <span class="o">=</span> <span class="n">ConditionalPoissonTorch</span><span class="o">.</span><span class="n">from_weights</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">w</span><span class="o">=</span><span class="p">[</span><span class="mf">0.68</span><span class="p">,</span> <span class="mf">1.02</span><span class="p">,</span> <span class="mf">0.55</span><span class="p">,</span> <span class="mf">1.63</span><span class="p">,</span> <span class="mf">0.67</span><span class="p">,</span> <span class="mf">2.82</span><span class="p">])</span>
 
-<span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.68</span><span class="p">,</span> <span class="mf">1.02</span><span class="p">,</span> <span class="mf">0.55</span><span class="p">,</span> <span class="mf">1.63</span><span class="p">,</span> <span class="mf">0.67</span><span class="p">,</span> <span class="mf">2.82</span><span class="p">])</span>
-<span class="n">n</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">cp</span><span class="o">.</span><span class="n">log_normalizer</span>
+<span class="mf">3.362122</span>
 
-<span class="n">cp</span> <span class="o">=</span> <span class="n">ConditionalPoisson</span><span class="o">.</span><span class="n">from_weights</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">cp</span><span class="o">.</span><span class="n">incl_prob</span>
+<span class="n">tensor</span><span class="p">([</span><span class="mf">0.3813</span><span class="p">,</span> <span class="mf">0.5038</span><span class="p">,</span> <span class="mf">0.3236</span><span class="p">,</span> <span class="mf">0.6424</span><span class="p">,</span> <span class="mf">0.3771</span><span class="p">,</span> <span class="mf">0.7718</span><span class="p">])</span>
 
-<span class="n">cp</span><span class="o">.</span><span class="n">log_normalizer</span>       <span class="c1"># log Z(w, n)</span>
-<span class="n">cp</span><span class="o">.</span><span class="n">pi</span>                   <span class="c1"># inclusion probabilities (sum to n)</span>
-<span class="n">cp</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">10_000</span><span class="p">)</span>       <span class="c1"># draw 10k exact samples</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">cp</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">tensor</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">]])</span>
 
-<span class="c1"># Inverse problem: find weights from target inclusion probabilities</span>
-<span class="n">cp_fit</span> <span class="o">=</span> <span class="n">ConditionalPoisson</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">cp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="c1"># Inverse problem: find weights from target inclusion probabilities</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">cp_fit</span> <span class="o">=</span> <span class="n">ConditionalPoissonTorch</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">cp</span><span class="o">.</span><span class="n">incl_prob</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="p">(</span><span class="n">cp_fit</span><span class="o">.</span><span class="n">incl_prob</span> <span class="o">-</span> <span class="n">cp</span><span class="o">.</span><span class="n">incl_prob</span><span class="p">)</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+<span class="n">tensor</span><span class="p">(</span><span class="mf">6.53e-08</span><span class="p">)</span>
 </code></pre></div>
 
 <h2 id="the-poisson-approximation">The Poisson Approximation</h2>
@@ -3161,7 +3167,7 @@ $$
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Target: the inclusion probabilities from our earlier example</span>
-<span class="n">pi_star</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">pi</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">pi_star</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">incl_prob</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
 <span class="c1"># Fit from scratch</span>
 <span class="n">cp_fit</span> <span class="o">=</span> <span class="n">ConditionalPoisson</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">pi_star</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -3195,7 +3201,7 @@ $$
 <p>Three methods for computing the normalizing constant:
 <a href="bench_timing.py#dp_forward_Z" title="dp_forward_Z" class="verified" target="_blank">✓</a> DP forward pass $\mathcal{O}(Nn)$ ·
 <a href="conditional_poisson_numpy.py" title="ConditionalPoisson.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
-<a href="torch_fft_prototype.py#forward_log_Z" title="forward_log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$</p>
+<a href="conditional_poisson_torch.py#forward_log_Z" title="forward_log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$</p>
 <figure>
 <p><img src="../figures/timing_Z.svg" alt="Log-log plot: computing Z" style="width:100%"></p>
 </figure>
@@ -3207,8 +3213,8 @@ $$
 <a href="bench_timing.py#tree_loo_pi" title="tree_loo_pi" class="verified" target="_blank">✓</a> $N \times$ Tree leave-one-out $\mathcal{O}(N^2 \log^2 n)$ ·
 <a href="bench_samplers.py#sequential_pi" title="sequential_pi" class="verified" target="_blank">✓</a> Forward-backward DP $\mathcal{O}(Nn)$ ·
 <a href="bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R <code>sampling</code> package ·
-<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.pi" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
-<a href="torch_fft_prototype.py#compute_pi" title="compute_pi" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$</p>
+<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.incl_prob" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
+<a href="conditional_poisson_torch.py#compute_pi" title="compute_pi" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$</p>
 <figure>
 <p><img src="../figures/timing_pi.svg" alt="Log-log plot: computing inclusion probabilities" style="width:100%"></p>
 </figure>
@@ -3611,18 +3617,18 @@ Plotly.react('timing-3d', makeTraces('pi'), layout);
 <p><strong>Guarantee.</strong> With this choice of $r$, the coefficients $c_k(r)$ are proportional to the PMF of $K$, whose mode is at $n \pm 1$.  The PMF of a sum of Bernoullis is log-concave, so it decays exponentially away from the mode.  In practice, this makes the dynamic range $\max_k c_k / c_n$ a modest constant (typically $\approx 1$), ensuring the relative FFT error in $c_n$ is $\mathcal{O}(\varepsilon)$.</p>
 <p><strong>Autograd compatibility.</strong> The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).</p>
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
-<p><strong>Numerical validation.</strong> The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$).  With $r=1$ the dynamic range is $\approx 10^{16}$, destroying all precision.  The optimal $r^*$ brings it to $\approx 1$.</p>
+<p><strong>Numerical validation.</strong> The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$).  With $r=1$ the dynamic range is $\approx 10^{16}$, destroying all precision.  The optimal $r^*$ brings it to $\approx 1$.<a href="test_identities.py#test_rescaling_dynamic_range" title="test_rescaling_dynamic_range" class="verified" target="_blank">✓</a></p>
 <div id="r-comparison">
 </div>
 <script>
 (function() {
   var data = [
-    {label:'r = 1',   dr:1e16, err:8e+01},
-    {label:'r = n/W', dr:1e0,  err:7e-15},
-    {label:'r = r*',  dr:1e0,  err:1e-14},
-    {label:'r = 1',   dr:1e16, err:2e+02},
-    {label:'r = n/W', dr:8e1,  err:2e-13},
-    {label:'r = r*',  dr:1e0,  err:4e-14},
+    {label:'$r = 1$',        dr:1e16, err:8e+01},
+    {label:'$r = n/\\W$',    dr:1e0,  err:7e-15},
+    {label:'$r = r^\\star$', dr:1e0,  err:1e-14},
+    {label:'$r = 1$',        dr:1e16, err:2e+02},
+    {label:'$r = n/\\W$',    dr:8e1,  err:2e-13},
+    {label:'$r = r^\\star$', dr:1e0,  err:4e-14},
   ];
 
   var groups = [
@@ -3631,14 +3637,14 @@ Plotly.react('timing-3d', makeTraces('pi'), layout);
   ];
 
   var container = d3.select('#r-comparison');
-  var margin = {top: 4, right: 100, bottom: 30, left: 70};
-  var W = 500, rowH = 24, groupGap = 18, groupLabelH = 18;
+  var margin = {top: 4, right: 160, bottom: 40, left: 80};
+  var W = 560, rowH = 28, groupGap = 18, groupLabelH = 22;
   var totalH = groups.length * (3 * rowH + groupLabelH + groupGap) - groupGap;
   var H = margin.top + margin.bottom + totalH;
   var width = W - margin.left - margin.right;
 
   var svg = container.append('svg').attr('width', W).attr('height', H)
-    .style('user-select','none').style('-webkit-user-select','none');
+    .style('user-select','none').style('-webkit-user-select','none').style('overflow','visible');
   var g = svg.append('g').attr('transform','translate('+margin.left+','+margin.top+')');
 
   var x = d3.scaleLog().domain([1, 1e17]).range([0, width]).clamp(true);
@@ -3647,51 +3653,67 @@ Plotly.react('timing-3d', makeTraces('pi'), layout);
   g.append('g').attr('transform','translate(0,'+totalH+')')
     .call(d3.axisBottom(x).ticks(6, '.0e').tickSize(3))
     .selectAll('text').style('font-size','10px');
-  g.append('text').attr('x', width/2).attr('y', totalH + 26)
-    .attr('text-anchor','middle').style('font-size','11px').style('fill','#666')
-    .text('dynamic range (log scale)');
+  g.append('foreignObject').attr('x', width/2 - 80).attr('y', totalH + 18).attr('width', 160).attr('height', 24)
+    .append('xhtml:div').style('text-align','center').style('font-size','12px').style('color','#666')
+    .html('dynamic range (log scale)');
 
-  var colors = {'r = 1':'#c0504d', 'r = n/W':'#999', 'r = r*':'#5b9bd5'};
+  var colors = {'$r = 1$':'#c0504d', '$r = n/\\W$':'#999', '$r = r^\\star$':'#5b9bd5'};
   var yPos = 0;
+
+  function drHtml(dr) {
+    if (dr >= 1e3) return '$10^{' + Math.round(Math.log10(dr)) + '}$';
+    return '$' + dr.toFixed(0) + '$';
+  }
+  function errHtml(err) {
+    var exp = Math.floor(Math.log10(Math.abs(err)));
+    var coef = err / Math.pow(10, exp);
+    var coefStr = Math.round(coef);
+    if (exp === 0) return '$' + coefStr + '$';
+    return '$' + coefStr + '\\!\\times\\! 10^{' + exp + '}$';
+  }
 
   groups.forEach(function(grp, gi) {
     // Group title
-    g.append('text').attr('x', -6).attr('y', yPos + 12)
-      .attr('text-anchor','end').style('font-size','11px')
-      .style('fill','#888').style('font-style','italic')
-      .text(grp.title);
+    g.append('foreignObject').attr('x', -margin.left).attr('y', yPos - 2).attr('width', margin.left - 6).attr('height', 24)
+      .append('xhtml:div').style('text-align','right').style('font-size','11px')
+      .style('color','#888').style('font-style','italic').style('line-height','22px')
+      .html(grp.title);
     yPos += groupLabelH;
 
     grp.rows.forEach(function(d) {
       var barW = Math.max(2, x(Math.max(1.01, d.dr)));
       // Bar
-      g.append('rect').attr('x', 0).attr('y', yPos + 3)
-        .attr('width', barW).attr('height', rowH - 6)
+      g.append('rect').attr('x', 0).attr('y', yPos + 4)
+        .attr('width', barW).attr('height', rowH - 8)
         .attr('fill', colors[d.label]).attr('opacity', 0.8).attr('rx', 2);
-      // Row label
-      g.append('text').attr('x', -6).attr('y', yPos + rowH/2 + 1)
-        .attr('text-anchor','end').attr('dominant-baseline','middle')
-        .style('font-size','12px').style('fill','#333')
-        .text(d.label);
-      // Dynamic range value on bar
-      var drText = d.dr >= 10 ? '10' + '\u2070\u00B9\u00B2\u00B3\u2074\u2075\u2076\u2077\u2078\u2079'.split('').slice(0,0) : '';
-      // simpler: just use text
-      var drStr = d.dr >= 1e3 ? '10^' + Math.round(Math.log10(d.dr)) : d.dr.toFixed(0);
-      var errStr = d.err.toExponential(0);
-      g.append('text').attr('x', barW + 5).attr('y', yPos + rowH/2 + 1)
-        .attr('dominant-baseline','middle')
-        .style('font-size','11px').style('fill','#666')
-        .text('DR=' + drStr + ',  |err|=' + errStr);
+      // Row label (MathJax via foreignObject)
+      g.append('foreignObject').attr('x', -margin.left).attr('y', yPos).attr('width', margin.left - 6).attr('height', rowH)
+        .append('xhtml:div').style('text-align','right').style('font-size','13px')
+        .style('color','#333').style('line-height', rowH + 'px')
+        .html(d.label);
+      // Annotation (MathJax via foreignObject)
+      var annotHtml = 'DR$\\,{=}\\,$' + drHtml(d.dr).slice(1,-1) + ',\u2003$|$err$|\\,{=}\\,$' + errHtml(d.err).slice(1,-1);
+      g.append('foreignObject').attr('x', barW + 5).attr('y', yPos).attr('width', 200).attr('height', rowH)
+        .append('xhtml:div').style('font-size','12px').style('color','#666')
+        .style('line-height', rowH + 'px').style('white-space','nowrap')
+        .html(annotHtml);
       yPos += rowH;
     });
     yPos += groupGap;
   });
+
+  // Typeset MathJax
+  var el = container.node();
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetClear([el]);
+    MathJax.typesetPromise([el]);
+  }
 })();
 </script>
 
 </div>
 
-<p>Code: <a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py"><code>torch_fft_prototype.py</code></a></p>
+<p>Code: <a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson_torch.py"><code>conditional_poisson_torch.py</code></a></p>
 <h2 id="application-horvitz-thompson-estimation">Application: Horvitz-Thompson Estimation</h2>
 <p>So far we've built machinery for sampling fixed-size subsets and computing inclusion probabilities.  A natural question: what can you <em>do</em> with this?  One important application is unbiased estimation.</p>
 <p><strong>Setup.</strong> Suppose you have a distribution $p$ over a universe $\mathcal{S}$ of $N$ items, and a function $f$ that is expensive to evaluate.  You want to estimate $\mu = \sum_i p(i)\, f(i)$ using only $n$ evaluations of $f$.  With i.i.d. Monte Carlo, you'd draw $n$ samples—but some items may repeat, wasting evaluations.</p>
@@ -3702,7 +3724,7 @@ $$</p>
 <p>This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.</p>
 <p><strong>Example.</strong> With $N = 100$ items and $n = 5$, set weights proportional to $p(i)$ so that high-probability items are more likely to be selected.  Each sample gives 5 distinct evaluations of $f$; the HT formula reweights them to produce an unbiased estimate of the full sum.</p>
 <p>For more on SWOR-based estimation (including the near-optimal priority sampling scheme), see my earlier post on <a href="../post/2017/07/03/estimating-means-in-a-finite-universe/">estimating means in a finite universe</a>.</p>
-<h2 id="identities-for-math156-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
+<h2 id="identities-for-math172-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
 <p>The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> <a href="https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial">elementary symmetric polynomial</a> $e_n(\bw)$.  Here are some useful identities.</p>
 <h3 id="differential-identities">Differential Identities</h3>
 <p>The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:</p>
@@ -3787,7 +3809,7 @@ For non-diagonal $L$, the K-DPP introduces correlations between items (repulsion
 </tbody>
 </table>
 <p>There are no problem-specific derivations here—each row follows from a general theorem in automatic differentiation or computer algebra.</p>
-<p>The PyTorch implementation (<a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/torch_fft_prototype.py"><code>torch_fft_prototype.py</code></a>) uses FFT-based polynomial multiplication with <strong>contour radius scaling</strong>—rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stable—achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.</p>
+<p>The PyTorch implementation (<a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson_torch.py"><code>conditional_poisson_torch.py</code></a>) uses FFT-based polynomial multiplication with <strong>contour radius scaling</strong>—rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stable—achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.</p>
 <p><strong>Acknowledgment.</strong> This post was written with extensive help from <a href="https://claude.ai/claude-code">Claude Code</a>—especially the interactive widgets, which would not have been possible without it.</p>
 <p><strong>References:</strong></p>
 <ul>
