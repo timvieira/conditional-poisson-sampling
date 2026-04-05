@@ -173,7 +173,7 @@ POPOVER_CSS = r"""
     box-shadow: 0 4px 20px rgba(0,0,0,0.15);
     max-width: min(720px, 90vw);
     max-height: 60vh;
-    overflow: hidden;
+    overflow-y: auto;
     font-size: 13px;
     line-height: 1.5;
 }
@@ -187,7 +187,9 @@ POPOVER_CSS = r"""
     font-size: 12px;
     color: #666;
     background: #efe9e0;
-    border-radius: 6px 6px 0 0;
+    position: sticky;
+    top: 0;
+    z-index: 1;
     cursor: grab;
     user-select: none;
 }
@@ -209,8 +211,7 @@ POPOVER_CSS = r"""
     text-decoration: underline;
 }
 .code-popover .popover-body {
-    overflow: auto;
-    max-height: calc(60vh - 36px);
+    overflow-x: auto;
     padding: 10px 14px;
 }
 .code-popover .popover-body pre {

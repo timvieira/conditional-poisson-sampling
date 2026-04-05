@@ -51,6 +51,7 @@
 - [x] Fitting objective (Cell 16) is called "log-likelihood" but is actually the expected log-probability E_{S~P*}[log P_θ(S)]; call it "expected log-probability" or "cross-entropy objective"
 - [x] I don't think P_L and P_R are defined anywhere - can we avoid using them or do we need to define them?
 - [x] write the sampling pseudocode in the same style as the rejection sampler.
+- [ ] The maximum-entropy test could be strengthened considerably by actually optimizing over the space of all distributions over size-$n$ sets, rather than just checking against a few specific alternatives.
 
 ## Undefined / Missing Definitions
 
