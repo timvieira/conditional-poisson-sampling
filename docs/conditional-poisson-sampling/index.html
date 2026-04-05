@@ -90,13 +90,13 @@ $$</p>
 <p>The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is a weighted generalization of the binomial coefficient, which recovers $\binom{N}{n} = \Zw{\bw}{n}$ when $\bw = \mathbf{1}^N$.<a href="test_identities.py#test_Z_equals_binomial_when_uniform" title="test_Z_equals_binomial_when_uniform" class="verified" target="_blank">✓</a></p>
 <p><strong>Inclusion probabilities.</strong> The inclusion probability $\pip_i \defeq \sum_{S} \Ps(S)\, \mathbf{1}[i \in S]$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$, as the other items push back through the size constraint $|S| = n$. Later in this article, we provide an interactive widget for exploring the nonlinear relationship between $\bw$ and $\bpip$.</p>
 <p><strong>Why is this distribution special?</strong> The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, it is the unique <em>maximum-entropy</em> one<a href="test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>—making the fewest assumptions beyond the marginals (<a href="https://doi.org/10.1103/PhysRev.106.620">Jaynes, 1957</a>; <a href="https://academic.oup.com/biomet/article-abstract/81/3/457/256956">Chen, Dempster &amp; Liu, 1994</a>), in the same sense that the Gaussian is max-entropy for given mean and variance.  The log-normalizer $\log \Zw{\bw}{n}$ is convex in $\btheta$, so many properties follow mechanically: inclusion probabilities are the gradient ($\pip_i = \partial \log \Z / \partial \theta_i$) and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the <em>exponential fixed-size design</em> for this reason.</p>
-<p><strong>Relationship to Poisson sampling.</strong> In Poisson sampling,<label class="sidenote-number"></label><span class="margin-note">Named after mathematician <a href="https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson">Siméon Denis Poisson</a>.  Although poisson is the French word for fish, no fishing metaphor is intended.</span> each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_i \mathbf{1}[i \in S]$ is random.  The <em>conditional</em> Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.  The weight $\w_i$ is the <em>odds</em> of the $i$<sup>th</sup> coin: $\w_i \defeq p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a></p>
+<p><strong>Relationship to Poisson sampling.</strong> In Poisson sampling,<label class="sidenote-number"></label><span class="margin-note">Named after mathematician <a href="https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson">Siméon Denis Poisson</a>.  Although poisson is the French word for fish, no fishing metaphor is intended.</span> each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_{i=1}^{N} \mathbf{1}[i \in S]$ is random.  The <em>conditional</em> Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.  The weight $\w_i$ is the <em>odds</em> of the $i$<sup>th</sup> coin: $\w_i \defeq p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a></p>
 <p><strong>Sampling without replacement.</strong> The following construction shows how conditional
 Poisson can be used for sampling without replacement.  Draw $n$ items
 independently from the categorical distribution over weights, and keep only the
 samples where all draws are distinct:</p>
 <div class="pseudocode">
-<p>$\bw' \leftarrow \bw / \sum_i \w_i$<br>
+<p>$\bw' \leftarrow \bw / \sum_{i=1}^{N} \w_i$<br>
 <b>repeat</b><br>
 $\quad$ Draw $s_1, \ldots, s_n \overset{\text{i.i.d.}}{\sim} \text{Categorical}(\bw')$<br>
 $\quad$ $S \leftarrow \{s_1, \ldots, s_n\}$<br>
@@ -307,7 +307,7 @@ small { font-size: smaller; }
 
     // --- Pi bars ---
     var pb = tbody.append('tr');
-    pb.append('td').attr('class','rl').style('font-size','0.7em').style('color','#999').html('drag to set target<br>($\\sum_i \\pip_i = n$)');
+    pb.append('td').attr('class','rl').style('font-size','0.7em').style('color','#999').html('drag to set target<br>($\\sum_{i=1}^{N} \\pip_i = n$)');
     for(var i=0;i<N;i++){
       (function(idx){
         var td = pb.append('td').attr('class','bar-td');
@@ -392,7 +392,7 @@ svg text { font-family: 'EB Garamond', serif; }
 </style>
 
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0; width: fit-content; min-width: 100%; max-width: none;">
-<p><strong>Interactive product tree.</strong> Drag the weight sliders to see how changing $\w_i$ affects the polynomial coefficients at every node. The tree builds the product $\prod_i(1 + \w_i \z)$ bottom-up; the $n$<sup>th</sup> coefficient at the root (highlighted in red) is the normalizing constant $\Z$. Use the $N$ and $n$ controls to change the problem size.</p>
+<p><strong>Interactive product tree.</strong> Drag the weight sliders to see how changing $\w_i$ affects the polynomial coefficients at every node. The tree builds the product $\prod_{i=1}^{N}(1 + \w_i \z)$ bottom-up; the $n$<sup>th</sup> coefficient at the root (highlighted in red) is the normalizing constant $\Z$. Use the $N$ and $n$ controls to change the problem size.</p>
 <div id="tw">
 </div>
 <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -2846,7 +2846,7 @@ $S \leftarrow \text{sample}(\text{root}, n)$</p>
 
 <h2 id="the-poisson-approximation">The Poisson Approximation</h2>
 <p>The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="test_identities.py#test_pi_sums_to_n" title="test_pi_sums_to_n" class="verified" target="_blank">✓</a> and each $\pip_i \in [0, 1]$.<a href="test_identities.py#test_pi_in_unit_interval" title="test_pi_in_unit_interval" class="verified" target="_blank">✓</a>  Items with larger weights get higher inclusion probabilities, but the relationship is nonlinear—the other weights push back through the size constraint $|S| = n$.</p>
-<p><strong>Poisson approximation.</strong>  If each item were included independently with probability $p_i = \w_i r/(1+\w_i r)$, where $r$ is the <strong>tilting parameter</strong> that makes $\sum_i p_i = n$, we would get</p>
+<p><strong>Poisson approximation.</strong>  If each item were included independently with probability $p_i = \w_i r/(1+\w_i r)$, where $r$ is the <strong>tilting parameter</strong> that makes $\sum_{i=1}^{N} p_i = n$, we would get</p>
 <p>$$\pip_i \;\approx\; \frac{\w_i \, r}{1 + \w_i \, r}.$$</p>
 <p><a id="Hájek's-approximation"></a>The actual inclusion probabilities are close but not identical—<a href="https://doi.org/10.1214/aoms/1177700375">Hájek (1964, Theorem 5.2)</a> showed that $\pip_i = p_i + \mathcal{O}(1/N)$.  This means initializing $\theta_i^{(0)} = \text{logit}(\piptgt_i)$ gives a warm start that is off by at most $\mathcal{O}(1/N)$ for the <a href="#Fitting-Weights-to-Target-Probabilities">fitting</a> optimizer.</p>
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
@@ -3083,7 +3083,7 @@ $$
 </p>
 
 $$
-\mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_i \theta_i \big(\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] - \piptgt_i\big)
+\mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_{i=1}^{N} \theta_i \big(\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] - \piptgt_i\big)
 $$
 
 <p>
@@ -3115,7 +3115,7 @@ $$
 </p>
 
 $$
-\mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_i \theta_i \big(\pip_i(\btheta) - \piptgt_i\big)
+\mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_{i=1}^{N} \theta_i \big(\pip_i(\btheta) - \piptgt_i\big)
 $$
 
 <p>
@@ -3131,7 +3131,7 @@ H(\Ps) &= -\sum_S \Ps(S) \log \Ps(S) \\
 $$
 
 <p>
-<p>where the last step uses $\sum_S \Ps(S) \sum_{i \in S} \theta_i = \sum_i \theta_i \pip_i(\btheta) = \bpip(\btheta)^\top \btheta$.  Substituting $H(\Ps)$ into $\mathcal{L}(\Ps, \btheta)$:</p>
+<p>where the last step uses $\sum_S \Ps(S) \sum_{i \in S} \theta_i = \sum_{i=1}^{N} \theta_i \pip_i(\btheta) = \bpip(\btheta)^\top \btheta$.  Substituting $H(\Ps)$ into $\mathcal{L}(\Ps, \btheta)$:</p>
 </p>
 
 $$
@@ -3151,7 +3151,7 @@ $$
 </p>
 
 <p>
-<p><b>Why it works.</b>  Because the inclusion-probability constraints are linear in $\Ps$ and a feasible $\Ps$ exists (whenever $0 < \piptgt_i < 1$ and $\sum_i \piptgt_i = n$), there is no gap between the primal and dual optima.  So the optimal $\btheta$ from the dual gives weights $\w_i = e^{\theta_i}$ whose conditional Poisson distribution solves the primal: it achieves maximum entropy among all distributions over size-$n$ subsets, and its inclusion probabilities match the targets exactly, $\bpip(\btheta) = \bpiptgt$.</p>
+<p><b>Why it works.</b>  Because the inclusion-probability constraints are linear in $\Ps$ and a feasible $\Ps$ exists (whenever $0 < \piptgt_i < 1$ and $\sum_{i=1}^{N} \piptgt_i = n$), there is no gap between the primal and dual optima.  So the optimal $\btheta$ from the dual gives weights $\w_i = e^{\theta_i}$ whose conditional Poisson distribution solves the primal: it achieves maximum entropy among all distributions over size-$n$ subsets, and its inclusion probabilities match the targets exactly, $\bpip(\btheta) = \bpiptgt$.</p>
 </p>
 
 </details>
@@ -3371,19 +3371,19 @@ Plotly.react('timing-3d', makeTraces('pi'), layout);
 <h2 id="pytorch-implementation-with-contour-scaling">PyTorch Implementation with Contour Scaling</h2>
 <p>Can we use PyTorch's autograd to compute the gradient (inclusion probabilities) automatically, given only the forward pass?</p>
 <p>Yes—and it's both simpler and faster than a hand-coded downward pass.  The key insight is that <strong>computing $\bpip$ is just backpropagation</strong> applied to the upward pass.  The <a href="../evaluating-fx-is-as-fast-as-fx/">Baur-Strassen theorem</a> guarantees that the gradient costs at most a small constant factor more than the forward pass (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">Baur &amp; Strassen, 1983</a> prove $3\times$ for nonscalar operations on polynomials; <a href="https://doi.org/10.1137/1.9780898717761">Griewank &amp; Walther, 2008</a> give $5\times$ for general reverse-mode AD).  <a href="https://doi.org/10.1137/1.9780898717761">Griewank &amp; Walther (2008)</a> show that the numerical stability of the derivatives is inherited from the forward pass—so if we make the forward pass stable, everything else follows.</p>
-<p>The computation is just the product tree: build $\prod_i (1 + \w_i \z)$ bottom-up using polynomial multiplication, then extract $\llbracket \cdot \rrbracket(\z^n)$ and take the log.  In PyTorch, we batch all multiplications at each tree level into a single operation—$\mathcal{O}(\log N)$ torch calls instead of $\mathcal{O}(N)$.</p>
+<p>The computation is just the product tree: build $\prod_{i=1}^{N} (1 + \w_i \z)$ bottom-up using polynomial multiplication, then extract $\llbracket \cdot \rrbracket(\z^n)$ and take the log.  In PyTorch, we batch all multiplications at each tree level into a single operation—$\mathcal{O}(\log N)$ torch calls instead of $\mathcal{O}(N)$.</p>
 <h3 id="the-fft-precision-problem-and-weight-rescaling">The FFT Precision Problem and Weight Rescaling</h3>
-<p>Using FFT for the polynomial multiplications gives $\mathcal{O}(N \log^2 n)$ complexity (with truncation to degree $n$).  But naively, FFT introduces rounding errors $\approx \varepsilon \cdot \max_k|c_k|$ per coefficient, where $c_k$ denotes the $k$<sup>th</sup> coefficient of the product polynomial $\prod_i(1 + \w_i \z) = \sum_k c_k \z^k$.  The largest coefficient (near degree $N/2$) can be $\approx 10^{300}$ times larger than $c_n$, the coefficient we need—so FFT noise drowns the signal.</p>
+<p>Using FFT for the polynomial multiplications gives $\mathcal{O}(N \log^2 n)$ complexity (with truncation to degree $n$).  But naively, FFT introduces rounding errors $\approx \varepsilon \cdot \max_k|c_k|$ per coefficient, where $c_k$ denotes the $k$<sup>th</sup> coefficient of the product polynomial $\prod_{i=1}^{N}(1 + \w_i \z) = \sum_{k=0}^{N} c_k \z^k$.  The largest coefficient (near degree $N/2$) can be $\approx 10^{300}$ times larger than $c_n$, the coefficient we need—so FFT noise drowns the signal.</p>
 <p><strong>The key identity.</strong>  For any $r > 0$:<a href="test_identities.py#test_contour_scaling" title="test_contour_scaling" class="verified" target="_blank">✓</a></p>
-<p>$$\Zw{\bw}{n} = r^{-n} \cdot \llbracket \textstyle\prod_i(1 + \w_i r\, \z) \rrbracket(\z^n)$$</p>
+<p>$$\Zw{\bw}{n} = r^{-n} \cdot \llbracket \textstyle\prod_{i=1}^{N}(1 + \w_i r\, \z) \rrbracket(\z^n)$$</p>
 <p>This is immediate: each $\z^n$ term in the product picks up a factor of $r$ per item, giving $r^n \cdot \Zw{\bw}{n}$.  The identity says we can rescale all weights by any $r > 0$ and recover the same answer.  In exact arithmetic, $r$ doesn't matter.  In floating-point, it matters enormously: different values of $r$ shift which coefficient is largest, changing the dynamic range and thus the FFT rounding error relative to $c_n$.</p>
 <p><strong>Choosing $r$.</strong>  The FFT error in $c_n$ is $\mathcal{O}(\varepsilon \cdot \max_k |c_k|)$, so the relative error is $\max_k |c_k| / |c_n|$ times machine epsilon.  If $c_n$ is the largest coefficient, the relative error is just $\mathcal{O}(\varepsilon)$.  After rescaling by $r$, the $k$<sup>th</sup> coefficient becomes $c_k(r) = \Zw{\bw}{k} \cdot r^k$.  We want $r$ such that $c_n(r) \approx \max_k c_k(r)$.</p>
-<p>This is where the <a href="#The-Poisson-Approximation">Poisson approximation</a> reappears.  Define $p_i \defeq \w_i r/(1 + \w_i r)$—the same Poisson inclusion probabilities from earlier.  Then $c_k(r) = \Pr[K = k] \cdot \prod_i(1+\w_i r)$ where $K \defeq \sum_i \text{Bernoulli}(p_i)$ and $\prod_i(1+\w_i r)$ is independent of $k$.  So $\arg\max_k c_k(r) = \text{mode}(K)$.  For a sum of independent Bernoullis, $|\text{mode}(K) - \mathbb{E}[K]| \le 1$ (<a href="https://doi.org/10.1214/aoms/1177703287">Darroch, 1964</a>).  Setting $\mathbb{E}[K] = n$ places the mode at degree $n \pm 1$, which means the optimal contour radius is exactly the tilting parameter from the Poisson approximation:<a href="test_identities.py#test_contour_r_solves_expected_size" title="test_contour_r_solves_expected_size" class="verified" target="_blank">✓</a></p>
-<p>$$\sum_i \frac{\w_i \cdot r}{1 + \w_i \cdot r} = \sum_i p_i = n$$</p>
-<p>In other words, the $r$ that makes the Poisson approximation $\pip_i \approx p_i$ satisfy $\sum p_i = n$ is the same $r$ that minimizes FFT rounding error.  This is not a coincidence: both are asking for the rescaling that centers the Poisson Binomial distribution at degree $n$.</p>
-<p>This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's method converges in a few iterations.  A simpler heuristic, $r = n / \W$ (where $\W \defeq \sum_i \w_i$), linearizes $\w_i r / (1 + \w_i r) \approx \w_i r$ and works for mild weights but breaks down with heavy tails.</p>
+<p>This is where the <a href="#The-Poisson-Approximation">Poisson approximation</a> reappears.  Define $p_i \defeq \w_i r/(1 + \w_i r)$—the same Poisson inclusion probabilities from earlier.  Then $c_k(r) = \Pr[K = k] \cdot \prod_{i=1}^{N}(1+\w_i r)$ where $K \defeq \sum_{i=1}^{N} \text{Bernoulli}(p_i)$ and $\prod_{i=1}^{N}(1+\w_i r)$ is independent of $k$.  So $\arg\max_k c_k(r) = \text{mode}(K)$.  For a sum of independent Bernoullis, $|\text{mode}(K) - \mathbb{E}[K]| \le 1$ (<a href="https://doi.org/10.1214/aoms/1177703287">Darroch, 1964</a>).  Setting $\mathbb{E}[K] = n$ places the mode at degree $n \pm 1$, which means the optimal contour radius is exactly the tilting parameter from the Poisson approximation:<a href="test_identities.py#test_contour_r_solves_expected_size" title="test_contour_r_solves_expected_size" class="verified" target="_blank">✓</a></p>
+<p>$$\sum_{i=1}^{N} \frac{\w_i \cdot r}{1 + \w_i \cdot r} = \sum_{i=1}^{N} p_i = n$$</p>
+<p>In other words, the $r$ that makes the Poisson approximation $\pip_i \approx p_i$ satisfy $\sum_{i=1}^{N} p_i = n$ is the same $r$ that minimizes FFT rounding error.  This is not a coincidence: both are asking for the rescaling that centers the Poisson Binomial distribution at degree $n$.</p>
+<p>This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's method converges in a few iterations.  A simpler heuristic, $r = n / \W$ (where $\W \defeq \sum_{i=1}^{N} \w_i$), linearizes $\w_i r / (1 + \w_i r) \approx \w_i r$ and works for mild weights but breaks down with heavy tails.</p>
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
-<p><strong>Contour diagram.</strong> The generating function $f(\z) = \prod_i(1 + \w_i \z)$ has zeros at $\z = -1/\w_i$ on the negative real axis.  Extracting the $n$<sup>th</sup> coefficient via FFT is equivalent to sampling $f$ at equally-spaced points on the circle $|\z| = r$.  Drag the weight sliders or the circle to explore.</p>
+<p><strong>Contour diagram.</strong> The generating function $f(\z) = \prod_{i=1}^{N}(1 + \w_i \z)$ has zeros at $\z = -1/\w_i$ on the negative real axis.  Extracting the $n$<sup>th</sup> coefficient via FFT is equivalent to sampling $f$ at equally-spaced points on the circle $|\z| = r$.  Drag the weight sliders or the circle to explore.</p>
 <div id="contour-diagram">
 </div>
 <script>
@@ -3716,7 +3716,7 @@ Plotly.react('timing-3d', makeTraces('pi'), layout);
 <p>Code: <a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson_torch.py"><code>conditional_poisson_torch.py</code></a></p>
 <h2 id="application-horvitz-thompson-estimation">Application: Horvitz-Thompson Estimation</h2>
 <p>So far we've built machinery for sampling fixed-size subsets and computing inclusion probabilities.  A natural question: what can you <em>do</em> with this?  One important application is unbiased estimation.</p>
-<p><strong>Setup.</strong> Suppose you have a distribution $p$ over a universe $\mathcal{S}$ of $N$ items, and a function $f$ that is expensive to evaluate.  You want to estimate $\mu = \sum_i p(i)\, f(i)$ using only $n$ evaluations of $f$.  With i.i.d. Monte Carlo, you'd draw $n$ samples—but some items may repeat, wasting evaluations.</p>
+<p><strong>Setup.</strong> Suppose you have a distribution $p$ over a universe $\mathcal{S}$ of $N$ items, and a function $f$ that is expensive to evaluate.  You want to estimate $\mu = \sum_{i=1}^{N} p(i)\, f(i)$ using only $n$ evaluations of $f$.  With i.i.d. Monte Carlo, you'd draw $n$ samples—but some items may repeat, wasting evaluations.</p>
 <p><strong>The estimator.</strong> The <strong>Horvitz-Thompson estimator</strong> (<a href="https://doi.org/10.1080/01621459.1952.10483446">Horvitz &amp; Thompson, 1952</a>) uses sampling <em>without</em> replacement to guarantee $n$ <em>distinct</em> evaluations.  Draw a fixed-size subset $S \sim \Ps_n$ using conditional Poisson sampling, then form:</p>
 <p>$$
 \hat{\mu}_{\text{HT}}(S) = \sum_{i \in S} \frac{p(i)}{\pip_i}\, f(i), \quad S \sim \Ps_n
@@ -3738,7 +3738,7 @@ $$</p>
 <p>Running this DP forward gives $\Z$; running backpropagation on it gives $\bpip$—all in $\mathcal{O}(Nn)$.  This is simpler than the product tree for moderate $N$, and illustrates the same principle: the gradient comes for free via automatic differentiation.</p>
 <p><strong>Proposition (Weighted Vandermonde identity).</strong> For disjoint groups $A, B$ with weight vectors $\ba$ and $\bb$:</p>
 <p>$$\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$$</p>
-<p>This is a weighted generalization of <a href="https://en.wikipedia.org/wiki/Vandermonde%27s_identity">Vandermonde's identity</a> $\binom{a+b}{k} = \sum_{j=0}^{k} \binom{a}{j}\binom{b}{k-j}$.<a href="test_identities.py#test_weighted_vandermonde" title="test_weighted_vandermonde" class="verified" target="_blank">✓</a>  The proof is immediate from the generating function: $\Zw{\bw}{k}$ is the $k$<sup>th</sup> coefficient of $\prod_i(1 + \w_i \z)$, and factoring this product over $A \cup B$ turns coefficient extraction into a convolution.</p>
+<p>This is a weighted generalization of <a href="https://en.wikipedia.org/wiki/Vandermonde%27s_identity">Vandermonde's identity</a> $\binom{a+b}{k} = \sum_{j=0}^{k} \binom{a}{j}\binom{b}{k-j}$.<a href="test_identities.py#test_weighted_vandermonde" title="test_weighted_vandermonde" class="verified" target="_blank">✓</a>  The proof is immediate from the generating function: $\Zw{\bw}{k}$ is the $k$<sup>th</sup> coefficient of $\prod_{i=1}^{N}(1 + \w_i \z)$, and factoring this product over $A \cup B$ turns coefficient extraction into a convolution.</p>
 <details class="derivation">
 <summary>Proof
 </summary>
@@ -3752,7 +3752,7 @@ The left side is $\sum_k \Zw{(\ba;\,\bb)}{k}\, \z^k$.  The right side is a produ
 </details>
 
 <p>This is why polynomial multiplication computes $\Z$: the product tree exploits this identity at every node.  It is also what makes the sampling algorithm correct—splitting a quota of $k$ items between two subtrees according to $\Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$ produces the exact conditional distribution.</p>
-<p><strong>Newton's identities.</strong> The elementary symmetric polynomials can be computed from <strong>power sums</strong> $g_k \defeq \sum_i \w_i^k$ (see <a href="https://doi.org/10.1017/CBO9780511609589">Stanley (1999)</a>, Chapter 7):</p>
+<p><strong>Newton's identities.</strong> The elementary symmetric polynomials can be computed from <strong>power sums</strong> $g_k \defeq \sum_{i=1}^{N} \w_i^k$ (see <a href="https://doi.org/10.1017/CBO9780511609589">Stanley (1999)</a>, Chapter 7):</p>
 <p>$$\Zw{\bw}{k} = \sum_{i=1}^{k} \frac{(-1)^{i-1}}{k}\, \Zw{\bw}{k-i} \cdot g_i$$</p>
 <p><a href="test_identities.py#test_newtons_identities" title="test_newtons_identities" class="verified" target="_blank">✓</a> This is an $\mathcal{O}(Nn)$ algorithm that only needs the power sums, not the individual weights—useful when the universe is implicitly defined (e.g., paths in a weighted finite-state automaton, where $g_k$ can be computed via matrix methods).</p>
 <h3 id="connection-to-k-dpps">Connection to K-DPPs</h3>
