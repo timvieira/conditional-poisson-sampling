@@ -132,7 +132,6 @@ small { font-size: smaller; }
 #cps .bar-td.readonly { cursor: default; }
 #cps .bar-td svg { display: block; margin: 0 auto; }
 .entry-content h2, .entry-content h3, .entry-content h4 { text-align: left; }
-#tw, #bp { overflow-x: auto; }
 @media (max-width: 600px) {
   body { font-size: 14pt; padding: 0 0.5em; }
   #cps .rl { width: 60px; font-size: 0.75em; }
@@ -392,7 +391,7 @@ svg text { font-family: 'EB Garamond', serif; }
 #tw-status { font-size: 0.75em; color: #999; margin-top: 4px; }
 </style>
 
-<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0; width: 100%; overflow-x: auto;">
+<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0; width: fit-content; min-width: 100%; max-width: none;">
 <p><strong>Interactive product tree.</strong> Drag the weight sliders to see how changing $\w_i$ affects the polynomial coefficients at every node. The tree builds the product $\prod_i(1 + \w_i \z)$ bottom-up; the $n$<sup>th</sup> coefficient at the root (highlighted in red) is the normalizing constant $\Z$. Use the $N$ and $n$ controls to change the problem size.</p>
 <div id="tw">
 </div>
@@ -926,7 +925,7 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
 <p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running <a href="../evaluating-fx-is-as-fast-as-fx/">backpropagation</a> on the same tree—no new algorithm needed.  By the Baur-Strassen theorem (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">1983</a>), the gradient costs at most a constant factor more than the forward computation.</p>
 <p><strong>The key insight: forward + backprop.</strong>  Computing $\pip_i$ requires the "leave-one-out" product $\prod_{j \neq i}(1 + \w_j \z)$—a single item removed from the full product.  A naive approach recomputes this from scratch for each $i$, giving $\mathcal{O}(N^2 n)$ total.  But any differentiable forward pass that computes $\log \Z$—whether the $\mathcal{O}(Nn)$ Pascal DP or the $\mathcal{O}(N \log^2 n)$ product tree—gives all $N$ inclusion probabilities via a single backpropagation pass at the same asymptotic cost.  This is a general principle: backprop computes the gradient of any scalar output for free (up to a small constant factor).  The product tree is just the fastest known forward pass; the gradient follows mechanically.</p>
 <p>In the PyTorch implementation, the gradient comes for free via <code>torch.autograd</code>—no hand-coded tree traversal needed.</p>
-<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0; width: 100%; overflow-x: auto;">
+<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0; width: fit-content; min-width: 100%; max-width: none;">
 <p><strong>Interactive backpropagation tree.</strong> Each node shows the forward polynomial coefficients (<span style="color:#5b9bd5">blue</span>, top) and the adjoint $\bar{c}_k$ (<span style="color:#7b2d8e">purple</span>, bottom).  The seed $\bar{c}_n = 1/Z$ at the root flows upward; at each node, the child's adjoint is the cross-correlation of the parent adjoint with the sibling polynomial.  At the leaves, $\pip_i = \w_i \cdot \bar{c}_1^{(i)}$. Drag the weight sliders to explore.</p>
 <div id="bp">
 </div>
@@ -1531,7 +1530,7 @@ Drag the weight sliders to change $\w_i$ and see how the split distributions upd
   <button id="sa-btn-weights">Resample Weights</button></p>
 </div>
 
-<div id="sa-anim-container" style="position: relative; overflow-x: auto;">
+<div id="sa-anim-container" style="position: relative; overflow: visible;">
 
 </div>
 <div id="sa-status-bar">
