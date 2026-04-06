@@ -53,6 +53,10 @@
 - Citations verified against actual publications
 - No hardcoded stale numbers
 
+## Other
+
+- [ ] Update README
+
 ## Bugs
 
 (none)
