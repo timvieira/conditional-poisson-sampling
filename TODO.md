@@ -20,7 +20,6 @@
 - [ ] NumPy tree timing slopes (~1.15–1.45 in $N$) are higher than expected for $O(N \log^2 N)$. Investigate whether forcing FFT throughout gives cleaner scaling.
 - [ ] Test GPU performance — both `conditional_poisson_torch.py` (FFT) and `torch_prototype.py` (direct conv1d) should be benchmarked on GPU. Float32 precision risk needs testing (contour scaling helps but may not fully compensate).
 - [x] Promote `conditional_poisson_torch.py` to the primary library implementation — merged `torch_fft_prototype.py` into it with full `ConditionalPoissonTorch` class (from_weights, fit, sample, log_prob, pi, hvp). Blog post Basic Usage updated.
-- [ ] Package up the NumPy, PyTorch, and JavaScript libraries as easy-to-install single-file libraries via pip/npm. (`pyproject.toml` and `package.json` exist but are not polished for distribution.)
 - [x] The maximum-entropy test could be strengthened by actually optimizing over the space of all distributions over size-$n$ sets, rather than just checking against a few specific alternatives.
 
 ## Blog Polish
@@ -55,10 +54,26 @@
 
 ## Repo Housekeeping
 
+### Cleanup
+
 - [ ] Tidy up the repo (clean up unused files, organize structure)
-- [ ] Update README
+- [ ] Remove `memory/` directory (Claude session state, shouldn't be checked in)
+- [ ] Remove `bench_scaling.png` from git tracking (114KB binary; `*.png` is in `.gitignore` but this was committed before the rule)
+- [ ] Audit dead code: `plot_timing_3d.py` (superseded by inline Plotly widget?), `torch_prototype.py` (superseded by `conditional_poisson_torch.py`?), `screenshot_test.mjs` / `test_animation.mjs` (still used?), `display_utils.py` (still imported?)
 - [ ] Delete stale branches
+
+### Packaging and Distribution
+
+- [ ] Add a `LICENSE` file (pyproject.toml says MIT but no license file exists)
+- [ ] Update `pyproject.toml` to also package `conditional_poisson_torch` (currently only includes `conditional_poisson_numpy`)
+- [ ] Package up the NumPy, PyTorch, and JavaScript libraries as easy-to-install single-file libraries via pip/npm (`pyproject.toml` and `package.json` exist but are not polished for distribution)
+- [ ] Add `requirements.txt` or `[project.optional-dependencies]` for dev deps (scipy, torch, matplotlib)
+
+### Dev Quality
+
 - [ ] Set up CI via GitHub Actions (run tests, lint)
+- [ ] Add linting config (ruff/flake8/mypy)
+- [ ] Update README
 
 ## Bugs
 
