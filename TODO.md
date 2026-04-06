@@ -1,4 +1,4 @@
-# Blog Post TODO
+# TODO
 
 ## Content
 
@@ -53,11 +53,11 @@
 - Citations verified against actual publications
 - No hardcoded stale numbers
 
-## Other
+## Repo Housekeeping
 
+- [ ] Tidy up the repo (clean up unused files, organize structure)
 - [ ] Update README
 - [ ] Delete stale branches
-- [ ] Tidy up the repo (clean up unused files, organize structure)
 
 ## Bugs
 
