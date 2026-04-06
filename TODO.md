@@ -57,6 +57,7 @@
 
 - [ ] Update README
 - [ ] Delete stale branches
+- [ ] Tidy up the repo (clean up unused files, organize structure)
 
 ## Bugs
 
