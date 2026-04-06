@@ -37,7 +37,7 @@
 - [ ] Inclusion probability widget: hard to distinguish forward values from adjoint (backward) values. Explore different layouts. Also, inclusion probabilities appear at the bottom rather than the top—keep the forward-value + backward-value visual metaphor consistent.
 - [ ] Several widgets overflow their containers on mobile. Fix the layout to fill viewport width on small screens, then add horizontal scroll for wide SVGs.
 - [ ] Centralize widget/layout styles into the blog's CSS (`~/projects/blog/main/content/css/blog.css`) instead of inline styles in the .md file.
-- [ ] Clicking "Gradient Descent" and "Archive" in the header should navigate to the blog's archive page.
+- [x] Clicking "Gradient Descent" and "Archive" in the header should navigate to the blog's archive page.
 
 ## Checklist (final pass)
 
