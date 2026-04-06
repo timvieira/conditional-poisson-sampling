@@ -58,6 +58,7 @@
 - [ ] Tidy up the repo (clean up unused files, organize structure)
 - [ ] Update README
 - [ ] Delete stale branches
+- [ ] Set up CI via GitHub Actions (run tests, lint)
 
 ## Bugs
 
