@@ -13,6 +13,7 @@
 - [ ] Hide all Python/plotting code—just show the plot. Link to relevant implementations using the checkmark/footnote pill system (e.g., each curve links to its implementation in the repo).
 - [ ] Add more baselines for computing $\pi$ — (1) backprop-on-DP at $O(Nn)$, (2) naive loop versions: $N \times O(Nn)$ DP and $N \times O(N \log^2 n)$ product tree. These show the value of backprop vs. leave-one-out recomputation.
 - [ ] Add a programmatically generated empirical slope table. For each method, fit log-log slopes (time vs $N$ at fixed $n$, and time vs $n$ at fixed $N$) from the grid sweep data and display alongside theoretical complexity bounds. Auto-flag rows where empirical slope deviates significantly from prediction.
+- [ ] Scrutinize timing experiments. The R `sampling` package appears surprisingly fast for computing π—need to understand why. Is it compiled C under the hood? Are we measuring the right thing? Verify that all methods are computing the same quantity and that subprocess overhead isn't distorting R timings. Check whether R's `UPMEqfromw` is pure R or calls compiled code.
 - [ ] 3D timing plots: replace the single dropdown plot with three separate 3D plots (computing $Z$, computing $\pi$, drawing samples). Sampling timing is currently only a static 2D SVG—it has two variables ($N$, $n$) just like the others, so it should be 3D too.
 
 ## Implementation
