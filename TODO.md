@@ -56,6 +56,7 @@
 ## Other
 
 - [ ] Update README
+- [ ] Delete stale branches
 
 ## Bugs
 
