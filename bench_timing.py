@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import time
+from bisect import bisect_left
 
 import numpy as np
 
@@ -182,10 +183,7 @@ def simple_tree_sample(cdfs, S, N, n, rng):
                 selected.append(node - S)
             continue
         cdf = cdfs[node][k]
-        u = rng.random()
-        j = 0
-        while j < k and cdf[j] < u:
-            j += 1
+        j = bisect_left(cdf, rng.random())
         stack.append((2 * node + 1, k - j))
         stack.append((2 * node, j))
     selected.sort()

@@ -41,6 +41,7 @@ Pure PyTorch internally — no numpy or scipy dependency.
 import torch
 import torch.nn.functional as F
 import math
+from bisect import bisect_left as _bisect_left
 from typing import Optional, Union
 
 
@@ -536,10 +537,7 @@ class ConditionalPoissonTorch:
                         selected.append(node - tree_n)
                     continue
                 cdf = cdfs[node][k]
-                u = r.random()
-                j = 0
-                while j < k and cdf[j] < u:
-                    j += 1
+                j = _bisect_left(cdf, r.random())
                 stack.append((2 * node + 1, k - j))
                 stack.append((2 * node, j))
             selected.sort()

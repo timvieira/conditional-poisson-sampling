@@ -72,6 +72,7 @@ than the peak coefficient at degree ~subtree_size/2.
 from __future__ import annotations
 import numpy as np
 from typing import Optional, Union
+from bisect import bisect_left
 from scipy.signal import convolve
 
 __all__ = ["ConditionalPoissonNumPy"]
@@ -310,10 +311,7 @@ def _tree_sample(cdfs, S, N, n, rng):
                 selected.append(node - S)
             continue
         cdf = cdfs[node][k]
-        u = rng.random()
-        j = 0
-        while j < k and cdf[j] < u:
-            j += 1
+        j = bisect_left(cdf, rng.random())
         stack.append((2 * node + 1, k - j))
         stack.append((2 * node, j))
     selected.sort()

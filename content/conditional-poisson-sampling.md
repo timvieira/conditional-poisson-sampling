@@ -891,9 +891,9 @@ svg text { font-family: 'EB Garamond', serif; }
 
 **Complexity.** At each level of the tree, the total size of the polynomials being multiplied is $\mathcal{O}(N)$, and each multiplication is done via FFT in $\mathcal{O}(d \log d)$ time where $d$ is the degree. The recurrence is
 
-$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N), \quad T(1) = \mathcal{O}(1)$$
+$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N)$$
 
-which solves to $T(N) = \mathcal{O}(N \log^2 n)$ by the Master Theorem.
+which solves to $T(N) = \mathcal{O}(N \log^2 n)$.
 The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be **truncated to degree $n$** without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.
 
 
@@ -1450,7 +1450,31 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`�
 
 ### Drawing Exact Samples
 
-Sampling reuses the product tree (no gradient computation needed).  Starting at the root with a quota of $k = n$ items to select, we walk top-down: at each internal node, randomly split the quota between the left and right subtrees.  The probability of assigning $j$ items to the left is proportional to $\llbracket P_\text{left} \rrbracket(\z^j) \cdot \llbracket P_\text{right} \rrbracket(\z^{k-j})$.  This is exact, not approximate—it follows from the **weighted Vandermonde identity**: $\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$, which says the number of ways to choose $k$ items from $A \cup B$ is the convolution of the two groups' counts.  Each term in the sum is the conditional probability of a particular left/right split.  At the leaves, quota 1 means "include this item"; quota 0 means "exclude."
+Sampling reuses the product tree (no gradient computation needed).  The algorithm has two phases: a one-time $\mathcal{O}(N n^2)$ precomputation that builds a CDF table from the tree, and an $\mathcal{O}(n \log N)$ per-sample walk that uses it.
+
+**Precomputation.** For each internal node and each possible quota $k = 1, \ldots, \min(n, |T|)$, precompute the CDF of the split distribution:
+
+<div class="pseudocode">
+<b>for</b> each internal node with children $L$, $R$:<br>
+$\quad$ <b>for</b> $k = 1, \ldots, \min(n, |T|)$:<br>
+$\quad\quad$ $F[k, j] \leftarrow \sum_{j'=0}^{j} \llbracket P_L \rrbracket(\z^{j'}) \cdot \llbracket P_R \rrbracket(\z^{k-j'})$ for $j = 0, \ldots, k$<br>
+$\quad\quad$ Normalize: $F[k, j] \leftarrow F[k, j] \,/\, F[k, k]$
+</div>
+
+**Sampling.** Walk the tree top-down, splitting quotas using the cached CDFs via binary search:
+
+<div class="pseudocode">
+$\text{quota}[\text{root}] \leftarrow n$<br>
+<b>for</b> each internal node (top-down) with quota $k > 0$:<br>
+$\quad$ Draw $u \sim \text{Uniform}(0, 1)$<br>
+$\quad$ $j \leftarrow \text{bisect}(F[k], u)$ <span style="color:#888">(binary search in sorted CDF)</span><br>
+$\quad$ $\text{quota}[L] \leftarrow j, \quad \text{quota}[R] \leftarrow k - j$<br>
+<b>return</b> $\{i : \text{quota}[\text{leaf}_i] = 1\}$
+</div>
+
+This is exact, not approximate—it follows from the **weighted Vandermonde identity**: $\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$, which says the number of ways to choose $k$ items from $A \cup B$ is the convolution of the two groups' counts.  Each term in the sum is the conditional probability of a particular left/right split.  At the leaves, quota 1 means "include this item"; quota 0 means "exclude."
+
+The precomputation costs $\mathcal{O}(Nn)$: a node with subtree size $s$ builds CDFs for quotas $1, \ldots, \min(n, s)$ at total cost $\mathcal{O}(\min(n, s)^2)$, and summing over all nodes gives $\mathcal{O}(Nn)$ by the standard tree telescoping argument.  After that, each sample costs $\mathcal{O}(n \log N)$: the walk visits at most $n$ nodes with nonzero quota per level across $\mathcal{O}(\log N)$ levels, and the total quota per level is $n$, so the linear-scan cost is $\mathcal{O}(n)$ per level.  Binary search on the CDF reduces the per-node cost from $\mathcal{O}(k)$ to $\mathcal{O}(\log k)$, which helps at nodes near the root where quotas are large.
 
 <style>
 #sampling-anim .sa-widget-box {
