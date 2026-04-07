@@ -86,4 +86,5 @@ The build system (`~/projects/blog/main/build.py`) renders the .md file using Py
 - Commit and push after every logical change
 - Run `blog deploy` to publish changes to the live site
 - Run tests before committing
+- **Deploy after any change to snippet source files.** The blog's popover code snippets are extracted from Python and R source files listed in `extract_snippets.py` (`test_identities.py`, `bench_timing.py`, `bench_samplers.py`, `conditional_poisson_torch.py`, `conditional_poisson_numpy.py`, `bench_timing_r.R`). Any change to these files changes the deployed snippets and requires `blog deploy`.
 - **Never write citations without verifying them** — check title, authors, year, venue, and URL against the actual publication. Hallucinated references are unacceptable.
