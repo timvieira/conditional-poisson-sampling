@@ -91,7 +91,11 @@
 - [ ] Tidy up the repo (clean up unused files, organize structure)
 - [ ] Remove `memory/` directory (Claude session state, shouldn't be checked in)
 - [ ] Remove `bench_scaling.png` from git tracking (114KB binary; `*.png` is in `.gitignore` but this was committed before the rule)
-- [ ] Audit dead code: `plot_timing_3d.py` (superseded by inline Plotly widget?), `torch_prototype.py` (superseded by `conditional_poisson_torch.py`?), `screenshot_test.mjs` / `test_animation.mjs` (still used?), `display_utils.py` (still imported?)
+- [x] ~~Audit dead code: `torch_prototype.py`~~ — removed
+- [ ] Decide: remove `display_utils.py`? Only imported by notebook cells, not source code.
+- [ ] Decide: remove `screenshot_test.mjs` / `test_animation.mjs`? Likely dead JS test files, not integrated into build or test pipeline.
+- [ ] Decide: remove `plot_timing_3d.py`? May be superseded by inline Plotly widget in the article.
+- [ ] Decide: remove `bench_scaling.py`? Standalone scaling analysis script. Still uses centralized classes but may be redundant with `bench_timing.py`.
 - [ ] Delete stale branches
 
 ### Packaging and Distribution
