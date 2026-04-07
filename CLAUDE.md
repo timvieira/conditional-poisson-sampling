@@ -54,7 +54,7 @@ When changing notation or API names, update **all** of these in the same commit:
 
 ## Blog post ↔ identity tests (critical)
 
-The blog post (`content/conditional-poisson-sampling.md`) and the identity test suite (`tests/test_identities.py`) must be kept in exact correspondence. Every mathematical identity, equality, and theorem stated in the blog post has a matching test that verifies it numerically. Inline `<small>` references in the notebook link each claim to its test.
+The blog post (`content/conditional-poisson-sampling.md`) and the identity test suite (`tests/test_identities.py`) must be kept in exact correspondence. Every mathematical identity, equality, and theorem stated in the blog post has a matching test that verifies it numerically. Inline ✓ pill links in the article connect each claim to its test.
 
 **Rules:**
 - When adding or changing a mathematical claim in the blog post, add or update the corresponding test in `tests/test_identities.py` in the same commit.
@@ -67,15 +67,23 @@ The code informs the tests and the tests inform the code. They are two views of 
 
 ## Blog post structure
 
-The blog post is assembled from two files:
+The blog post is a single file:
 
-- **`content/conditional-poisson-sampling.md`** — the master template. Contains all prose, widget HTML/JS, and `{% notebook ... cells[X:Y] %}` directives that pull in code cells.
-- **`content/conditional-poisson-sampling.ipynb`** — the Jupyter notebook. Only code cells are rendered from here (via `{% notebook %}` directives). Markdown cells in the notebook are stale copies; the .md file is authoritative for all prose.
+- **`content/conditional-poisson-sampling.md`** — contains all prose, widget HTML/JS, and inline code examples.
 
-The build system (`~/projects/blog/main/build.py`) renders the .md file using Python-Markdown with nbconvert for notebook cell inclusions, and a Jinja2 template for the page chrome.
+The build system (`~/projects/blog/main/build.py`) renders the .md file using Python-Markdown and a Jinja2 template for the page chrome.
 
 ## Build System
 
+- **`make test`** — run all Python tests
+- **`make bench`** — run all benchmarks
+- **`make data`** — regenerate benchmark data (timing_data.json, timing_grid.json)
+- **`make figures`** — regenerate SVG plots from benchmark data
+- **`make snippets`** — regenerate popover.js code snippets
+- **`make deploy`** — run tests, regenerate snippets, build and deploy to GitHub Pages
+- **`make dev`** — start dev server with auto-rebuild
+- **`make install`** — install package with dev dependencies
+- **`make install-r`** — set up R conda env with the sampling package
 - **`blog dev`** — builds the site and serves it at `http://localhost:8000/` with file-watching auto-rebuild. The dev server proxies `/blog/` to the central blog repo so CSS references work locally.
 - **`blog deploy`** — builds, commits `docs/`, and pushes to GitHub. The site is served via GitHub Pages from the `main` branch, `/docs` directory.
 
@@ -84,7 +92,7 @@ The build system (`~/projects/blog/main/build.py`) renders the .md file using Py
 ## Workflow
 
 - Commit and push after every logical change
-- Run `blog deploy` to publish changes to the live site
-- Run tests before committing
+- Run `make deploy` to publish changes to the live site
+- Run `make test` before committing
 - **Deploy after any change to snippet source files.** The blog's popover code snippets are extracted from Python and R source files listed in `extract_snippets.py` (`tests/test_identities.py`, `bench/bench_timing.py`, `bench/bench_samplers.py`, `conditional_poisson/torch.py`, `conditional_poisson/numpy.py`, `bench/bench_timing_r.R`). Any change to these files changes the deployed snippets and requires `blog deploy`.
 - **Never write citations without verifying them** — check title, authors, year, venue, and URL against the actual publication. Hallucinated references are unacceptable.

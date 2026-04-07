@@ -96,6 +96,10 @@ deploy: test snippets
 install:
 	pip install -e ".[dev]"
 
+install-r:
+	conda create -n cps-r -y r-base r-sampling
+	@echo "R environment ready: conda run -n cps-r Rscript ..."
+
 clean:
 	rm -rf __pycache__ conditional_poisson/__pycache__ tests/__pycache__ bench/__pycache__
 	rm -rf *.egg-info build dist .pytest_cache

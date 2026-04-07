@@ -41,12 +41,12 @@
 - [ ] Rerun `bench_timing.py` and regenerate `timing_data.json` + SVG plots (sampling data is stale after sampler rewrite)
 - [ ] Rerun `bench_timing_grid.py` and update inline 3D widget data in the article (sampling rows are stale)
 - [ ] Update `plot_timing.py` to include new sampling methods (sequential, PyTorch tree) in the SVG
-- [ ] Update `bench_timing_grid.py` sampling section to use class methods instead of old standalone functions
+- [x] ~~Update `bench_timing_grid.py` to use class methods~~ — done
 - [ ] The static `timing_samples.svg` still shows old curves from the vectorized sampler — must be regenerated
 
 ### Other
 - [ ] NumPy tree timing slopes (~1.15–1.45 in $N$) are higher than expected for $O(N \log^2 N)$. Investigate whether forcing FFT throughout gives cleaner scaling.
-- [ ] Test GPU performance — both `conditional_poisson_torch.py` (FFT) and `torch_prototype.py` (direct conv1d) should be benchmarked on GPU. Float32 precision risk needs testing (contour scaling helps but may not fully compensate).
+- [ ] Test GPU performance — `conditional_poisson/torch.py` (FFT) should be benchmarked on GPU. Float32 precision risk needs testing (contour scaling helps but may not fully compensate).
 - [x] Promote `conditional_poisson_torch.py` to the primary library implementation — merged `torch_fft_prototype.py` into it with full `ConditionalPoissonTorch` class (from_weights, fit, sample, log_prob, pi, hvp). Blog post Basic Usage updated.
 - [x] The maximum-entropy test could be strengthened by actually optimizing over the space of all distributions over size-$n$ sets, rather than just checking against a few specific alternatives.
 
@@ -91,9 +91,9 @@
 
 - [ ] Tidy up the repo (clean up unused files, organize structure)
 - [ ] Remove `memory/` directory (Claude session state, shouldn't be checked in)
-- [ ] Remove `bench_scaling.png` from git tracking (114KB binary; `*.png` is in `.gitignore` but this was committed before the rule)
+- [x] ~~Remove `bench_scaling.png`~~ — done
 - [x] ~~Audit dead code: `torch_prototype.py`~~ — removed
-- [ ] Decide: remove `display_utils.py`? Only imported by notebook cells, not source code.
+- [x] ~~Remove `display_utils.py`~~ — removed (only consumer was the deleted notebook)
 - [ ] Fix `test_animation.mjs` — update paths, verify it runs, integrate into CI
 - [ ] Add mathematical correctness tests for JS widget algorithms (product tree, quota splitting, polynomial multiplication, CDF computation). Either extend `test_animation.mjs` to check computed values against known answers, or extract JS algorithms into testable modules and test with Node.js.
 - [ ] Decide: remove `plot_timing_3d.py`? May be superseded by inline Plotly widget in the article.
@@ -103,13 +103,14 @@
 ### Packaging and Distribution
 
 - [ ] Add a `LICENSE` file (pyproject.toml says MIT but no license file exists)
-- [ ] Update `pyproject.toml` to also package `conditional_poisson_torch`, `conditional_poisson_sequential_numpy`, and `conditional_poisson_sequential_torch`
-- [ ] Package up the NumPy, PyTorch, and JavaScript libraries as easy-to-install single-file libraries via pip/npm (`pyproject.toml` and `package.json` exist but are not polished for distribution)
-- [ ] Add `requirements.txt` or `[project.optional-dependencies]` for dev deps (scipy, torch, matplotlib)
+- [x] ~~Package as `conditional_poisson` with all four implementations~~ — done
+- [x] ~~Add optional-dependencies for dev/torch~~ — done
+- [ ] Package up the JavaScript library as an easy-to-install npm module
+- [ ] Publish to PyPI
 
 ### Dev Quality
 
-- [ ] Set up CI via GitHub Actions (run tests, lint)
+- [x] ~~Set up CI via GitHub Actions~~ — done (Python tests + JS tests)
 - [ ] Add linting config (ruff/flake8/mypy)
 - [ ] Update README
 
