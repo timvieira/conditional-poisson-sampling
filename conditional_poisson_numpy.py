@@ -594,7 +594,8 @@ class ConditionalPoissonNumPy:
 
         Complexity: O(N (log N)^2) to build tree [cached] + O(size * n * log N).
         """
-        rng = np.random.default_rng(rng)
+        if not isinstance(rng, np.random.Generator):
+            rng = np.random.default_rng(rng)
         if self._reduced is not None:
             # Sample from reduced problem, map indices back, merge with forced-in
             int_samples = self._reduced.sample(size, rng)
@@ -607,10 +608,11 @@ class ConditionalPoissonNumPy:
             return np.tile(np.sort(self._forced_in), (size, 1))
         _, _, S, _, _ = self._get_p_tree()
         cdfs = self._get_sample_cdfs()
-        samples = np.stack(
+        if size == 1:
+            return _tree_sample(cdfs, S, self.N, self._n, rng).reshape(1, -1)
+        return np.stack(
             [_tree_sample(cdfs, S, self.N, self._n, rng) for _ in range(size)]
         )
-        return samples
 
     # ── Hessian-vector product ────────────────────────────────────────────────
 
