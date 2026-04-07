@@ -505,30 +505,43 @@ def test_max_entropy():
         for i in S:
             A[i, j] = 1.0
 
-    # Maximize entropy subject to: A @ q = pi_target.
-    # Softmax parameterization q = softmax(u) ensures q > 0 and sum(q) = 1,
-    # leaving only the marginal constraint, enforced via penalty.
-    def softmax(u):
-        u = u - u.max()
-        e = np.exp(u)
-        return e / e.sum()
-
     p_cps = np.array([probs_cps[S] for S in all_S])
 
-    # Penalty method: minimize -H(softmax(u)) + mu * ||A @ softmax(u) - pi||^2
-    # Increasing mu drives the constraint violation to zero.
-    u = np.zeros(M)
-    for mu in [1e2, 1e4, 1e6, 1e8]:
-        def objective(u):
-            q = softmax(u)
-            neg_H = np.sum(q * np.log(q))
-            violation = A @ q - pi_target
-            return neg_H + mu * np.dot(violation, violation)
-        result = minimize(objective, u, method='L-BFGS-B',
-                          options={'ftol': 1e-15, 'maxiter': 2000})
-        u = result.x
+    # Maximize entropy over the simplex subject to marginal constraints A @ q = pi_target.
+    # Variables: q[j] = P(S_j), j = 0..M-1.
+    # Constraints: q >= 0, sum(q) = 1, A @ q = pi_target.
+    # The sum(q)=1 constraint is redundant with A @ q = pi_target since
+    # sum(pi_target) = n and each column of A sums to n, but we include it
+    # for numerical robustness.
+    # Solve via the dual: max-entropy with linear constraints A @ q = pi_target
+    # has dual variables lambda such that q_j = exp(-1 - lambda^T a_j) / Z(lambda),
+    # where a_j is the j-th column of A (indicator of subset S_j).
+    # The dual objective (to minimize) is:
+    #   g(lambda) = log(sum_j exp(-lambda^T a_j)) + lambda^T pi_target
+    # This is convex and unconstrained — L-BFGS handles it easily.
 
-    q_opt = softmax(u)
+    # The max-entropy distribution with constraints E[A] = pi_target is an
+    # exponential family: q_j ∝ exp(lambda^T a_j).  The dual is convex:
+    #   minimize  log(sum_j exp(lambda^T a_j)) - lambda^T pi_target
+    def dual_obj_and_grad(lam):
+        logits = A.T @ lam  # (M,)
+        logits_max = logits.max()
+        log_Z = np.log(np.exp(logits - logits_max).sum()) + logits_max
+        q = np.exp(logits - log_Z)
+        obj = log_Z - lam @ pi_target
+        grad = A @ q - pi_target
+        return obj, grad
+
+    lam0 = np.zeros(N)
+    result = minimize(dual_obj_and_grad, lam0, jac=True, method='L-BFGS-B',
+                      options={'ftol': 0, 'gtol': 1e-14, 'maxiter': 5000})
+    lam_opt = result.x
+
+    # Recover primal from dual
+    logits = A.T @ lam_opt
+    log_Z = np.log(np.exp(logits - logits.max()).sum()) + logits.max()
+    q_opt = np.exp(logits - log_Z)
+
     H_opt = -np.sum(q_opt * np.log(q_opt))
     assert np.allclose(A @ q_opt, pi_target, atol=1e-6), \
         f"Marginal constraint violated: max err {np.max(np.abs(A @ q_opt - pi_target)):.2e}"
