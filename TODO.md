@@ -13,7 +13,7 @@
 - [ ] Hide all Python/plotting code—just show the plot. Link to relevant implementations using the checkmark/footnote pill system (e.g., each curve links to its implementation in the repo).
 - [ ] Add more baselines for computing $\pi$ — (1) backprop-on-DP at $O(Nn)$, (2) naive loop versions: $N \times O(Nn)$ DP and $N \times O(N \log^2 n)$ product tree. These show the value of backprop vs. leave-one-out recomputation.
 - [ ] Add a programmatically generated empirical slope table. For each method, fit log-log slopes (time vs $N$ at fixed $n$, and time vs $n$ at fixed $N$) from the grid sweep data and display alongside theoretical complexity bounds. Auto-flag rows where empirical slope deviates significantly from prediction.
-- [ ] Scrutinize timing experiments. The R `sampling` package appears surprisingly fast for computing π—need to understand why. Is it compiled C under the hood? Are we measuring the right thing? Verify that all methods are computing the same quantity and that subprocess overhead isn't distorting R timings. Check whether R's `UPMEqfromw` is pure R or calls compiled code.
+- [ ] Scrutinize timing experiments. R's `sampling` package functions (`UPMEqfromw`, `UPMEpikfromq`, `UPMEsfromq`, `UPMEpiktildefrompik`) are confirmed pure R (no compiled C). Subprocess overhead and measurement methodology still need investigation. Verify that all methods compute the same quantity.
 - [ ] Explore the fitting algorithm in the R `sampling` package. It may be faster simply because its fixed-point iteration has less overhead than L-BFGS (e.g., no secant equations). Compare the number of iterations required by the R fixed-point method vs. our L-BFGS solver.
 - [ ] 3D timing plots: replace the single dropdown plot with three separate 3D plots (computing $Z$, computing $\pi$, drawing samples). Sampling timing is currently only a static 2D SVG—it has two variables ($N$, $n$) just like the others, so it should be 3D too.
 
@@ -21,19 +21,23 @@
 
 ### Code cleanup
 - [ ] Remove stale aliases and floating functions — `bench_samplers.py` has standalone `sequential_pi`, `sequential_sample`, `_build_dp_table` that duplicate the sequential classes
-- [ ] Remove `hvp` from `ConditionalPoissonNumPy` and `ConditionalPoissonTorch`
+- [ ] Remove `hvp` from `ConditionalPoissonNumPy` and `ConditionalPoissonTorch` (keep internal HVP for Newton-CG fitting; remove from public API). Update README which lists `hvp` in the API table and code example.
 - [ ] Remove `sample_sequential` from `ConditionalPoissonNumPy` — use `ConditionalPoissonSequentialNumPy.sample` instead
 
 ### Sequential implementations
 - [ ] Add `fit` and `log_prob` to `ConditionalPoissonSequentialNumPy`
 - [ ] Add `fit` and `log_prob` to `ConditionalPoissonSequentialTorch`
-- [ ] Fix numerical overflow in `ConditionalPoissonSequentialNumPy._get_seq_q` — the ESP recurrence operates in linear space without log-scaling, producing NaN at N ≥ 500
+- [ ] Fix numerical overflow in sequential `_get_seq_q` — the ESP recurrence operates in linear space without log-scaling, producing NaN at N ≥ 500. Affects both NumPy and Torch sequential classes.
 - [ ] `ConditionalPoissonSequentialTorch` should use `torch.autograd` for `incl_prob` (backprop on `log_normalizer`) instead of manual forward-backward DP
 - [ ] All four implementations should have the same public interface: `from_weights`, `fit`, `sample`, `log_prob`, `incl_prob`, `log_normalizer`, `n`, `N`, `theta`, `w`
+- [ ] Extend `test_all_implementations.py` to cover `fit` and `log_prob` once sequential classes implement them
 
 ### Benchmarks
 - [ ] Rerun `bench_timing.py` and regenerate `timing_data.json` + SVG plots (sampling data is stale after sampler rewrite)
 - [ ] Rerun `bench_timing_grid.py` and update inline 3D widget data in the article (sampling rows are stale)
+- [ ] Update `plot_timing.py` to include new sampling methods (sequential, PyTorch tree) in the SVG
+- [ ] Update `bench_timing_grid.py` sampling section to use class methods instead of old standalone functions
+- [ ] The static `timing_samples.svg` still shows old curves from the vectorized sampler — must be regenerated
 
 ### Other
 - [ ] NumPy tree timing slopes (~1.15–1.45 in $N$) are higher than expected for $O(N \log^2 N)$. Investigate whether forcing FFT throughout gives cleaner scaling.
@@ -86,7 +90,7 @@
 ### Packaging and Distribution
 
 - [ ] Add a `LICENSE` file (pyproject.toml says MIT but no license file exists)
-- [ ] Update `pyproject.toml` to also package `conditional_poisson_torch` (currently only includes `conditional_poisson_numpy`)
+- [ ] Update `pyproject.toml` to also package `conditional_poisson_torch`, `conditional_poisson_sequential_numpy`, and `conditional_poisson_sequential_torch`
 - [ ] Package up the NumPy, PyTorch, and JavaScript libraries as easy-to-install single-file libraries via pip/npm (`pyproject.toml` and `package.json` exist but are not polished for distribution)
 - [ ] Add `requirements.txt` or `[project.optional-dependencies]` for dev deps (scipy, torch, matplotlib)
 
