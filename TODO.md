@@ -25,6 +25,8 @@
 
 ## Blog Polish
 
+- [ ] Add a note encouraging readers to report issues on the [GitHub issue tracker](https://github.com/timvieira/conditional-poisson-sampling/issues)
+- [ ] Add a citation section at the end of the post (e.g., BibTeX snippet, suggested citation format)
 - [ ] Why are there still references to the NumPy implementation in the article? The timing section legitimately benchmarks the NumPy tree, but it should be framed as the reference/pedagogical implementation, not the recommended one.
 - [ ] Consistently color code math symbols and widgets — use the same colors for $P(S)$, $\pi$, and $w$ in both LaTeX and D3 widgets. Previously removed all color coding; bring it back in a principled way with a shared palette.
 - [x] Make the $P(S)$ horizontal bars in the interactive explorer taller — ideally same width as the other bars.
