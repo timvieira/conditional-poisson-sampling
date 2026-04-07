@@ -23,6 +23,10 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 \newcommand{\defeq}{\overset{\small\text{def}}{=}}
 </macros>
 
+<div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 16px; margin-bottom: 1.5em; border-radius: 4px; font-size: 0.95em;">
+<b>Draft</b> — This article is a work in progress. Content may change.
+</div>
+
 <div class="margin-note">
 <a href="test_identities.py" class="verified" target="_blank">✓</a> = numerically verified—each links to its test case in <a href="test_identities.py" style="color:#999">test_identities.py</a>.
 </div>

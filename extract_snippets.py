@@ -445,8 +445,13 @@ def main():
     )
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(css_js + js)
-    print(f"  wrote {OUTPUT} ({OUTPUT.stat().st_size:,} bytes)")
+    new_content = css_js + js
+    # Only write if content changed, to avoid triggering file-watcher loops
+    if OUTPUT.exists() and OUTPUT.read_text() == new_content:
+        print(f"  {OUTPUT} unchanged ({len(new_content):,} bytes)")
+    else:
+        OUTPUT.write_text(new_content)
+        print(f"  wrote {OUTPUT} ({OUTPUT.stat().st_size:,} bytes)")
 
 
 if __name__ == "__main__":
