@@ -49,23 +49,6 @@ def test_sampling():
     assert np.max(np.abs(pi_emp - cp.incl_prob)) < 0.02
 
 
-def test_hvp():
-    rng = np.random.default_rng(0)
-    N, n = 20, 7
-    q_true = rng.exponential(1.0, N)
-    cp = ConditionalPoissonNumPy.from_weights(n, q_true)
-    cp_fit = ConditionalPoissonNumPy.fit(cp.incl_prob, n)
-    v = rng.standard_normal(N)
-    Hv = cp_fit.hvp(v)
-    eps = 1e-5
-    J = np.zeros((N, N))
-    for j in range(N):
-        ej = np.zeros(N); ej[j] = 1.0
-        J[:, j] = (ConditionalPoissonNumPy(n, cp_fit.theta + eps * ej).incl_prob -
-                    ConditionalPoissonNumPy(n, cp_fit.theta - eps * ej).incl_prob) / (2 * eps)
-    assert np.max(np.abs(Hv - J @ v)) < 1e-5
-    assert np.linalg.norm(cp_fit.hvp(np.ones(N))) < 1e-8
-
 
 def test_numerical_stability():
     rng = np.random.default_rng(0)
@@ -346,20 +329,6 @@ def test_brute_force_log_prob():
                 f"log_prob mismatch for N={N}, n={n}, S={s}"
 
 
-def test_brute_force_hvp():
-    rng = np.random.default_rng(13)
-    for N, n in _BRUTE_CASES:
-        theta = rng.standard_normal(N)
-        cp = ConditionalPoissonNumPy(n, theta)
-        _, _, Cov_bf, _, _ = _brute_force(theta, n)
-        # test multiple random directions
-        for _ in range(3):
-            v = rng.standard_normal(N)
-            Hv = cp.hvp(v)
-            Hv_bf = Cov_bf @ v
-            assert np.allclose(Hv, Hv_bf, atol=1e-8), \
-                f"hvp mismatch for N={N}, n={n}: max err={np.max(np.abs(Hv - Hv_bf)):.2e}"
-
 
 def test_brute_force_sampling_distribution():
     """Verify that sample frequencies converge to brute-force probabilities."""
@@ -391,7 +360,6 @@ if __name__ == "__main__":
         test_fitting,
         test_log_prob_normalizes,
         test_sampling,
-        test_hvp,
         test_numerical_stability,
         test_n_equals_1,
         test_n_equals_N_minus_1,
@@ -404,7 +372,6 @@ if __name__ == "__main__":
         test_brute_force_pi,
         test_brute_force_log_normalizer,
         test_brute_force_log_prob,
-        test_brute_force_hvp,
         test_brute_force_sampling_distribution,
     ]
     for t in tests:

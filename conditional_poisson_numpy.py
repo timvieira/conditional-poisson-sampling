@@ -9,7 +9,7 @@ Conditional Poisson distribution over fixed-size subsets.
 where w_i are non-negative weights (zero and infinity allowed).  Internally parameterised by
 log-weights theta_i = log(w_i).
 
-Everything — forward pass, gradient, Hessian-vector product, and sampling —
+Everything — forward pass, gradient, and sampling —
 uses a polynomial product tree built once and cached.
 
 Tree structure
@@ -59,9 +59,8 @@ where the O(N log N) term is FFT-based polynomial multiplication.
   _build_p_tree          O(N (log N)^2)
   _downward_pass         O(N (log N)^2)
   incl_prob / log_normalizer    O(N (log N)^2)  [cached]
-  hvp(v)                 O(N (log N)^2)  [P-tree cached; D-tree + downward fresh]
   sample(M)              O(N (log N)^2 + M n log N)
-  fit(pi_star)           O(N (log N)^2 * Newton_iters * CG_iters)
+  fit(pi_star)           O(N (log N)^2 * L-BFGS_iters)
 
 TODO: truncate polynomials to degree n throughout the tree to achieve
 O(N log^2 n) instead of O(N log^2 N).  This requires per-coefficient
@@ -96,23 +95,6 @@ def _pmul(a, als, b, bls):
     c = convolve(a, b)
     cn, inc = _scale(c)
     return cn, als + bls + inc
-
-def _padd(a, als, b, bls):
-    """Add two scaled polynomials (possibly different lengths). Returns (c, cls)."""
-    if als == -np.inf:
-        return b.copy(), bls
-    if bls == -np.inf:
-        return a.copy(), als
-    s = max(als, bls)
-    la, lb = len(a), len(b)
-    if la >= lb:
-        out = a * np.exp(als - s)
-        out[:lb] += b * np.exp(bls - s)
-    else:
-        out = b * np.exp(bls - s)
-        out[:la] += a * np.exp(als - s)
-    cn, inc = _scale(out)
-    return cn, s + inc
 
 
 # ── Upward pass: P-tree ──────────────────────────────────────────────────────
@@ -151,66 +133,25 @@ def _build_p_tree(q_s):
     return Pc, Pls, S
 
 
-# ── Upward pass: D-tree (for HVP; requires P-tree already built) ─────────────
-
-def _build_d_tree(Pc, Pls, q_s, v, S):
-    """
-    Build D-tree: D_T(z) = sum_{i in T} q_i v_i prod_{j in T, j!=i}(1+q_j z).
-
-    D[node] = convolve(D[L], P[R]) + convolve(P[L], D[R])   (product rule)
-
-    Complexity: O(N (log N)^2).
-    """
-    N = len(q_s)
-    Dc  = [None] * (2 * S)
-    Dls = np.full(2 * S, -np.inf)
-
-    for i in range(S):
-        d_val = q_s[i] * v[i] if i < N else 0.0
-        if d_val == 0.0:
-            Dc[S + i] = np.zeros(1)
-            Dls[S + i] = -np.inf
-        else:
-            sign = 1.0 if d_val > 0 else -1.0
-            Dc[S + i] = np.array([sign])
-            Dls[S + i] = np.log(abs(d_val))
-
-    for i in range(S - 1, 0, -1):
-        l, r = 2 * i, 2 * i + 1
-        t1c, t1s = _pmul(Dc[l], Dls[l], Pc[r], Pls[r])
-        t2c, t2s = _pmul(Pc[l], Pls[l], Dc[r], Dls[r])
-        Dc[i], Dls[i] = _padd(t1c, t1s, t2c, t2s)
-
-    return Dc, Dls
-
-
 # ── Downward pass ─────────────────────────────────────────────────────────────
 
-def _downward_pass(Pc, Pls, Dc, Dls, S):
+def _downward_pass(Pc, Pls, S):
     """
     Top-down pass propagating outside polynomials to every leaf.
 
-    Pass Dc=None, Dls=None to skip D (pi-only mode).
-
     At leaf i on return:
       oPc[S+i], oPls[S+i]  encodes  P^{(-i)}(z)
-      oDc[S+i], oDls[S+i]  encodes  D^{(-i)}(z)  (if D requested)
 
     Update rule (child c with sibling s):
       oP[c] = oP[parent] * P[s]
-      oD[c] = oD[parent] * P[s]  +  oP[parent] * D[s]
 
     Complexity: O(N (log N)^2).
     """
-    do_d = (Dc is not None)
     N2 = 2 * S
-
-    oPc  = [None] * N2;  oPls = np.full(N2, -np.inf)
-    oDc  = [None] * N2;  oDls = np.full(N2, -np.inf)
-
-    oPc[1] = np.array([1.0]); oPls[1] = 0.0
-    if do_d:
-        oDc[1] = np.zeros(1); oDls[1] = -np.inf
+    oPc  = [None] * N2
+    oPls = np.full(N2, -np.inf)
+    oPc[1] = np.array([1.0])
+    oPls[1] = 0.0
 
     for i in range(1, S):
         if oPc[i] is None:
@@ -218,19 +159,15 @@ def _downward_pass(Pc, Pls, Dc, Dls, S):
         l, r = 2 * i, 2 * i + 1
         for c, s in ((l, r), (r, l)):
             oPc[c], oPls[c] = _pmul(oPc[i], oPls[i], Pc[s], Pls[s])
-            if do_d:
-                t1c, t1s = _pmul(oDc[i], oDls[i], Pc[s], Pls[s])
-                t2c, t2s = _pmul(oPc[i], oPls[i], Dc[s], Dls[s])
-                oDc[c], oDls[c] = _padd(t1c, t1s, t2c, t2s)
 
-    return oPc, oPls, oDc, oDls
+    return oPc, oPls
 
 
-# ── Extraction: pi, log_Z, and (optionally) Hv ───────────────────────────────
+# ── Extraction: pi, log_Z ────────────────────────────────────────────────────
 
-def _extract(q_s, log_gm, Pc, Pls, oPc, oPls, oDc, oDls, S, N, n, v):
+def _extract(q_s, log_gm, Pc, Pls, oPc, oPls, S, N, n):
     """
-    Extract pi, Hv (optional), and log_Z from tree + downward-pass results.
+    Extract pi and log_Z from tree + downward-pass results.
 
     pi_i   = q_s[i] * oPc[S+i][n-1] / Pc[1][n]  * exp(oPls[S+i] - Pls[1])
     log Z  = log|Pc[1][n]| + Pls[1] + n * log_gm
@@ -239,28 +176,14 @@ def _extract(q_s, log_gm, Pc, Pls, oPc, oPls, oDc, oDls, S, N, n, v):
     root_ls = float(Pls[1])
     log_Z   = (np.log(abs(en_n)) + root_ls + n * log_gm) if en_n != 0.0 else -np.inf
 
-    do_hv = (oDc is not None) and (v is not None)
-    pi   = np.zeros(N)
-    SumZ = np.zeros(N) if do_hv else None
-
+    pi = np.zeros(N)
     for i in range(N):
         op = oPc[S + i]
         op_ls = float(oPls[S + i])
         if en_n != 0.0 and op is not None and len(op) > n - 1:
             pi[i] = q_s[i] * float(op[n - 1]) / en_n * np.exp(op_ls - root_ls)
-        if do_hv and n >= 2:
-            od = oDc[S + i]
-            od_ls = float(oDls[S + i])
-            if en_n != 0.0 and od is not None and len(od) > n - 2:
-                SumZ[i] = q_s[i] * float(od[n - 2]) / en_n * np.exp(od_ls - root_ls)
 
-    if do_hv:
-        alpha = float(np.dot(pi, v))
-        Hv = SumZ + pi * v - pi * alpha
-    else:
-        Hv = None
-
-    return pi, Hv, log_Z
+    return pi, log_Z
 
 
 # ── Sampler: divide-and-conquer on the P-tree ─────────────────────────────────
@@ -318,21 +241,6 @@ def _tree_sample(cdfs, S, N, n, rng):
     return np.array(selected, dtype=np.int32)
 
 
-# ── CG solver ─────────────────────────────────────────────────────────────────
-
-def _cg(matvec, b, tol=1e-12, max_iter=None):
-    n = len(b); max_iter = max_iter or min(n, 500)
-    x, r, p = np.zeros(n), b.copy(), b.copy()
-    rr = float(np.dot(r, r))
-    for _ in range(max_iter):
-        if rr < tol ** 2: break
-        Ap  = matvec(p);  pAp = float(np.dot(p, Ap))
-        if pAp <= 0: break
-        a   = rr / pAp;  x += a * p;  r -= a * Ap
-        rr2 = float(np.dot(r, r))
-        p   = r + (rr2 / rr) * p;  rr = rr2
-    return x
-
 
 # ══ ConditionalPoissonNumPy ════════════════════════════════════════════════════════
 
@@ -364,7 +272,7 @@ class ConditionalPoissonNumPy:
     Notes
     -----
     - The P-tree is built once on first access and shared by pi, log_normalizer,
-      and sample. The D-tree is rebuilt per hvp(v) call (depends on v).
+      and sample.
     - theta is zero-centered after fitting (shift-invariant distribution).
     """
 
@@ -421,18 +329,18 @@ class ConditionalPoissonNumPy:
         n: int,
         *,
         tol: float = 1e-10,
-        max_iter: int = 50,
+        max_iter: int = 200,
         verbose: bool = False,
     ) -> "ConditionalPoissonNumPy":
         """
-        Fit to target inclusion probabilities.
+        Fit to target inclusion probabilities via L-BFGS.
 
         Parameters
         ----------
         pi_star : (N,) array with entries in (0, 1) summing to n
         n       : subset size
         tol     : convergence threshold on max|pi* - pi|
-        max_iter: maximum Newton iterations
+        max_iter: maximum L-BFGS iterations
         verbose : print iteration progress
 
         Returns
@@ -480,9 +388,9 @@ class ConditionalPoissonNumPy:
     def _forward(self):
         if "pi" not in self._cache:
             Pc, Pls, S, q_s, log_gm = self._get_p_tree()
-            oPc, oPls, _, _ = _downward_pass(Pc, Pls, None, None, S)
-            pi, _, log_Z = _extract(q_s, log_gm, Pc, Pls, oPc, oPls,
-                                    None, None, S, self.N, self._n, None)
+            oPc, oPls = _downward_pass(Pc, Pls, S)
+            pi, log_Z = _extract(q_s, log_gm, Pc, Pls, oPc, oPls,
+                                 S, self.N, self._n)
             self._cache["pi"]    = pi
             self._cache["log_Z"] = log_Z
 
@@ -614,97 +522,6 @@ class ConditionalPoissonNumPy:
             [_tree_sample(cdfs, S, self.N, self._n, rng) for _ in range(size)]
         )
 
-    def _get_seq_q(self):
-        """Build and cache the sequential conditional probability table q."""
-        if "seq_q" not in self._cache:
-            w = self.w
-            N, n = self.N, self._n
-            # Backward ESP recurrence: expa[i, k] = e_k(w[i:N])
-            expa = np.zeros((N, n))
-            for i in range(N):
-                expa[i, 0] = np.sum(w[i:N])
-            for i in range(N - n, N):
-                expa[i, N - i - 1] = np.prod(w[i:N])
-            for i in range(N - 3, -1, -1):
-                for k in range(1, min(N - i - 1, n)):
-                    expa[i, k] = w[i] * expa[i + 1, k - 1] + expa[i + 1, k]
-            # q[i, k] = P(include item i | k items left to select from i..N-1)
-            q = np.zeros((N, n))
-            for i in range(N - 1, -1, -1):
-                q[i, 0] = w[i] / expa[i, 0]
-            for i in range(N - n, N):
-                q[i, N - i - 1] = 1.0
-            for i in range(N - 3, -1, -1):
-                for k in range(1, min(N - i - 1, n)):
-                    q[i, k] = w[i] * expa[i + 1, k - 1] / expa[i, k]
-            self._cache["seq_q"] = q
-        return self._cache["seq_q"]
-
-    def sample_sequential(
-        self,
-        size: int = 1,
-        rng: Optional[Union[int, np.random.Generator]] = None,
-    ) -> np.ndarray:
-        """
-        Draw independent samples using O(N) sequential scan.
-
-        Builds an O(Nn) DP table (cached), then scans items sequentially,
-        including each with its conditional probability.
-
-        Parameters
-        ----------
-        size : number of subsets to draw
-        rng  : seed or np.random.Generator
-
-        Returns
-        -------
-        (size, n) int array; each row is a sorted list of n item indices.
-
-        Complexity: O(Nn) to build table [cached] + O(size * N).
-        """
-        if not isinstance(rng, np.random.Generator):
-            rng = np.random.default_rng(rng)
-        q = self._get_seq_q()
-        N, n = self.N, self._n
-        samples = np.empty((size, n), dtype=np.int32)
-        for m in range(size):
-            k = n
-            cursor = 0
-            for i in range(N):
-                if k == 0:
-                    break
-                if rng.random() < q[i, k - 1]:
-                    samples[m, cursor] = i
-                    cursor += 1
-                    k -= 1
-        return samples
-
-    # ── Hessian-vector product ────────────────────────────────────────────────
-
-    def hvp(self, v: np.ndarray) -> np.ndarray:
-        """
-        Compute Cov[1_S] v.  O(N (log N)^2).
-
-        Cov[1_S] is the covariance matrix of the inclusion indicators.
-        It is positive semi-definite with rank N-1; null space = span{1}
-        since sum(1_{i in S}) = n is constant.
-
-        Uses the cached P-tree; rebuilds D-tree (which depends on v).
-        """
-        v = np.asarray(v, float)
-        if self._reduced is not None:
-            Hv = np.zeros(self.N)
-            Hv[self._interior] = self._reduced.hvp(v[self._interior])
-            return Hv
-        if len(self._forced_in) > 0:
-            return np.zeros(self.N)
-        Pc, Pls, S, q_s, log_gm = self._get_p_tree()
-        Dc, Dls = _build_d_tree(Pc, Pls, q_s, v, S)
-        oPc, oPls, oDc, oDls = _downward_pass(Pc, Pls, Dc, Dls, S)
-        _, Hv, _ = _extract(q_s, log_gm, Pc, Pls, oPc, oPls, oDc, oDls,
-                            S, self.N, self._n, v)
-        return Hv
-
     # ── Fitting ───────────────────────────────────────────────────────────────
 
     def fit_inplace(
@@ -712,17 +529,20 @@ class ConditionalPoissonNumPy:
         pi_star: np.ndarray,
         *,
         tol: float = 1e-10,
-        max_iter: int = 50,
+        max_iter: int = 200,
         verbose: bool = False,
     ) -> "ConditionalPoissonNumPy":
         """
         Update weights to match target inclusion probabilities pi*.
 
-        Maximizes the log-likelihood via Newton-CG with Armijo backtracking.
+        Minimizes -E_π★[log P_θ(S)] = -(π★ᵀθ - log Z(θ, n)) via L-BFGS.
+        The gradient is π(θ) - π★, so convergence means max|π - π★| ≤ tol.
         Log-weights are zero-centered on completion (shift-invariant distribution).
 
         Returns self (for chaining).
         """
+        from scipy.optimize import minimize
+
         pi_star = np.asarray(pi_star, float)
         if len(pi_star) != self.N:
             raise ValueError(f"len(pi_star)={len(pi_star)} != N={self.N}")
@@ -731,45 +551,37 @@ class ConditionalPoissonNumPy:
         if not np.all((pi_star > 0) & (pi_star < 1)):
             raise ValueError("all pi_star must lie strictly in (0, 1)")
 
-        # Warm start: logit(pi*) = log(pi*/(1-pi*)).  This is the Poisson
-        # sampling odds — asymptotically exact by Hájek (1964), Thm 5.2:
-        # the CPS inclusion probs satisfy pi_i = p_i + O(1/N) where
-        # p_i = w_i/(1+w_i) are the unconditional Poisson probs.
-        theta = np.log(pi_star / (1.0 - pi_star))
+        # Warm start: logit(pi*)
+        theta0 = np.log(pi_star / (1.0 - pi_star))
 
-        converged = False
-        for it in range(max_iter):
-            self.theta  = theta          # sets theta, clears cache
-            pi          = self._cache.get("pi") or self.incl_prob
-            log_Z       = self._cache["log_Z"]
-            grad        = pi_star - pi
-            err         = float(np.max(np.abs(grad)))
+        iter_count = [0]
+
+        def neg_ll_and_grad(theta):
+            self.theta = theta  # clears cache
+            pi = self.incl_prob
+            log_Z = self._cache["log_Z"]
+            loss = -(float(np.dot(pi_star, theta)) - log_Z)
+            grad = -(pi_star - pi)  # gradient of neg log-likelihood
             if verbose:
-                print(f"  iter {it:3d}:  max|pi*-pi| = {err:.3e}")
-            if err < tol:
-                converged = True
-                break
+                err = float(np.max(np.abs(pi_star - pi)))
+                print(f"  iter {iter_count[0]:3d}:  max|pi*-pi| = {err:.3e}")
+            iter_count[0] += 1
+            return loss, grad
 
-            delta = _cg(self.hvp, grad)
+        result = minimize(
+            neg_ll_and_grad, theta0,
+            method='L-BFGS-B', jac=True,
+            options={'maxiter': max_iter, 'gtol': tol, 'ftol': 0},
+        )
 
-            slope = float(np.dot(grad, delta))
-            L0    = float(np.dot(pi_star, theta)) - log_Z
-            step  = 1.0
-            for _ in range(20):
-                th_new        = theta + step * delta
-                tmp           = ConditionalPoissonNumPy(self._n, th_new)
-                L_new         = float(np.dot(pi_star, th_new)) - tmp.log_normalizer
-                if L_new >= L0 + 1e-4 * step * slope: break
-                step         *= 0.5
-
-            theta += step * delta
-
-        if not converged:
+        theta = result.x
+        self.theta = theta
+        fit_err = float(np.max(np.abs(self.incl_prob - pi_star)))
+        if fit_err > tol:
             import warnings
             warnings.warn(
-                f"fit did not converge after {max_iter} iterations "
-                f"(max|pi*-pi| = {err:.3e}, tol = {tol:.3e}). "
-                f"Increase max_iter or loosen tol.",
+                f"fit did not reach tol={tol:.0e}: max|pi - pi*| = {fit_err:.2e}. "
+                f"L-BFGS exhausted max_iter={max_iter} without converging.",
                 stacklevel=3,
             )
 

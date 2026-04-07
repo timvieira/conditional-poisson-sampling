@@ -279,19 +279,6 @@ def compute_pi(theta, n):
     return pi
 
 
-def compute_hvp(theta, n, v):
-    """Hessian-vector product Cov[1_S] v via double backward.
-
-    Pearlmutter's R-operator: forward-mode AD applied to the backward pass
-    (or equivalently, backward-mode applied to the gradient computation).
-    Cost is O(1)x the gradient, i.e., O(1)x the forward pass.
-    """
-    theta = theta.detach().requires_grad_(True)
-    log_Z = forward_log_Z(theta, n)
-    grad = torch.autograd.grad(log_Z, theta, create_graph=True)[0]
-    hv = torch.autograd.grad(grad, theta, grad_outputs=v)[0]
-    return hv
-
 
 # ── Class interface ──────────────────────────────────────────────────────────
 
@@ -563,12 +550,6 @@ class ConditionalPoissonTorch:
             torch.tensor(self._draw_one(cdfs, tree_n, N, n, rng), dtype=torch.long)
             for _ in range(size)
         ])
-
-    # ── Hessian-vector product ────────────────────────────────────────────────
-
-    def hvp(self, v) -> torch.Tensor:
-        """Compute Cov[1_S] v via autograd (double backward)."""
-        return compute_hvp(self._theta, self._n, _to_tensor(v, self._theta.dtype)).detach()
 
     # ── Repr ──────────────────────────────────────────────────────────────────
 

@@ -17,7 +17,6 @@ from conditional_poisson_torch import (
     ConditionalPoissonTorch,
     forward_log_Z,
     compute_pi,
-    compute_hvp,
 )
 
 
@@ -188,39 +187,6 @@ class TestInclusionProbabilities(unittest.TestCase):
         pi = compute_pi(theta, n).detach().numpy()
         np.testing.assert_allclose(pi, pi_from_probs, atol=1e-10)
 
-
-class TestHVP(unittest.TestCase):
-    """Test Hessian-vector product against brute-force covariance."""
-
-    def test_small(self):
-        w, n = W_SMALL, N_SMALL
-        cov = cov_bf(w, n)
-        v = RNG.standard_normal(len(w))
-
-        theta = torch.tensor(np.log(w), dtype=torch.float64)
-        v_t = torch.tensor(v, dtype=torch.float64)
-        hvp = compute_hvp(theta, n, v_t).detach().numpy()
-        np.testing.assert_allclose(hvp, cov @ v, atol=1e-9)
-
-    def test_identity_vectors(self):
-        """Cov·e_i gives the i-th column of the covariance matrix."""
-        w, n = W_SMALL, N_SMALL
-        cov = cov_bf(w, n)
-        theta = torch.tensor(np.log(w), dtype=torch.float64)
-
-        for i in range(len(w)):
-            e_i = torch.zeros(len(w), dtype=torch.float64)
-            e_i[i] = 1.0
-            col = compute_hvp(theta, n, e_i).detach().numpy()
-            np.testing.assert_allclose(col, cov[:, i], atol=1e-9,
-                                       err_msg=f"column {i}")
-
-    def test_diagonal_is_variance(self):
-        """Diagonal of Cov should be pi_i(1 - pi_i)."""
-        w, n = W_SMALL, N_SMALL
-        cov = cov_bf(w, n)
-        pi = pi_bf(w, n)
-        np.testing.assert_allclose(np.diag(cov), pi * (1 - pi), atol=1e-10)
 
 
 class TestLogProb(unittest.TestCase):

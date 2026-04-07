@@ -40,9 +40,6 @@ samples = cp.sample(1000, rng=42)   # shape (1000, 2)
 # Log-probability of a specific subset
 print(cp.log_prob([0, 3]))
 
-# Hessian-vector product: Cov[1_S] v
-v = np.random.randn(5)
-print(cp.hvp(v))
 ```
 
 ### Constructors
@@ -66,9 +63,8 @@ print(np.max(np.abs(cp.incl_prob - pi_star)))  # should be < tol
 | Operation | Time |
 |---|---|
 | `incl_prob` / `log_normalizer` | $O(N \log^2 N)$ (cached) |
-| `hvp(v)` | $O(N \log^2 N)$ (P-tree cached; D-tree rebuilt) |
 | `sample(M)` | $O(N \log^2 N + M n \log N)$ |
-| `fit(pi_star)` | $O(N \log^2 N \cdot T_{\text{Newton}} \cdot T_{\text{CG}})$ |
+| `fit(pi_star)` | $O(N \log^2 N \cdot T_{\text{L-BFGS}})$ |
 
 ## Tests
 
