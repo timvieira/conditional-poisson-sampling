@@ -448,10 +448,9 @@ class ConditionalPoissonTorch:
     # ── Sampling ──────────────────────────────────────────────────────────────
 
     def _build_sample_tree(self):
-        """Build the product tree for sampling (cached on first call).
+        """Build the product tree and precompute CDFs for sampling.
 
-        tree[node][k] = Z(w_T, k) for items in subtree T (up to a
-        per-node scale factor that cancels in the sampling ratios).
+        Cached on first call to sample().
         """
         N = self._N
         n = self._n
@@ -461,59 +460,44 @@ class ConditionalPoissonTorch:
         w_scaled = w * r
 
         tree_n = 1 << (N - 1).bit_length()
-        tree = [None] * (2 * tree_n)
+        Pc = [None] * (2 * tree_n)
 
         for i in range(N):
-            tree[tree_n + i] = torch.tensor([1.0, w_scaled[i].item()],
-                                            dtype=self._theta.dtype)
+            Pc[tree_n + i] = [1.0, w_scaled[i].item()]
         for i in range(N, tree_n):
-            tree[tree_n + i] = torch.ones(1, dtype=self._theta.dtype)
+            Pc[tree_n + i] = [1.0]
 
         for i in range(tree_n - 1, 0, -1):
-            p = _batch_poly_mul(tree[2 * i].unsqueeze(0),
-                                tree[2 * i + 1].unsqueeze(0)).squeeze(0)
+            L = torch.tensor(Pc[2 * i], dtype=self._theta.dtype)
+            R = torch.tensor(Pc[2 * i + 1], dtype=self._theta.dtype)
+            p = _batch_poly_mul(L.unsqueeze(0), R.unsqueeze(0)).squeeze(0)
             if len(p) > n + 1:
                 p = p[:n + 1]
             mx = p.abs().max()
             if mx > 0:
                 p = p / mx
-            tree[i] = p.detach()
+            Pc[i] = p.tolist()
 
-        self._sample_tree = (tree, tree_n)
+        # Precompute normalized CDFs for each (node, quota) pair
+        cdfs = [None] * (2 * tree_n)
+        for node in range(1, tree_n):
+            L, R = Pc[2 * node], Pc[2 * node + 1]
+            max_k = min(n, len(L) - 1 + len(R) - 1)
+            node_cdfs = [None] * (max_k + 1)
+            for k in range(1, max_k + 1):
+                cdf = []
+                total = 0.0
+                for j in range(k + 1):
+                    rem = k - j
+                    lv = L[j] if j < len(L) else 0.0
+                    rv = R[rem] if rem < len(R) else 0.0
+                    total += max(lv, 0.0) * max(rv, 0.0)
+                    cdf.append(total)
+                if total > 0:
+                    node_cdfs[k] = [c / total for c in cdf]
+            cdfs[node] = node_cdfs
 
-    def _draw_one_sample(self, generator):
-        """Draw one sample via top-down quota splitting."""
-        tree, tree_n = self._sample_tree
-        n = self._n
-        N = self._N
-
-        selected = []
-        stack = [(1, n)]
-        while stack:
-            node, k = stack.pop()
-            if k == 0:
-                continue
-            if node >= tree_n:
-                leaf = node - tree_n
-                if leaf < N and k == 1:
-                    selected.append(leaf)
-                continue
-            left = tree[2 * node]
-            right = tree[2 * node + 1]
-            probs = torch.zeros(k + 1, dtype=self._theta.dtype)
-            for j in range(k + 1):
-                rem = k - j
-                if j < len(left) and rem < len(right):
-                    probs[j] = max(left[j].item(), 0.0) * max(right[rem].item(), 0.0)
-            total = probs.sum()
-            if total <= 0:
-                continue
-            probs /= total
-            j = torch.multinomial(probs, 1, generator=generator).item()
-            stack.append((2 * node + 1, k - j))
-            stack.append((2 * node, j))
-
-        return torch.sort(torch.tensor(selected, dtype=torch.long))[0]
+        self._sample_tree = (cdfs, tree_n)
 
     def sample(self, size: int = 1, rng: Optional[int] = None) -> torch.Tensor:
         """
@@ -521,11 +505,7 @@ class ConditionalPoissonTorch:
 
         Returns (size, n) long tensor of sorted indices.
         """
-        generator = torch.Generator()
-        if rng is not None:
-            generator.manual_seed(rng)
-        else:
-            generator.seed()
+        import random as _random
 
         if self._sample_tree is None:
             self._build_sample_tree()
@@ -535,7 +515,37 @@ class ConditionalPoissonTorch:
         if self._n == self._N:
             return torch.arange(self._N).unsqueeze(0).expand(size, -1)
 
-        return torch.stack([self._draw_one_sample(generator) for _ in range(size)])
+        cdfs, tree_n = self._sample_tree
+        N, n = self._N, self._n
+
+        if rng is not None:
+            r = _random.Random(rng)
+        else:
+            r = _random.Random()
+
+        samples = []
+        for _ in range(size):
+            selected = []
+            stack = [(1, n)]
+            while stack:
+                node, k = stack.pop()
+                if k == 0:
+                    continue
+                if node >= tree_n:
+                    if node - tree_n < N:
+                        selected.append(node - tree_n)
+                    continue
+                cdf = cdfs[node][k]
+                u = r.random()
+                j = 0
+                while j < k and cdf[j] < u:
+                    j += 1
+                stack.append((2 * node + 1, k - j))
+                stack.append((2 * node, j))
+            selected.sort()
+            samples.append(torch.tensor(selected, dtype=torch.long))
+
+        return torch.stack(samples)
 
     # ── Hessian-vector product ────────────────────────────────────────────────
 

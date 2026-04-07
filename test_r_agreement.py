@@ -19,7 +19,7 @@ import sys
 import tempfile
 import unittest
 
-from conditional_poisson_numpy import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoissonNumPy
 
 
 def find_rscript():
@@ -129,7 +129,7 @@ class TestRPiAgreement(unittest.TestCase):
 
     def _check(self, w, n, tol=1e-10):
         pi_r = r_compute_pi(w, n)
-        cp = ConditionalPoisson.from_weights(n, w)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         pi_tree = cp.incl_prob
         self.assertAlmostEqual(pi_r.sum(), n, places=8,
                                msg=f"R pi doesn't sum to n")
@@ -186,7 +186,7 @@ class TestRFittingAgreement(unittest.TestCase):
         r_err = np.max(np.abs(pi_r_roundtrip - pi_target))
 
         # Our fitting
-        cp = ConditionalPoisson.fit(pi_target, n)
+        cp = ConditionalPoissonNumPy.fit(pi_target, n)
         pi_ours = cp.incl_prob
         our_err = np.max(np.abs(pi_ours - pi_target))
 
@@ -198,7 +198,7 @@ class TestRFittingAgreement(unittest.TestCase):
     def _check_weights_agree(self, pi_target, n, tol=1e-4):
         """R and our fitted weights should give the same π."""
         w_r, _, pi_r = r_fit(pi_target, n)
-        cp = ConditionalPoisson.fit(pi_target, n)
+        cp = ConditionalPoissonNumPy.fit(pi_target, n)
 
         # Both should recover the target
         max_diff_r = np.max(np.abs(pi_r - pi_target))
@@ -208,7 +208,7 @@ class TestRFittingAgreement(unittest.TestCase):
 
         # The fitted π values should agree (weights may differ by a global
         # scale due to different parameterizations, but π is unique)
-        pi_from_r_weights = ConditionalPoisson.from_weights(n, w_r).incl_prob
+        pi_from_r_weights = ConditionalPoissonNumPy.from_weights(n, w_r).incl_prob
         max_pi_diff = np.max(np.abs(pi_from_r_weights - cp.incl_prob))
         self.assertLess(max_pi_diff, tol,
                         msg=f"π from R weights vs ours: {max_pi_diff:.2e}")
@@ -224,7 +224,7 @@ class TestRFittingAgreement(unittest.TestCase):
         """Target π from a known weight vector."""
         w_true = np.array([1.5, 3.2, 0.8, 4.5, 2.0, 1.0, 3.5, 0.5])
         n = 3
-        pi_target = ConditionalPoisson.from_weights(n, w_true).incl_prob
+        pi_target = ConditionalPoissonNumPy.from_weights(n, w_true).incl_prob
         self._check_roundtrip(pi_target, n)
         self._check_weights_agree(pi_target, n)
 
@@ -233,7 +233,7 @@ class TestRFittingAgreement(unittest.TestCase):
         rng = np.random.RandomState(42)
         w_true = rng.exponential(1.0, 50)
         n = 20
-        pi_target = ConditionalPoisson.from_weights(n, w_true).incl_prob
+        pi_target = ConditionalPoissonNumPy.from_weights(n, w_true).incl_prob
         self._check_roundtrip(pi_target, n)
         self._check_weights_agree(pi_target, n)
 
@@ -248,7 +248,7 @@ class TestRSamplingDistribution(unittest.TestCase):
         n_samples = 10000
 
         # Get true π
-        cp = ConditionalPoisson.from_weights(n, w)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         pi_true = cp.incl_prob
 
         # Draw samples from R
@@ -278,7 +278,7 @@ class TestRSamplingDistribution(unittest.TestCase):
         n_samples = 20000
 
         # True distribution
-        cp = ConditionalPoisson.from_weights(n, w)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         from itertools import combinations
         all_S = list(combinations(range(len(w)), n))
         log_w = np.log(w)

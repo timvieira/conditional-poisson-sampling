@@ -14,6 +14,7 @@
 - [ ] Add more baselines for computing $\pi$ — (1) backprop-on-DP at $O(Nn)$, (2) naive loop versions: $N \times O(Nn)$ DP and $N \times O(N \log^2 n)$ product tree. These show the value of backprop vs. leave-one-out recomputation.
 - [ ] Add a programmatically generated empirical slope table. For each method, fit log-log slopes (time vs $N$ at fixed $n$, and time vs $n$ at fixed $N$) from the grid sweep data and display alongside theoretical complexity bounds. Auto-flag rows where empirical slope deviates significantly from prediction.
 - [ ] Scrutinize timing experiments. The R `sampling` package appears surprisingly fast for computing π—need to understand why. Is it compiled C under the hood? Are we measuring the right thing? Verify that all methods are computing the same quantity and that subprocess overhead isn't distorting R timings. Check whether R's `UPMEqfromw` is pure R or calls compiled code.
+- [ ] Explore the fitting algorithm in the R `sampling` package. It may be faster simply because its fixed-point iteration has less overhead than L-BFGS (e.g., no secant equations). Compare the number of iterations required by the R fixed-point method vs. our L-BFGS solver.
 - [ ] 3D timing plots: replace the single dropdown plot with three separate 3D plots (computing $Z$, computing $\pi$, drawing samples). Sampling timing is currently only a static 2D SVG—it has two variables ($N$, $n$) just like the others, so it should be 3D too.
 
 ## Implementation
@@ -33,7 +34,7 @@
 
 ## Interactive Documentation
 
-- [ ] Integrate Pyodide-based interactive Python cells into the blog post so readers can edit and run code in the browser. Prototype in `mockup_pyodide.html`. Uses a pure-NumPy `ConditionalPoisson` class (O(N²n) DP—fine for demo sizes). Basic Usage section is the obvious first candidate; fitting and sampling sections could follow.
+- [ ] Integrate Pyodide-based interactive Python cells into the blog post so readers can edit and run code in the browser. Prototype in `mockup_pyodide.html`. Uses a pure-NumPy `ConditionalPoissonNumPy` class (O(N²n) DP—fine for demo sizes). Basic Usage section is the obvious first candidate; fitting and sampling sections could follow.
 
 ## Widget UX
 

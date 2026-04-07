@@ -19,7 +19,7 @@ import time
 
 import numpy as np
 
-from conditional_poisson_numpy import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoissonNumPy
 from bench_samplers import sequential_pi
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -52,8 +52,8 @@ def dp_forward_Z(w, n):
 
 
 def numpy_tree_Z(w, n):
-    """O(N log^2 N) product tree Z via ConditionalPoisson."""
-    cp = ConditionalPoisson.from_weights(n, w)
+    """O(N log^2 N) product tree Z via ConditionalPoissonNumPy."""
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     return cp.log_normalizer
 
 
@@ -88,12 +88,12 @@ def tree_loo_pi(w, n):
     then pi_i = w_i * Z_{-i}(n-1) / Z(n).  Total cost: O(N^2 log^2 n).
     """
     N = len(w)
-    cp_full = ConditionalPoisson.from_weights(n, w)
+    cp_full = ConditionalPoissonNumPy.from_weights(n, w)
     log_Z = cp_full.log_normalizer
     pi = np.empty(N)
     for i in range(N):
         w_loo = np.delete(w, i)
-        cp_loo = ConditionalPoisson.from_weights(n - 1, w_loo)
+        cp_loo = ConditionalPoissonNumPy.from_weights(n - 1, w_loo)
         pi[i] = w[i] * np.exp(cp_loo.log_normalizer - log_Z)
     return pi
 
@@ -105,7 +105,7 @@ def fwd_bwd_dp_pi(w, n):
 
 def numpy_tree_pi(w, n):
     """O(N log^2 N) product tree + backprop for inclusion probabilities."""
-    cp = ConditionalPoisson.from_weights(n, w)
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     return cp.incl_prob
 
 
@@ -120,6 +120,104 @@ def fft_autograd_pi(theta, n):
 def numpy_tree_sample(cp, M, rng):
     """O(n log N) per sample via product tree quota splitting."""
     return cp.sample(M, rng=rng)
+
+
+def torch_tree_sample(cpt, M, rng_seed):
+    """O(n log N) per sample via PyTorch product tree quota splitting."""
+    return cpt.sample(M, rng=rng_seed)
+
+
+def sequential_sample_from_q(q, rng):
+    """O(N) sequential scan sampler, matching R's UPMEsfromq."""
+    N, n_cols = q.shape
+    s = np.empty(n_cols, dtype=np.int32)
+    k = n_cols
+    cursor = 0
+    for i in range(N):
+        if k == 0:
+            break
+        if rng.random() < q[i, k - 1]:
+            s[cursor] = i
+            cursor += 1
+            k -= 1
+    return s
+
+
+def build_tree_cdfs(Pc, S, N, n):
+    """Precompute CDFs for every (node, quota) pair in the tree.
+
+    Returns cdfs: dict mapping node -> list of length n+1,
+    where cdfs[node][k] is the CDF array for quota k (or None if impossible).
+    """
+    cdfs = [None] * (2 * S)
+    for node in range(1, S):
+        L, R = Pc[2 * node], Pc[2 * node + 1]
+        max_k = min(n, len(L) - 1 + len(R) - 1)
+        node_cdfs = [None] * (max_k + 1)
+        for k in range(1, max_k + 1):
+            cdf = []
+            total = 0.0
+            for j in range(k + 1):
+                r = k - j
+                lv = L[j] if j < len(L) else 0.0
+                rv = R[r] if r < len(R) else 0.0
+                total += max(lv, 0.0) * max(rv, 0.0)
+                cdf.append(total)
+            if total > 0:
+                node_cdfs[k] = [c / total for c in cdf]
+        cdfs[node] = node_cdfs
+    return cdfs
+
+
+def simple_tree_sample(cdfs, S, N, n, rng):
+    """O(n log N) single-sample tree sampler with precomputed CDFs."""
+    selected = []
+    stack = [(1, n)]
+    while stack:
+        node, k = stack.pop()
+        if k == 0:
+            continue
+        if node >= S:
+            if node - S < N:
+                selected.append(node - S)
+            continue
+        cdf = cdfs[node][k]
+        u = rng.random()
+        j = 0
+        while j < k and cdf[j] < u:
+            j += 1
+        stack.append((2 * node + 1, k - j))
+        stack.append((2 * node, j))
+    selected.sort()
+    return selected
+
+
+def build_q_table(w, n):
+    """O(Nn) DP to compute sequential conditional probabilities q[i, k].
+
+    Matches R's UPMEqfromw: q[i, k] is the probability of including item i
+    given that k items still need to be selected from items i..N-1.
+    """
+    N = len(w)
+    # expa[i, k] = e_k(w[i:N]), the k-th elementary symmetric polynomial
+    expa = np.zeros((N, n))
+    for i in range(N):
+        expa[i, 0] = np.sum(w[i:N])
+    for i in range(N - n, N):
+        expa[i, N - i - 1] = np.prod(w[i:N])
+    for i in range(N - 3, -1, -1):
+        for k in range(1, min(N - i - 1, n)):
+            expa[i, k] = w[i] * expa[i + 1, k - 1] + expa[i + 1, k]
+    # q[i, k] = w[i] * expa[i+1, k-1] / expa[i, k]
+    q = np.zeros((N, n))
+    for i in range(N - 1, -1, -1):
+        q[i, 0] = w[i] / expa[i, 0]
+    for i in range(N - n, N):
+        q[i, N - i - 1] = 1.0
+    for i in range(N - 3, -1, -1):
+        for k in range(1, min(N - i - 1, n)):
+            q[i, k] = w[i] * expa[i + 1, k - 1] / expa[i, k]
+    return q
 
 
 # ── R subprocess ─────────────────────────────────────────────────────────────
@@ -247,7 +345,7 @@ def run_benchmarks(quick=False):
         pi_target = sequential_pi(w, n)
 
         print("  fit: NumPy tree...", file=sys.stderr, end="", flush=True)
-        ms = time_fn(lambda: ConditionalPoisson.fit(pi_target, n), reps=reps)
+        ms = time_fn(lambda: ConditionalPoissonNumPy.fit(pi_target, n), reps=reps)
         add("NumPy tree (Newton-CG)", "fit", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 
@@ -265,11 +363,11 @@ def run_benchmarks(quick=False):
         print(f" {len(r_results)} results", file=sys.stderr)
 
         # ── Sampling benchmarks ─────────────────────────────────────
-        cp = ConditionalPoisson.from_weights(n, w)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         sample_rng = np.random.RandomState(seed)
 
         print("  samples: NumPy tree (1, incl. build)...", file=sys.stderr, end="", flush=True)
-        ms = time_fn(lambda: ConditionalPoisson.from_weights(n, w).sample(1, rng=sample_rng), reps=reps)
+        ms = time_fn(lambda: ConditionalPoissonNumPy.from_weights(n, w).sample(1, rng=sample_rng), reps=reps)
         add("NumPy tree (1 sample, incl. build)", "samples", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 
@@ -278,10 +376,43 @@ def run_benchmarks(quick=False):
         add("NumPy tree (1 sample)", "samples", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 
-        print("  samples: NumPy tree (10k)...", file=sys.stderr, end="", flush=True)
-        ms = time_fn(lambda: numpy_tree_sample(cp, 10_000, sample_rng),
-                     reps=max(1, reps // 2), warmup=1)
-        add("NumPy tree (10k samples)", "samples", N, n, ms)
+        # PyTorch tree sampling
+        from conditional_poisson_torch import ConditionalPoissonTorch
+        cpt = ConditionalPoissonTorch.from_weights(n, w)
+
+        print("  samples: PyTorch tree (1, incl. build)...", file=sys.stderr, end="", flush=True)
+        ms = time_fn(lambda: ConditionalPoissonTorch.from_weights(n, w).sample(1, rng=seed), reps=reps)
+        add("PyTorch tree (1 sample, incl. build)", "samples", N, n, ms)
+        print(f" {ms:.1f}ms", file=sys.stderr)
+
+        print("  samples: PyTorch tree (1)...", file=sys.stderr, end="", flush=True)
+        ms = time_fn(lambda: torch_tree_sample(cpt, 1, seed), reps=reps)
+        add("PyTorch tree (1 sample)", "samples", N, n, ms)
+        print(f" {ms:.1f}ms", file=sys.stderr)
+
+        # Simple tree sampler
+        Pc = cp._get_p_tree()[0]
+        S_tree = cp._get_p_tree()[2]
+        tree_cdfs = build_tree_cdfs(Pc, S_tree, N, n)
+        simple_rng = np.random.default_rng(seed)
+
+        print("  samples: Simple tree (1)...", file=sys.stderr, end="", flush=True)
+        ms = time_fn(lambda: simple_tree_sample(tree_cdfs, S_tree, N, n, simple_rng), reps=reps)
+        add("Simple tree (1 sample)", "samples", N, n, ms)
+        print(f" {ms:.1f}ms", file=sys.stderr)
+
+        # Sequential scan sampling (matching R's UPMEsfromq)
+        q_table = build_q_table(w, n)
+        seq_rng = np.random.default_rng(seed)
+
+        print("  samples: Sequential (1, incl. DP)...", file=sys.stderr, end="", flush=True)
+        ms = time_fn(lambda: sequential_sample_from_q(build_q_table(w, n), seq_rng), reps=reps)
+        add("Sequential (1 sample, incl. DP)", "samples", N, n, ms)
+        print(f" {ms:.1f}ms", file=sys.stderr)
+
+        print("  samples: Sequential (1)...", file=sys.stderr, end="", flush=True)
+        ms = time_fn(lambda: sequential_sample_from_q(q_table, seq_rng), reps=reps)
+        add("Sequential (1 sample)", "samples", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 
     return results

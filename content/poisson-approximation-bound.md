@@ -43,7 +43,7 @@ $$|\pip_i - p_i| \;\leq\; \frac{p_i(1 - p_i)}{d}$$
 
 where $d \defeq \sum_j p_j(1-p_j) = \text{Var}(K)$ is the variance of the Poisson sample size $K = \sum_j I_j$.
 
-**Numerical evidence.** The ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ has been computed across $>10^6$ random instances with $N$ up to $200$ and weight spreads up to $e^{12}$.  It grows slowly with $N$—from $\approx 0.38$ at $N = 3$ to $\approx 0.71$ at $N = 34$.  No violation has been found.
+**Numerical evidence.** The ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ has been computed across $>10^6$ random instances with $N$ up to $200$ and weight spreads up to $\exp(12)$.  It grows slowly with $N$—from $\approx 0.38$ at $N = 3$ to $\approx 0.71$ at $N = 34$.  No violation has been found.
 
 
 ## The Extremal Family
@@ -193,7 +193,7 @@ Combining: $|\log R_i| \leq |p_i - 1/2|/\tilde{d} + 1/(2\tilde{d}) = \max(p_i, 1
 
 This bound is numerically verified (max ratio 0.71) and the "slack" of $1/2$ in $\max(p_i, 1{-}p_i)$ vs $|p_i - 1/2|$ exactly absorbs the Edgeworth $P_1$ correction.
 
-**Gap.**  The log-ratio bound $|\log R_i| \leq \max(p_i, 1{-}p_i)/\tilde{d}$ does **not** imply the original bound $(1+\w_i)|1-R_i|d \leq R_i + \w_i$ (the $|1 - e^\alpha|$ step is lossy—verified: 2.5M violations in the implication).
+**Gap.**  The log-ratio bound $|\log R_i| \leq \max(p_i, 1{-}p_i)/\tilde{d}$ does **not** imply the original bound $(1+\w_i)|1-R_i|d \leq R_i + \w_i$ (the $|1 - \exp(\alpha)|$ step is lossy—verified: 2.5M violations in the implication).
 
 Moreover, the **leading saddlepoint term exceeds the bound** in some regimes (small $p_i$, small $d$).  The bound holds only through exact cancellation between leading and correction terms.  This rules out any proof that bounds these separately.
 
@@ -220,7 +220,7 @@ This gives $|1 - R_i| \leq \max(|1-R'|, |S'-1|)$ — the ratio for the $N$-item 
 |---|---|---|---|
 | Markov matrix | $\|\pi - p\|_i \leq q_i \|\delta\|_\infty$ | $\|\delta\|_\infty \leq 1/d$ | $\|\delta\|_\infty$ too large |
 | Algebraic (fixed $N$) | Proof for $N \leq 6$ | General $N$ | Polynomials grow exponentially |
-| Tilting/Edgeworth | $\|\log R_i\| \leq \max(p,1{-}p)/\tilde{d}$ | Implication to original | $\|1-e^\alpha\|$ step too lossy |
+| Tilting/Edgeworth | $\|\log R_i\| \leq \max(p,1{-}p)/\tilde{d}$ | Implication to original | $\|1-\exp(\alpha)\|$ step too lossy |
 | Induction | $\|1-R_i\| \leq \max(\|1-R'\|, \|S'-1\|)$ | $1/d$ factor | Sub-problem $d$ mismatch |
 
 The conjecture is an algebraic inequality about elementary symmetric polynomials of real-rooted polynomials.  A proof likely requires a structural argument from this theory—perhaps using interlacing, ultra-log-concavity, or the strongly Rayleigh property—that captures the joint cancellation between leading and correction terms.

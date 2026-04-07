@@ -3,7 +3,7 @@
 import numpy as np
 import time
 import pylab as pl
-from conditional_poisson_numpy import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoissonNumPy
 
 
 def time_op(fn, min_reps=5, min_seconds=0.5):
@@ -27,7 +27,7 @@ def measure_build(Ns, ns_fn, label):
     for N in Ns:
         n = ns_fn(N)
         w = rng.exponential(1.0, N)
-        cp = ConditionalPoisson.from_weights(n, w)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         times = time_op(lambda: (cp._cache.clear(), cp._get_p_tree()))
         med = np.median(times) * 1000
         lo = np.percentile(times, 25) * 1000

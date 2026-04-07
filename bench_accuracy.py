@@ -9,7 +9,7 @@ Brute-force enumeration is used as ground truth for small instances.
 import numpy as np
 import time
 from itertools import combinations
-from conditional_poisson_numpy import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoissonNumPy
 
 
 # ── Sequential forward-backward DP ────────────────────────────────────────────
@@ -153,7 +153,7 @@ def main():
         w = rng.exponential(1.0, N)
 
         t0 = time.perf_counter()
-        cp = ConditionalPoisson.from_weights(n, w)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         pi_tree = cp.incl_prob
         tree_ms = (time.perf_counter() - t0) * 1000
 
@@ -299,7 +299,7 @@ cat(sprintf('{"weights":[%s]}\\n', paste(sprintf("%.15e", w), collapse=",")))
             w = np.array(json.loads(lines[1])["weights"])
 
             # Our implementations
-            cp = ConditionalPoisson.from_weights(n, w)
+            cp = ConditionalPoissonNumPy.from_weights(n, w)
             pi_tree = cp.incl_prob
             tree_sum_err = abs(pi_tree.sum() - n)
 

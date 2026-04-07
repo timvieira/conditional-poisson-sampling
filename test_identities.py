@@ -9,7 +9,7 @@ quoting or paraphrasing the relevant passage.
 import numpy as np
 from itertools import combinations
 from scipy.signal import convolve as poly_mul
-from conditional_poisson_numpy import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoissonNumPy
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ N_MED = 5
 def test_distribution_definition():
     """P(S) = prod(w_i, i in S) / Z(w,n) for all size-n subsets."""
     w, n = W_SMALL, N_SMALL
-    cp = ConditionalPoisson.from_weights(n, w)
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     probs, _ = all_probs_bf(w, n)
     Z = Z_bf(w, n)
     for S, p_bf in probs.items():
@@ -88,7 +88,7 @@ def test_Z_equals_binomial_when_uniform():
 def test_Z_is_elementary_symmetric_poly():
     """Z(w,n) = e_n(w), the n-th elementary symmetric polynomial."""
     w, n = W_SMALL, N_SMALL
-    cp = ConditionalPoisson.from_weights(n, w)
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     assert np.isclose(np.exp(cp.log_normalizer), Z_bf(w, n), rtol=1e-10)
 
 
@@ -149,21 +149,21 @@ def test_scaling_invariance():
 def test_pi_sums_to_n():
     """sum(pi_i) = n."""
     w, n = W_MED, N_MED
-    cp = ConditionalPoisson.from_weights(n, w)
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     assert np.isclose(cp.incl_prob.sum(), n, rtol=1e-12)
 
 
 def test_pi_in_unit_interval():
     """Each pi_i in [0, 1]."""
     w, n = W_MED, N_MED
-    cp = ConditionalPoisson.from_weights(n, w)
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     assert np.all(cp.incl_prob >= -1e-15) and np.all(cp.incl_prob <= 1 + 1e-15)
 
 
 def test_pi_matches_brute_force():
     """pi_i = P(i in S) computed by enumeration."""
     w, n = W_SMALL, N_SMALL
-    cp = ConditionalPoisson.from_weights(n, w)
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     pi_exact = pi_bf(w, n)
     assert np.allclose(cp.incl_prob, pi_exact, rtol=1e-10)
 
@@ -181,7 +181,7 @@ def test_pi_is_gradient_of_log_Z():
         w_plus = np.exp(theta_plus)
         log_Z_plus = np.log(Z_bf(w_plus, n))
         grad_numerical[i] = (log_Z_plus - log_Z_0) / eps
-    cp = ConditionalPoisson.from_weights(n, w)
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     assert np.allclose(cp.incl_prob, grad_numerical, rtol=1e-5), \
         f"max err = {np.max(np.abs(cp.incl_prob - grad_numerical))}"
 
@@ -194,7 +194,7 @@ def test_pi_leave_one_out():
     """pi_i = w_i * Z(w^{-i}, n-1) / Z(w, n)."""
     w, n = W_SMALL, N_SMALL
     Z_full = Z_bf(w, n)
-    cp = ConditionalPoisson.from_weights(n, w)
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     for i in range(len(w)):
         w_minus_i = np.delete(w, i)
         Z_leave = Z_bf(w_minus_i, n - 1)
@@ -460,7 +460,7 @@ def test_horvitz_thompson_unbiased():
     """E[sum_{i in S} p(i)/pi_i * f(i)] = sum_i p(i) * f(i)."""
     w, n = W_SMALL, N_SMALL
     N = len(w)
-    cp = ConditionalPoisson.from_weights(n, w)
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     rng = np.random.default_rng(0)
 
     # Arbitrary f and p
@@ -545,7 +545,7 @@ def test_max_entropy():
 def test_fitting_gradient():
     """Gradient of L(theta) = pi* - pi(theta)."""
     w, n = W_SMALL, N_SMALL
-    cp = ConditionalPoisson.from_weights(n, w)
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     pi_star = np.full(len(w), n / len(w))  # uniform target
 
     # L(theta) = pi*^T theta - log Z(w, n)
@@ -573,7 +573,7 @@ def test_fitting_recovers_target():
     # Ensure strict (0,1) after rescaling
     pi_star = np.clip(pi_star, 0.05, 0.95)
     pi_star *= n / pi_star.sum()
-    cp = ConditionalPoisson.fit(pi_star, n)
+    cp = ConditionalPoissonNumPy.fit(pi_star, n)
     assert np.allclose(cp.incl_prob, pi_star, atol=1e-10), \
         f"max err = {np.max(np.abs(cp.incl_prob - pi_star))}"
 
@@ -597,7 +597,7 @@ def test_contour_scaling():
 def test_contour_r_solves_expected_size():
     """The optimal r satisfies sum(w_i r / (1 + w_i r)) = n."""
     w, n = W_MED, N_MED
-    cp = ConditionalPoisson.from_weights(n, w)
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     # The internal scaling factor: when we set p_i = w_i r / (1 + w_i r),
     # the expected number of heads is n.
     # We can recover r from pi: pi_i = w_i * Z(w^{-i}, n-1) / Z(w, n)
@@ -625,8 +625,8 @@ def test_rescaling_dynamic_range():
             # Heavy tails: mix of very small and very large weights
             w = np.exp(rng.normal(0, 4, N))
 
-        # Compute exact log Z via ConditionalPoisson (uses optimal r internally)
-        cp = ConditionalPoisson.from_weights(n, w)
+        # Compute exact log Z via ConditionalPoissonNumPy (uses optimal r internally)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         log_Z_exact = cp.log_normalizer
 
         # Find optimal r
@@ -747,7 +747,7 @@ def test_sampling_distribution():
     """Sampling produces the correct distribution (chi-squared test)."""
     w, n = W_SMALL[:6], 2  # small enough for brute force
     N = len(w)
-    cp = ConditionalPoisson.from_weights(n, w)
+    cp = ConditionalPoissonNumPy.from_weights(n, w)
     probs_exact, _ = all_probs_bf(w, n)
     all_S = sorted(probs_exact.keys(), key=lambda s: tuple(sorted(s)))
     p_expected = np.array([probs_exact[S] for S in all_S])
@@ -777,7 +777,7 @@ def test_sampling_distribution():
 def test_boundary_zero_weight_pi():
     """w_i = 0 implies pi_i = 0 (item never selected); pi still sums to n."""
     w = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
-    cp = ConditionalPoisson.from_weights(n=2, w=w)
+    cp = ConditionalPoissonNumPy.from_weights(n=2, w=w)
     assert cp.incl_prob[0] == 0.0, f"pi[0] should be 0 when w[0]=0, got {cp.incl_prob[0]}"
     assert np.isclose(np.sum(cp.incl_prob), 2), f"pi should sum to n=2, got {np.sum(cp.incl_prob)}"
 
@@ -785,7 +785,7 @@ def test_boundary_zero_weight_pi():
 def test_boundary_inf_weight_pi():
     """w_i = inf implies pi_i = 1 (item always selected); pi still sums to n."""
     w = np.array([np.inf, 1.0, 2.0, 3.0, 4.0])
-    cp = ConditionalPoisson.from_weights(n=3, w=w)
+    cp = ConditionalPoissonNumPy.from_weights(n=3, w=w)
     assert cp.incl_prob[0] == 1.0, f"pi[0] should be 1 when w[0]=inf, got {cp.incl_prob[0]}"
     assert np.isclose(np.sum(cp.incl_prob), 3), f"pi should sum to n=3, got {np.sum(cp.incl_prob)}"
 
@@ -794,7 +794,7 @@ def test_boundary_mixed_zero_inf():
     """Mix of w=0, w=inf, and finite; pi=0 for zeros, pi=1 for infs, sum=n."""
     w = np.array([np.inf, 0.0, 1.0, 2.0, 3.0, np.inf, 0.0])
     n = 4
-    cp = ConditionalPoisson.from_weights(n=n, w=w)
+    cp = ConditionalPoissonNumPy.from_weights(n=n, w=w)
     assert cp.incl_prob[0] == 1.0
     assert cp.incl_prob[5] == 1.0
     assert cp.incl_prob[1] == 0.0
@@ -808,7 +808,7 @@ def test_boundary_mixed_zero_inf():
 def test_boundary_all_determined():
     """n items have w=inf, rest have w=0 — fully determined subset."""
     w = np.array([np.inf, np.inf, 0.0, 0.0, 0.0])
-    cp = ConditionalPoisson.from_weights(n=2, w=w)
+    cp = ConditionalPoissonNumPy.from_weights(n=2, w=w)
     assert np.allclose(cp.incl_prob, [1, 1, 0, 0, 0])
     # Only one possible subset, so log_prob = 0
     assert np.isclose(cp.log_prob(np.array([0, 1])), 0.0, atol=1e-12)
@@ -817,7 +817,7 @@ def test_boundary_all_determined():
 def test_boundary_sampling_respects_zero_inf():
     """Samples never include w=0 items, always include w=inf items."""
     w = np.array([np.inf, 0.0, 1.0, 2.0, 3.0])
-    cp = ConditionalPoisson.from_weights(n=3, w=w)
+    cp = ConditionalPoissonNumPy.from_weights(n=3, w=w)
     rng = np.random.default_rng(123)
     samples = cp.sample(500, rng=rng)
     # Item 0 (inf) must appear in every sample
@@ -838,7 +838,7 @@ def test_poisson_approximation_bound():
         N = rng.integers(3, 50)
         n = rng.integers(1, N)
         w = np.exp(rng.uniform(-5, 5, N))
-        cp = ConditionalPoisson.from_weights(n, w)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         pi = cp.incl_prob
         def f(logr):
             r = np.exp(logr)

@@ -22,11 +22,11 @@ Requires Python 3.8+, NumPy, and SciPy.
 
 ```python
 import numpy as np
-from conditional_poisson_numpy import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoissonNumPy
 
 # From weights (Bernoulli odds)
 w = np.array([1.0, 2.0, 3.0, 0.5, 1.5])
-cp = ConditionalPoisson.from_weights(n=2, w=w)
+cp = ConditionalPoissonNumPy.from_weights(n=2, w=w)
 
 # Inclusion probabilities: P(item i is in the sample)
 print(cp.incl_prob)          # shape (5,), sums to n=2
@@ -49,15 +49,15 @@ print(cp.hvp(v))
 
 | Constructor | Description |
 |---|---|
-| `ConditionalPoisson(n, theta)` | Direct from log-weights `theta`, where `theta[i]` $= \log w_i$ |
-| `ConditionalPoisson.from_weights(n, w)` | From weight vector $\boldsymbol{w}$ (uniform: `from_weights(n, np.ones(N))`) |
-| `ConditionalPoisson.fit(pi_star, n)` | Find $\boldsymbol{w}$ that produces target inclusion probabilities $\pi^{\ast}$ |
+| `ConditionalPoissonNumPy(n, theta)` | Direct from log-weights `theta`, where `theta[i]` $= \log w_i$ |
+| `ConditionalPoissonNumPy.from_weights(n, w)` | From weight vector $\boldsymbol{w}$ (uniform: `from_weights(n, np.ones(N))`) |
+| `ConditionalPoissonNumPy.fit(pi_star, n)` | Find $\boldsymbol{w}$ that produces target inclusion probabilities $\pi^{\ast}$ |
 
 ### Fitting to target probabilities
 
 ```python
 pi_star = np.array([0.6, 0.4, 0.8, 0.3, 0.9])  # must sum to n
-cp = ConditionalPoisson.fit(pi_star, n=3, tol=1e-10, verbose=True)
+cp = ConditionalPoissonNumPy.fit(pi_star, n=3, tol=1e-10, verbose=True)
 print(np.max(np.abs(cp.incl_prob - pi_star)))  # should be < tol
 ```
 

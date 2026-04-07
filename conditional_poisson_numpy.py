@@ -74,7 +74,7 @@ import numpy as np
 from typing import Optional, Union
 from scipy.signal import convolve
 
-__all__ = ["ConditionalPoisson"]
+__all__ = ["ConditionalPoissonNumPy"]
 
 
 # ── Scaled polynomial arithmetic ─────────────────────────────────────────────
@@ -264,120 +264,60 @@ def _extract(q_s, log_gm, Pc, Pls, oPc, oPls, oDc, oDls, S, N, n, v):
 
 # ── Sampler: divide-and-conquer on the P-tree ─────────────────────────────────
 
-def _tree_sample(Pc, S, N, n, M, rng):
+def _build_sample_cdfs(Pc, S, n):
+    """Precompute normalized CDFs for every (node, quota) pair.
+
+    Returns cdfs: list where cdfs[node][k] is a list of cumulative
+    probabilities for splitting quota k at that node, or None if
+    that quota is impossible.
     """
-    Sample M subsets of size n using the cached P-tree.
+    cdfs = [None] * (2 * S)
+    for node in range(1, S):
+        L, R = Pc[2 * node], Pc[2 * node + 1]
+        max_k = min(n, len(L) - 1 + len(R) - 1)
+        node_cdfs = [None] * (max_k + 1)
+        for k in range(1, max_k + 1):
+            cdf = []
+            total = 0.0
+            for j in range(k + 1):
+                r = k - j
+                lv = L[j] if j < len(L) else 0.0
+                rv = R[r] if r < len(R) else 0.0
+                total += max(lv, 0.0) * max(rv, 0.0)
+                cdf.append(total)
+            if total > 0:
+                node_cdfs[k] = [c / total for c in cdf]
+        cdfs[node] = node_cdfs
+    return cdfs
 
-    At each internal node with quota k, the split distribution is:
 
-      P(j items from L | k) ∝ Pc_L[j] * Pc_R[k-j],   j = 0..k
+def _tree_sample(cdfs, S, N, n, rng):
+    """Draw one sample via top-down quota splitting with precomputed CDFs.
 
-    The log-scale factors cancel in the ratio, so only the normalized
-    coefficient arrays Pc are needed.
+    At each internal node with quota k, split k items between left and
+    right children proportional to Pc_L[j] * Pc_R[k-j].
 
-    Processes each tree level as a batch to minimise Python loop overhead.
-
-    Complexity: O(n log N) per sample, O(M n log N) total.
+    Complexity: O(n log N).
     """
-    quotas = np.zeros((2 * S, M), dtype=np.int32)
-    quotas[1] = n
-
-    depth = int(np.log2(S))  # number of levels (S is a power of 2)
-    for d in range(depth):
-        level_start = 1 << d        # first node at this depth
-        level_end   = 1 << (d + 1)  # one past last node at this depth
-
-        # ── Fast path: levels where max quota ≤ 1 (Bernoulli decisions) ──
-        # Check if all nodes at this level have max_k ≤ 1
-        level_quotas = quotas[level_start:level_end]   # (num_nodes, M)
-        global_max_k = int(level_quotas.max())
-
-        if global_max_k == 0:
-            # All quotas are 0 — nothing to split
-            quotas[level_start * 2 : level_end * 2] = 0
+    selected = []
+    stack = [(1, n)]
+    while stack:
+        node, k = stack.pop()
+        if k == 0:
             continue
-
-        if global_max_k == 1:
-            # All decisions are Bernoulli: include in left child or right?
-            # prob(j=1|k=1) = Pl[1]*Pr[0] / (Pl[1]*Pr[0] + Pl[0]*Pr[1])
-            num_nodes = level_end - level_start
-            probs = np.zeros(num_nodes)
-            for idx in range(num_nodes):
-                node = level_start + idx
-                Pl, Pr = Pc[2 * node], Pc[2 * node + 1]
-                w1 = max(Pl[1], 0.0) * max(Pr[0], 0.0) if len(Pl) > 1 else 0.0
-                w0 = max(Pl[0], 0.0) * (max(Pr[1], 0.0) if len(Pr) > 1 else 0.0)
-                total = w0 + w1
-                probs[idx] = w1 / total if total > 0 else 0.5
-
-            # Vectorised Bernoulli across all nodes × all samples
-            u = rng.random((num_nodes, M))
-            is_k1 = level_quotas == 1  # (num_nodes, M)
-            j_left = (is_k1 & (u < probs[:, None])).astype(np.int32)
-
-            # Batch assignment to children
-            quotas[level_start * 2 : level_end * 2 : 2] = j_left
-            quotas[level_start * 2 + 1 : level_end * 2 + 1 : 2] = (
-                level_quotas - j_left
-            )
+        if node >= S:
+            if node - S < N:
+                selected.append(node - S)
             continue
-
-        # ── General case: per-node CDF sampling ──
-        for node in range(level_start, level_end):
-            k_arr = quotas[node]
-            Pl = Pc[2 * node]
-            Pr = Pc[2 * node + 1]
-            max_l = len(Pl)
-            max_r = len(Pr)
-            j_arr = np.zeros(M, dtype=np.int32)
-
-            max_k = int(k_arr.max())
-            if max_k == 0:
-                quotas[2 * node] = 0
-                quotas[2 * node + 1] = 0
-                continue
-
-            # Precompute CDF for each possible quota k = 1..max_k
-            cdf = np.zeros((max_k + 1, max_k + 1))
-            for k in range(1, max_k + 1):
-                km = min(k + 1, max_l)
-                jv = np.arange(km)
-                kv = k - jv
-                valid = kv < max_r
-                if not valid.any():
-                    continue
-                jv_v = jv[valid]
-                kv_v = kv[valid]
-                w = np.maximum(Pl[jv_v], 0.0) * np.maximum(Pr[kv_v], 0.0)
-                cdf[k, jv_v] = w
-            np.cumsum(cdf, axis=1, out=cdf)
-            row_totals = cdf[:, -1].copy()
-            row_totals[row_totals == 0] = 1.0
-            cdf /= row_totals[:, None]
-
-            u = rng.random(M)
-            active = k_arr > 0
-            if active.any():
-                active_idx = np.where(active)[0]
-                ki = k_arr[active_idx]
-                sample_cdfs = cdf[ki]
-                j_arr[active_idx] = np.argmax(
-                    sample_cdfs >= u[active_idx, None], axis=1,
-                )
-
-            quotas[2 * node] = j_arr
-            quotas[2 * node + 1] = k_arr - j_arr
-
-    # Collect leaf decisions into (M, n) output
-    # leaf_quotas[i, m] > 0 means item i is included in sample m
-    leaf_quotas = quotas[S : S + N]          # (N, M)
-    included = leaf_quotas.T > 0             # (M, N) bool
-    # Each row of `included` has exactly n True entries.
-    # np.where gives (sample_idx, item_idx) pairs sorted by sample then item.
-    sample_idx, item_idx = np.where(included)
-    out = item_idx.astype(np.int32).reshape(M, n)
-
-    return out
+        cdf = cdfs[node][k]
+        u = rng.random()
+        j = 0
+        while j < k and cdf[j] < u:
+            j += 1
+        stack.append((2 * node + 1, k - j))
+        stack.append((2 * node, j))
+    selected.sort()
+    return np.array(selected, dtype=np.int32)
 
 
 # ── CG solver ─────────────────────────────────────────────────────────────────
@@ -396,9 +336,9 @@ def _cg(matvec, b, tol=1e-12, max_iter=None):
     return x
 
 
-# ══ ConditionalPoisson ════════════════════════════════════════════════════════
+# ══ ConditionalPoissonNumPy ════════════════════════════════════════════════════════
 
-class ConditionalPoisson:
+class ConditionalPoissonNumPy:
     """
     Conditional Poisson distribution over fixed-size subsets.
 
@@ -406,9 +346,9 @@ class ConditionalPoisson:
 
     Construction
     ------------
-    ConditionalPoisson(n, theta)           direct from log-weights theta = log(w)
-    ConditionalPoisson.from_weights(n, w)  from non-negative weights w_i
-    ConditionalPoisson.fit(pi_star, n)     moment-match to target probs
+    ConditionalPoissonNumPy(n, theta)           direct from log-weights theta = log(w)
+    ConditionalPoissonNumPy.from_weights(n, w)  from non-negative weights w_i
+    ConditionalPoissonNumPy.fit(pi_star, n)     moment-match to target probs
 
     Properties  (all cached; cache invalidated when theta changes)
     ----------
@@ -459,17 +399,17 @@ class ConditionalPoisson:
         self._forced_in  = forced_in
         self._forced_out = forced_out
         self._interior   = interior
-        self._reduced: Optional["ConditionalPoisson"] = None
+        self._reduced: Optional["ConditionalPoissonNumPy"] = None
 
         if len(forced_in) > 0 or len(forced_out) > 0:
             if n_red > 0 and len(interior) > 0:
-                self._reduced = ConditionalPoisson(n_red, theta[interior])
+                self._reduced = ConditionalPoissonNumPy(n_red, theta[interior])
             # else: fully degenerate (all items determined), no reduced instance
 
     # ── Constructors ──────────────────────────────────────────────────────────
 
     @classmethod
-    def from_weights(cls, n: int, w: np.ndarray) -> "ConditionalPoisson":
+    def from_weights(cls, n: int, w: np.ndarray) -> "ConditionalPoissonNumPy":
         """Construct from non-negative weights w_i (0 and inf allowed)."""
         w = np.asarray(w, float)
         if np.any(w < 0): raise ValueError("all weights must be non-negative")
@@ -485,7 +425,7 @@ class ConditionalPoisson:
         tol: float = 1e-10,
         max_iter: int = 50,
         verbose: bool = False,
-    ) -> "ConditionalPoisson":
+    ) -> "ConditionalPoissonNumPy":
         """
         Fit to target inclusion probabilities.
 
@@ -499,7 +439,7 @@ class ConditionalPoisson:
 
         Returns
         -------
-        ConditionalPoisson with weights fit to match pi_star.
+        ConditionalPoissonNumPy with weights fit to match pi_star.
         """
         obj = cls(n, np.zeros(len(pi_star)))
         obj.fit_inplace(pi_star, tol=tol, max_iter=max_iter, verbose=verbose)
@@ -630,6 +570,13 @@ class ConditionalPoisson:
 
     # ── Sampling ──────────────────────────────────────────────────────────────
 
+    def _get_sample_cdfs(self):
+        """Build and cache the CDFs for sampling."""
+        if "sample_cdfs" not in self._cache:
+            Pc, Pls, S, q_s, _ = self._get_p_tree()
+            self._cache["sample_cdfs"] = _build_sample_cdfs(Pc, S, self._n)
+        return self._cache["sample_cdfs"]
+
     def sample(
         self,
         size: int = 1,
@@ -660,8 +607,12 @@ class ConditionalPoisson:
             return merged
         if len(self._forced_in) > 0:
             return np.tile(np.sort(self._forced_in), (size, 1))
-        Pc, Pls, S, q_s, _ = self._get_p_tree()
-        return _tree_sample(Pc, S, self.N, self._n, size, rng)
+        _, _, S, _, _ = self._get_p_tree()
+        cdfs = self._get_sample_cdfs()
+        samples = np.stack(
+            [_tree_sample(cdfs, S, self.N, self._n, rng) for _ in range(size)]
+        )
+        return samples
 
     # ── Hessian-vector product ────────────────────────────────────────────────
 
@@ -698,7 +649,7 @@ class ConditionalPoisson:
         tol: float = 1e-10,
         max_iter: int = 50,
         verbose: bool = False,
-    ) -> "ConditionalPoisson":
+    ) -> "ConditionalPoissonNumPy":
         """
         Update weights to match target inclusion probabilities pi*.
 
@@ -741,7 +692,7 @@ class ConditionalPoisson:
             step  = 1.0
             for _ in range(20):
                 th_new        = theta + step * delta
-                tmp           = ConditionalPoisson(self._n, th_new)
+                tmp           = ConditionalPoissonNumPy(self._n, th_new)
                 L_new         = float(np.dot(pi_star, th_new)) - tmp.log_normalizer
                 if L_new >= L0 + 1e-4 * step * slope: break
                 step         *= 0.5
@@ -763,6 +714,6 @@ class ConditionalPoisson:
 
     def __repr__(self) -> str:
         if "log_Z" in self._cache:
-            return (f"ConditionalPoisson(N={self.N}, n={self._n}, "
+            return (f"ConditionalPoissonNumPy(N={self.N}, n={self._n}, "
                     f"log_normalizer={self._cache['log_Z']:.3f})")
-        return f"ConditionalPoisson(N={self.N}, n={self._n})"
+        return f"ConditionalPoissonNumPy(N={self.N}, n={self._n})"

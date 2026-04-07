@@ -3,14 +3,14 @@
 import numpy as np
 import pytest
 from itertools import combinations
-from conditional_poisson_numpy import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoissonNumPy
 
 
 def test_forward_pass():
     rng = np.random.default_rng(0)
     N, n = 20, 7
     q_true = rng.exponential(1.0, N)
-    cp = ConditionalPoisson.from_weights(n, q_true)
+    cp = ConditionalPoissonNumPy.from_weights(n, q_true)
     pi = cp.incl_prob
     assert abs(pi.sum() - n) < 1e-6
     assert np.all((pi > 0) & (pi < 1))
@@ -21,14 +21,14 @@ def test_fitting():
     rng = np.random.default_rng(0)
     N, n = 20, 7
     q_true = rng.exponential(1.0, N)
-    cp = ConditionalPoisson.from_weights(n, q_true)
-    cp_fit = ConditionalPoisson.fit(cp.incl_prob, n)
+    cp = ConditionalPoissonNumPy.from_weights(n, q_true)
+    cp_fit = ConditionalPoissonNumPy.fit(cp.incl_prob, n)
     assert np.max(np.abs(cp.incl_prob - cp_fit.incl_prob)) < 1e-8
 
 
 def test_log_prob_normalizes():
     rng = np.random.default_rng(0)
-    cp = ConditionalPoisson.from_weights(3, rng.exponential(1.0, 6))
+    cp = ConditionalPoissonNumPy.from_weights(3, rng.exponential(1.0, 6))
     all_S = list(combinations(range(6), 3))
     lps = np.array([cp.log_prob(list(S)) for S in all_S])
     lps_b = cp.log_prob(np.array([list(S) for S in all_S]))
@@ -40,7 +40,7 @@ def test_sampling():
     rng = np.random.default_rng(0)
     N, n = 20, 7
     q_true = rng.exponential(1.0, N)
-    cp = ConditionalPoisson.from_weights(n, q_true)
+    cp = ConditionalPoissonNumPy.from_weights(n, q_true)
     M = 100_000
     S = cp.sample(M, rng=rng)
     assert S.shape == (M, n)
@@ -53,16 +53,16 @@ def test_hvp():
     rng = np.random.default_rng(0)
     N, n = 20, 7
     q_true = rng.exponential(1.0, N)
-    cp = ConditionalPoisson.from_weights(n, q_true)
-    cp_fit = ConditionalPoisson.fit(cp.incl_prob, n)
+    cp = ConditionalPoissonNumPy.from_weights(n, q_true)
+    cp_fit = ConditionalPoissonNumPy.fit(cp.incl_prob, n)
     v = rng.standard_normal(N)
     Hv = cp_fit.hvp(v)
     eps = 1e-5
     J = np.zeros((N, N))
     for j in range(N):
         ej = np.zeros(N); ej[j] = 1.0
-        J[:, j] = (ConditionalPoisson(n, cp_fit.theta + eps * ej).incl_prob -
-                    ConditionalPoisson(n, cp_fit.theta - eps * ej).incl_prob) / (2 * eps)
+        J[:, j] = (ConditionalPoissonNumPy(n, cp_fit.theta + eps * ej).incl_prob -
+                    ConditionalPoissonNumPy(n, cp_fit.theta - eps * ej).incl_prob) / (2 * eps)
     assert np.max(np.abs(Hv - J @ v)) < 1e-5
     assert np.linalg.norm(cp_fit.hvp(np.ones(N))) < 1e-8
 
@@ -78,7 +78,7 @@ def test_numerical_stability():
         (250, np.full(500, 5.0)),
     ]
     for n, theta in cases:
-        cp = ConditionalPoisson(n, theta)
+        cp = ConditionalPoissonNumPy(n, theta)
         pi = cp.incl_prob
         assert np.isfinite(pi).all(), f"non-finite pi for n={n}"
         assert np.isfinite(cp.log_normalizer), f"non-finite log_normalizer for n={n}"
@@ -90,7 +90,7 @@ def test_numerical_stability():
 def test_n_equals_1():
     rng = np.random.default_rng(1)
     N = 10
-    cp = ConditionalPoisson.from_weights(1, rng.exponential(1.0, N))
+    cp = ConditionalPoissonNumPy.from_weights(1, rng.exponential(1.0, N))
     pi = cp.incl_prob
     assert abs(pi.sum() - 1.0) < 1e-10
     assert np.all((pi > 0) & (pi < 1))
@@ -102,7 +102,7 @@ def test_n_equals_1():
 def test_n_equals_N_minus_1():
     rng = np.random.default_rng(2)
     N = 6
-    cp = ConditionalPoisson.from_weights(N - 1, rng.exponential(1.0, N))
+    cp = ConditionalPoissonNumPy.from_weights(N - 1, rng.exponential(1.0, N))
     pi = cp.incl_prob
     assert abs(pi.sum() - (N - 1)) < 1e-10
     assert np.all((pi > 0) & (pi < 1))
@@ -113,7 +113,7 @@ def test_n_equals_N_minus_1():
 
 
 def test_small_N():
-    cp = ConditionalPoisson.from_weights(1, np.array([2.0, 3.0]))
+    cp = ConditionalPoissonNumPy.from_weights(1, np.array([2.0, 3.0]))
     pi = cp.incl_prob
     assert abs(pi.sum() - 1.0) < 1e-10
     assert abs(pi[0] - 2.0 / 5.0) < 1e-10
@@ -123,7 +123,7 @@ def test_small_N():
 # ── Constructors ──────────────────────────────────────────────────────────────
 
 def test_uniform():
-    cp = ConditionalPoisson.from_weights(3, np.ones(10))
+    cp = ConditionalPoissonNumPy.from_weights(3, np.ones(10))
     pi = cp.incl_prob
     assert np.allclose(pi, 0.3)
     assert abs(pi.sum() - 3.0) < 1e-10
@@ -131,7 +131,7 @@ def test_uniform():
 
 def test_from_weights():
     q = np.array([1.0, 1.0, 1.0, 1.0])
-    cp = ConditionalPoisson.from_weights(2, q)
+    cp = ConditionalPoissonNumPy.from_weights(2, q)
     assert np.allclose(cp.incl_prob, 0.5)
     assert np.allclose(cp.theta, 0.0)
 
@@ -140,7 +140,7 @@ def test_from_weights():
 
 def test_theta_setter_invalidates_cache():
     rng = np.random.default_rng(3)
-    cp = ConditionalPoisson.from_weights(3, rng.exponential(1.0, 8))
+    cp = ConditionalPoissonNumPy.from_weights(3, rng.exponential(1.0, 8))
     pi_old = cp.incl_prob.copy()
     log_en_old = cp.log_normalizer
 
@@ -154,28 +154,28 @@ def test_theta_setter_invalidates_cache():
 
 def test_n_less_than_1_raises():
     with pytest.raises(ValueError, match="n must be >= 1"):
-        ConditionalPoisson(0, np.zeros(5))
+        ConditionalPoissonNumPy(0, np.zeros(5))
 
 
 def test_N_less_than_n_raises():
     with pytest.raises(ValueError, match="N=.*must be >= n"):
-        ConditionalPoisson(5, np.zeros(3))
+        ConditionalPoissonNumPy(5, np.zeros(3))
 
 
 def test_theta_not_1d_raises():
     with pytest.raises(ValueError, match="theta must be 1-D"):
-        ConditionalPoisson(2, np.zeros((3, 3)))
+        ConditionalPoissonNumPy(2, np.zeros((3, 3)))
 
 
 def test_from_weights_negative_raises():
     with pytest.raises(ValueError, match="all weights must be non-negative"):
-        ConditionalPoisson.from_weights(2, np.array([1.0, -1.0, 2.0]))
+        ConditionalPoissonNumPy.from_weights(2, np.array([1.0, -1.0, 2.0]))
 
 
 def test_boundary_w_zero():
     """w_i = 0 means item i is never selected."""
     w = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
-    cp = ConditionalPoisson.from_weights(2, w)
+    cp = ConditionalPoissonNumPy.from_weights(2, w)
     assert cp.incl_prob[0] == 0.0
     assert abs(cp.incl_prob.sum() - 2) < 1e-10
     # Samples never contain item 0
@@ -190,7 +190,7 @@ def test_boundary_w_zero():
 def test_boundary_w_inf():
     """w_i = inf means item i is always selected."""
     w = np.array([np.inf, 1.0, 2.0, 3.0, 4.0])
-    cp = ConditionalPoisson.from_weights(3, w)
+    cp = ConditionalPoissonNumPy.from_weights(3, w)
     assert cp.incl_prob[0] == 1.0
     assert abs(cp.incl_prob.sum() - 3) < 1e-10
     # Samples always contain item 0
@@ -205,7 +205,7 @@ def test_boundary_w_inf():
 def test_boundary_mixed():
     """Mix of w=0, w=inf, and finite weights."""
     w = np.array([np.inf, 0.0, 1.0, 2.0, 3.0, np.inf, 0.0])
-    cp = ConditionalPoisson.from_weights(3, w)
+    cp = ConditionalPoissonNumPy.from_weights(3, w)
     assert cp.incl_prob[0] == 1.0
     assert cp.incl_prob[5] == 1.0
     assert cp.incl_prob[1] == 0.0
@@ -220,7 +220,7 @@ def test_boundary_mixed():
 def test_boundary_all_forced():
     """All items determined: n items have w=inf, rest have w=0."""
     w = np.array([np.inf, np.inf, 0.0, 0.0, 0.0])
-    cp = ConditionalPoisson.from_weights(2, w)
+    cp = ConditionalPoissonNumPy.from_weights(2, w)
     assert np.allclose(cp.incl_prob, [1, 1, 0, 0, 0])
     samples = cp.sample(100, rng=42)
     assert np.all(samples == np.array([[0, 1]]))
@@ -228,19 +228,19 @@ def test_boundary_all_forced():
 
 def test_fit_bad_pi_sum_raises():
     with pytest.raises(ValueError, match="sum\\(pi_star\\)/n"):
-        ConditionalPoisson.fit(np.array([0.5, 0.5, 0.5]), n=2)
+        ConditionalPoissonNumPy.fit(np.array([0.5, 0.5, 0.5]), n=2)
 
 
 def test_fit_pi_out_of_range_raises():
     with pytest.raises(ValueError, match="strictly in \\(0, 1\\)"):
-        ConditionalPoisson.fit(np.array([0.0, 1.0, 1.0]), n=2)
+        ConditionalPoissonNumPy.fit(np.array([0.0, 1.0, 1.0]), n=2)
 
 
 # ── log_prob input formats ───────────────────────────────────────────────────
 
 def test_log_prob_bool_formats():
     rng = np.random.default_rng(4)
-    cp = ConditionalPoisson.from_weights(3, rng.exponential(1.0, 6))
+    cp = ConditionalPoissonNumPy.from_weights(3, rng.exponential(1.0, 6))
 
     S_idx = np.array([0, 2, 4])
     S_bool = np.zeros(6, dtype=bool)
@@ -264,7 +264,7 @@ def test_log_prob_bool_formats():
 # ── Sampling reproducibility ─────────────────────────────────────────────────
 
 def test_sampling_deterministic_with_seed():
-    cp = ConditionalPoisson.from_weights(3, np.array([1.0, 2.0, 3.0, 4.0, 5.0]))
+    cp = ConditionalPoissonNumPy.from_weights(3, np.array([1.0, 2.0, 3.0, 4.0, 5.0]))
     s1 = cp.sample(50, rng=42)
     s2 = cp.sample(50, rng=42)
     assert np.array_equal(s1, s2)
@@ -318,7 +318,7 @@ def test_brute_force_pi():
     rng = np.random.default_rng(10)
     for N, n in _BRUTE_CASES:
         theta = rng.standard_normal(N)
-        cp = ConditionalPoisson(n, theta)
+        cp = ConditionalPoissonNumPy(n, theta)
         _, pi_bf, _, _, _ = _brute_force(theta, n)
         assert np.allclose(cp.incl_prob, pi_bf, atol=1e-10), \
             f"pi mismatch for N={N}, n={n}: max err={np.max(np.abs(cp.incl_prob - pi_bf)):.2e}"
@@ -328,7 +328,7 @@ def test_brute_force_log_normalizer():
     rng = np.random.default_rng(11)
     for N, n in _BRUTE_CASES:
         theta = rng.standard_normal(N)
-        cp = ConditionalPoisson(n, theta)
+        cp = ConditionalPoissonNumPy(n, theta)
         log_en_bf, _, _, _, _ = _brute_force(theta, n)
         assert abs(cp.log_normalizer - log_en_bf) < 1e-10, \
             f"log_normalizer mismatch for N={N}, n={n}: {cp.log_normalizer} vs {log_en_bf}"
@@ -338,7 +338,7 @@ def test_brute_force_log_prob():
     rng = np.random.default_rng(12)
     for N, n in _BRUTE_CASES:
         theta = rng.standard_normal(N)
-        cp = ConditionalPoisson(n, theta)
+        cp = ConditionalPoissonNumPy(n, theta)
         _, _, _, all_S, probs_bf = _brute_force(theta, n)
         for k, s in enumerate(all_S):
             lp = cp.log_prob(list(s))
@@ -350,7 +350,7 @@ def test_brute_force_hvp():
     rng = np.random.default_rng(13)
     for N, n in _BRUTE_CASES:
         theta = rng.standard_normal(N)
-        cp = ConditionalPoisson(n, theta)
+        cp = ConditionalPoissonNumPy(n, theta)
         _, _, Cov_bf, _, _ = _brute_force(theta, n)
         # test multiple random directions
         for _ in range(3):
@@ -366,7 +366,7 @@ def test_brute_force_sampling_distribution():
     rng = np.random.default_rng(14)
     N, n = 5, 2
     theta = rng.standard_normal(N)
-    cp = ConditionalPoisson(n, theta)
+    cp = ConditionalPoissonNumPy(n, theta)
     _, _, _, all_S, probs_bf = _brute_force(theta, n)
 
     M = 200_000

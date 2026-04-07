@@ -901,7 +901,7 @@ The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)
 
 The inclusion probability is the gradient of the log-normalizer (an exponential family identity):
 
-$$\pip_i \defeq \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$
+$$\pip_i = \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$
 
 Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running [backpropagation](https://timvieira.github.io/blog/evaluating-fx-is-as-fast-as-fx/) on the same tree—no new algorithm needed.  By the Baur-Strassen theorem ([1983](https://doi.org/10.1016/0304-3975(83)90110-X)), the gradient costs at most a constant factor more than the forward computation.
 
@@ -3091,7 +3091,7 @@ $$
 \Ps(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
 $$
 
-<p>where $\w_i \defeq e^{\theta_i}$ and $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is the normalizing constant.  This is exactly the conditional Poisson distribution!  So the max-entropy distribution with inclusion-probability constraints must be a conditional Poisson sampling (CPS) distribution—the only question is <em>which</em> weights.</p>
+<p>where $\w_i = \exp(\theta_i)$ and $\Zw{\bw}{n} = \sum_{|S|=n} \prod_{i \in S} \w_i$ is the normalizing constant.  This is exactly the conditional Poisson distribution!  So the max-entropy distribution with inclusion-probability constraints must be a conditional Poisson sampling (CPS) distribution—the only question is <em>which</em> weights.</p>
 
 <p><b>Eliminating $\Ps$.</b>  Now substitute this optimal $\Ps$ back into $\mathcal{L}(\Ps, \btheta)$ to get a function of $\btheta$ alone.  The inclusion probabilities under $\Ps$ are $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \pip_i(\btheta)$, so:</p>
 
@@ -3121,9 +3121,9 @@ $$
 
 <p>The $\bpip(\btheta)$ terms cancel, leaving a clean function of $\btheta$ alone.</p>
 
-<p><b>The dual problem.</b>  The dual minimizes $\mathcal{L}(\Ps, \btheta)$ over $\btheta$.  Negating to turn this into a maximization, we get $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$.  This is concave because $\log \Zw{\bw}{n}$ is convex in $\btheta$ (it is a log of a sum of exponentials).</p>
+<p><b>The dual problem.</b>  The dual minimizes $\mathcal{L}(\Ps, \btheta)$ over $\btheta$.  Negating to turn this into a maximization, we get $\ell(\btheta) = \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$.  This is concave because $\log \Zw{\bw}{n}$ is convex in $\btheta$ (it is a log of a sum of exponentials).</p>
 
-<p><b>Why it works.</b>  Because the inclusion-probability constraints are linear in $\Ps$ and a feasible $\Ps$ exists (whenever $0 < \piptgt_i < 1$ and $\sum_{i=1}^{N} \piptgt_i = n$), there is no gap between the primal and dual optima.  So the optimal $\btheta$ from the dual gives weights $\w_i = e^{\theta_i}$ whose conditional Poisson distribution solves the primal: it achieves maximum entropy among all distributions over size-$n$ subsets, and its inclusion probabilities match the targets exactly, $\bpip(\btheta) = \bpiptgt$.</p>
+<p><b>Why it works.</b>  Because the inclusion-probability constraints are linear in $\Ps$ and a feasible $\Ps$ exists (whenever $0 < \piptgt_i < 1$ and $\sum_{i=1}^{N} \piptgt_i = n$), there is no gap between the primal and dual optima.  So the optimal $\btheta$ from the dual gives weights $\w_i = \exp(\theta_i)$ whose conditional Poisson distribution solves the primal: it achieves maximum entropy among all distributions over size-$n$ subsets, and its inclusion probabilities match the targets exactly, $\bpip(\btheta) = \bpiptgt$.</p>
 
 </details>
 
@@ -3141,7 +3141,7 @@ The plots below compare wall-clock time across methods for four operations: comp
 
 Three methods for computing the normalizing constant:
 <a href="bench_timing.py#dp_forward_Z" title="dp_forward_Z" class="verified" target="_blank">✓</a> DP forward pass $\mathcal{O}(Nn)$ ·
-<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
+<a href="conditional_poisson_numpy.py" title="ConditionalPoissonNumPy.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
 <a href="conditional_poisson_torch.py#forward_log_Z" title="forward_log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$
 
 <figure>
@@ -3158,7 +3158,7 @@ This is the main event.  The naive approach computes each $\pip_i$ independently
 <a href="bench_timing.py#tree_loo_pi" title="tree_loo_pi" class="verified" target="_blank">✓</a> $N \times$ Tree leave-one-out $\mathcal{O}(N^2 \log^2 n)$ ·
 <a href="bench_samplers.py#sequential_pi" title="sequential_pi" class="verified" target="_blank">✓</a> Forward-backward DP $\mathcal{O}(Nn)$ ·
 <a href="bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R `sampling` package ·
-<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.incl_prob" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
+<a href="conditional_poisson_numpy.py" title="ConditionalPoissonNumPy.incl_prob" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
 <a href="conditional_poisson_torch.py#compute_pi" title="compute_pi" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$
 
 <figure>
@@ -3171,7 +3171,7 @@ The leave-one-out methods (gray, dashed) are $\sim\!N\times$ slower than their b
 
 Given target inclusion probabilities $\bpiptgt$, find weights $\bw$ such that $\bpip(\bw) = \bpiptgt$:
 
-<a href="conditional_poisson_numpy.py#fit" title="ConditionalPoisson.fit" class="verified" target="_blank">✓</a> Product tree + Newton-CG ·
+<a href="conditional_poisson_numpy.py#fit" title="ConditionalPoissonNumPy.fit" class="verified" target="_blank">✓</a> Product tree + Newton-CG ·
 <a href="bench_timing_r.R" title="UPMEpiktildefrompik" class="verified" target="_blank">✓</a> R `sampling::UPMEpiktildefrompik` (fixed-point iteration)
 
 <figure>
@@ -3183,7 +3183,7 @@ Our Newton-CG optimizer uses true Hessian-vector products computed via the produ
 ### Drawing Samples
 
 <a href="bench_timing_r.R" title="UPMEqfromw + UPMEsfromq" class="verified" target="_blank">✓</a> R `sampling` (1 sample, with and without DP rebuild) ·
-<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (with and without tree build; 10k amortized)
+<a href="conditional_poisson_numpy.py" title="ConditionalPoissonNumPy.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (with and without tree build; 10k amortized)
 
 <figure>
 <img src="../figures/timing_samples.svg" alt="Log-log plot: drawing samples" style="width:100%">
@@ -3733,7 +3733,7 @@ The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> [elementary symme
 
 The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:
 
-$$\pip_i \defeq \frac{\partial \log \Z}{\partial \theta_i} = \frac{\w_i \cdot \Zw{\bw^{(-i)}}{n-1}}{\Zw{\bw}{n}}$$
+$$\pip_i = \frac{\partial \log \Z}{\partial \theta_i} = \frac{\w_i \cdot \Zw{\bw^{(-i)}}{n-1}}{\Zw{\bw}{n}}$$
 <a href="test_identities.py#test_pi_is_gradient_of_log_Z" title="test_pi_is_gradient_of_log_Z, test_pi_leave_one_out, test_pi_matches_brute_force" class="verified" target="_blank">✓</a>
 
 The leave-one-out formula generalizes to **higher-order inclusion probabilities**: $\pip(X) = P(X \subseteq S) = \prod_{i \in X} \w_i \cdot \Zw{\bw^{(-X)}}{n-|X|} / \Zw{\bw}{n}$.<a href="test_identities.py#test_higher_order_inclusion" title="test_higher_order_inclusion" class="verified" target="_blank">✓</a>

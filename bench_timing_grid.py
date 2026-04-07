@@ -13,7 +13,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from conditional_poisson_numpy import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoissonNumPy
 from bench_samplers import sequential_pi
 from bench_timing import (dp_forward_Z, dp_loo_pi, tree_loo_pi,
                           run_r_benchmark, time_fn)
@@ -52,7 +52,7 @@ def run_grid(quick=False):
             ms = time_fn(lambda: dp_forward_Z(w, n), reps=reps)
             add("DP forward", "Z", N, n, ms)
 
-            ms = time_fn(lambda: ConditionalPoisson.from_weights(n, w).log_normalizer, reps=reps)
+            ms = time_fn(lambda: ConditionalPoissonNumPy.from_weights(n, w).log_normalizer, reps=reps)
             add("NumPy tree", "Z", N, n, ms)
 
             ms = time_fn(lambda: forward_log_Z(theta, n), reps=reps)
@@ -62,7 +62,7 @@ def run_grid(quick=False):
             ms = time_fn(lambda: sequential_pi(w, n), reps=reps)
             add("Fwd-bwd DP", "pi", N, n, ms)
 
-            ms = time_fn(lambda: ConditionalPoisson.from_weights(n, w).incl_prob, reps=reps)
+            ms = time_fn(lambda: ConditionalPoissonNumPy.from_weights(n, w).incl_prob, reps=reps)
             add("NumPy tree", "pi", N, n, ms)
 
             ms = time_fn(lambda: compute_pi(theta, n), reps=reps)
@@ -77,7 +77,7 @@ def run_grid(quick=False):
 
             # Fitting benchmarks
             pi_target = sequential_pi(w, n)
-            ms = time_fn(lambda: ConditionalPoisson.fit(pi_target, n), reps=reps)
+            ms = time_fn(lambda: ConditionalPoissonNumPy.fit(pi_target, n), reps=reps)
             add("NumPy tree (Newton-CG)", "fit", N, n, ms)
 
             # R benchmarks (pi + fit + samples)
@@ -91,10 +91,10 @@ def run_grid(quick=False):
                     add(r["method"], "samples", N, n, r["time_ms"])
 
             # Sampling benchmarks
-            cp = ConditionalPoisson.from_weights(n, w)
+            cp = ConditionalPoissonNumPy.from_weights(n, w)
             sample_rng = np.random.RandomState(seed)
 
-            ms = time_fn(lambda: ConditionalPoisson.from_weights(n, w).sample(1, rng=sample_rng), reps=reps)
+            ms = time_fn(lambda: ConditionalPoissonNumPy.from_weights(n, w).sample(1, rng=sample_rng), reps=reps)
             add("NumPy tree (1 sample, incl. build)", "samples", N, n, ms)
 
             ms = time_fn(lambda: cp.sample(1, rng=sample_rng), reps=reps)

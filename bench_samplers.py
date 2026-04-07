@@ -16,7 +16,7 @@ This script compares:
 import numpy as np
 import time
 from itertools import combinations
-from conditional_poisson_numpy import ConditionalPoisson
+from conditional_poisson_numpy import ConditionalPoissonNumPy
 
 
 # ── Sequential O(NK) DP ──────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ def bench_accuracy():
     ]:
         w = rng.exponential(1.0, N)
 
-        cp = ConditionalPoisson.from_weights(n, w)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         pi_tree = cp.incl_prob
         pi_seq = sequential_pi(w, n)
 
@@ -241,7 +241,7 @@ def bench_build():
             _build_dp_table(q, n)
         dp_ms = (time.perf_counter() - t0) / reps * 1000
 
-        cp = ConditionalPoisson.from_weights(n, w)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         t0 = time.perf_counter()
         for _ in range(reps):
             cp._cache.clear()
@@ -267,7 +267,7 @@ def bench_sampling():
         sequential_sample(w, n, M, np.random.default_rng(42))
         seq_ms = (time.perf_counter() - t0) * 1000
 
-        cp = ConditionalPoisson.from_weights(n, w)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         cp._cache.clear()
         t0 = time.perf_counter()
         cp.sample(M, rng=np.random.default_rng(42))
@@ -291,7 +291,7 @@ def bench_varying_M():
         sequential_sample(w, n, M, np.random.default_rng(42))
         seq_ms = (time.perf_counter() - t0) * 1000
 
-        cp = ConditionalPoisson.from_weights(n, w)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         cp._cache.clear()
         t0 = time.perf_counter()
         cp.sample(M, rng=np.random.default_rng(42))
@@ -312,7 +312,7 @@ def bench_verify_sampling():
     ]:
         rng = np.random.default_rng(42)
         w = w_fn(rng)
-        cp = ConditionalPoisson.from_weights(n, w)
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
         exact = cp.incl_prob
 
         tree_pi = np.bincount(cp.sample(M, rng=0).ravel(), minlength=N) / M

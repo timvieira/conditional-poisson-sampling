@@ -182,7 +182,7 @@ def compute_hvp(theta, n, v):
 if __name__ == "__main__":
     import numpy as np
     import time
-    from conditional_poisson_numpy import ConditionalPoisson
+    from conditional_poisson_numpy import ConditionalPoissonNumPy
 
     np.random.seed(42)
 
@@ -192,7 +192,7 @@ if __name__ == "__main__":
         theta_t = torch.tensor(theta_np, dtype=torch.float64)
         v_t = torch.tensor(v_np, dtype=torch.float64)
 
-        cp = ConditionalPoisson(n, theta_np)
+        cp = ConditionalPoissonNumPy(n, theta_np)
 
         # ── Correctness ──
         pi_np = cp.incl_prob
