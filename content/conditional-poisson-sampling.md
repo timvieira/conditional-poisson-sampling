@@ -3871,4 +3871,15 @@ Found an error or have a suggestion? Please [open an issue](https://github.com/t
 
 - [Meister, Amini, Vieira & Cotterell (2021)](https://aclanthology.org/2021.emnlp-main.52/). "Conditional Poisson Stochastic Beams." *Proceedings of EMNLP 2021*.
 
+**Citing this post:**
+
+```bibtex
+@misc{vieira2026cps,
+  author = {Vieira, Tim},
+  title  = {Conditional Poisson Sampling},
+  year   = {2026},
+  url    = {https://timvieira.github.io/conditional-poisson-sampling/}
+}
+```
+
 <script src="figures/popover.js"></script>

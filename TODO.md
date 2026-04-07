@@ -56,7 +56,7 @@
 ## Blog Polish
 
 - [x] ~~Add a note encouraging readers to report issues on the [GitHub issue tracker](https://github.com/timvieira/conditional-poisson-sampling/issues)~~ — done
-- [ ] Add a citation section at the end of the post (e.g., BibTeX snippet, suggested citation format)
+- [x] ~~Add a citation section at the end of the post (e.g., BibTeX snippet, suggested citation format)~~ — done
 - [ ] Why are there still references to the NumPy implementation in the article? The timing section legitimately benchmarks the NumPy tree, but it should be framed as the reference/pedagogical implementation, not the recommended one.
 - [ ] Consistently color code math symbols and widgets — use the same colors for $P(S)$, $\pi$, and $w$ in both LaTeX and D3 widgets. Previously removed all color coding; bring it back in a principled way with a shared palette.
 
@@ -101,8 +101,8 @@
 - [x] ~~Remove `display_utils.py`~~ — removed (only consumer was the deleted notebook)
 - [ ] Fix `test_animation.mjs` — update paths, verify it runs, integrate into CI
 - [ ] Add mathematical correctness tests for JS widget algorithms (product tree, quota splitting, polynomial multiplication, CDF computation). Either extend `test_animation.mjs` to check computed values against known answers, or extract JS algorithms into testable modules and test with Node.js.
-- [ ] Decide: remove `plot_timing_3d.py`? May be superseded by inline Plotly widget in the article.
-- [ ] Decide: remove `bench_scaling.py`? Standalone scaling analysis script. Still uses centralized classes but may be redundant with `bench_timing.py`.
+- [x] ~~Decide: remove `plot_timing_3d.py`?~~ — removed (superseded by inline Plotly widget)
+- [x] ~~Decide: remove `bench_scaling.py`?~~ — removed (redundant with `bench_timing.py`)
 - [ ] Delete stale branches
 
 ### Packaging and Distribution
