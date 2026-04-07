@@ -3174,7 +3174,7 @@ $$
 <span class="n">pi_star</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">incl_prob</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
 <span class="c1"># Fit from scratch</span>
-<span class="n">cp_fit</span> <span class="o">=</span> <span class="n">ConditionalPoisson</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">pi_star</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">cp_fit</span> <span class="o">=</span> <span class="n">ConditionalPoissonNumPy</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">pi_star</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -3204,7 +3204,7 @@ $$
 <h3 id="computing-math14">Computing $\Z$</h3>
 <p>Three methods for computing the normalizing constant:
 <a href="bench_timing.py#dp_forward_Z" title="dp_forward_Z" class="verified" target="_blank">✓</a> DP forward pass $\mathcal{O}(Nn)$ ·
-<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
+<a href="conditional_poisson_numpy.py" title="ConditionalPoissonNumPy.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
 <a href="conditional_poisson_torch.py#forward_log_Z" title="forward_log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$</p>
 <figure>
 <p><img src="../figures/timing_Z.svg" alt="Log-log plot: computing Z" style="width:100%"></p>
@@ -3217,7 +3217,7 @@ $$
 <a href="bench_timing.py#tree_loo_pi" title="tree_loo_pi" class="verified" target="_blank">✓</a> $N \times$ Tree leave-one-out $\mathcal{O}(N^2 \log^2 n)$ ·
 <a href="bench_samplers.py#sequential_pi" title="sequential_pi" class="verified" target="_blank">✓</a> Forward-backward DP $\mathcal{O}(Nn)$ ·
 <a href="bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R <code>sampling</code> package ·
-<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.incl_prob" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
+<a href="conditional_poisson_numpy.py" title="ConditionalPoissonNumPy.incl_prob" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
 <a href="conditional_poisson_torch.py#compute_pi" title="compute_pi" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$</p>
 <figure>
 <p><img src="../figures/timing_pi.svg" alt="Log-log plot: computing inclusion probabilities" style="width:100%"></p>
@@ -3226,7 +3226,7 @@ $$
 <p>The leave-one-out methods (gray, dashed) are $\sim\!N\times$ slower than their backprop counterparts—this is the Baur-Strassen theorem in action.  The PyTorch FFT implementation is the fastest overall, combining FFT-based polynomial multiplication ($\mathcal{O}(d \log d)$ per multiply), batched execution ($\mathcal{O}(\log N)$ torch calls), and autograd.</p>
 <h3 id="fitting">Fitting</h3>
 <p>Given target inclusion probabilities $\bpiptgt$, find weights $\bw$ such that $\bpip(\bw) = \bpiptgt$:</p>
-<p><a href="conditional_poisson_numpy.py#fit" title="ConditionalPoisson.fit" class="verified" target="_blank">✓</a> Product tree + Newton-CG ·
+<p><a href="conditional_poisson_numpy.py#fit" title="ConditionalPoissonNumPy.fit" class="verified" target="_blank">✓</a> Product tree + Newton-CG ·
 <a href="bench_timing_r.R" title="UPMEpiktildefrompik" class="verified" target="_blank">✓</a> R <code>sampling::UPMEpiktildefrompik</code> (fixed-point iteration)</p>
 <figure>
 <p><img src="../figures/timing_fit.svg" alt="Log-log plot: fitting target pi to weights" style="width:100%"></p>
@@ -3235,7 +3235,7 @@ $$
 <p>Our Newton-CG optimizer uses true Hessian-vector products computed via the product tree, giving superlinear convergence.  R's <a href="https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R"><code>UPMEpiktildefrompik</code></a> uses $J = I$ rather than the true Jacobian, making it a fixed-point iteration ($\tilde{p} \mathrel{+}= \bpiptgt - \bpip(\tilde{p})$) despite the <a href="https://cran.r-project.org/web/packages/sampling/sampling.pdf">docs</a> calling it Newton's method.  Each R iteration requires a full $\mathcal{O}(Nn)$ DP pass to recompute $\bpip$.</p>
 <h3 id="drawing-samples">Drawing Samples</h3>
 <p><a href="bench_timing_r.R" title="UPMEqfromw + UPMEsfromq" class="verified" target="_blank">✓</a> R <code>sampling</code> (1 sample, with and without DP rebuild) ·
-<a href="conditional_poisson_numpy.py" title="ConditionalPoisson.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (with and without tree build; 10k amortized)</p>
+<a href="conditional_poisson_numpy.py" title="ConditionalPoissonNumPy.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (with and without tree build; 10k amortized)</p>
 <figure>
 <p><img src="../figures/timing_samples.svg" alt="Log-log plot: drawing samples" style="width:100%"></p>
 </figure>
