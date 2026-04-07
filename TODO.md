@@ -27,7 +27,9 @@
 - [x] ~~Move tests to `tests/`~~ — done
 - [ ] Add fixed-point iteration `fit` method (matching R's `UPMEpiktildefrompik`: `theta += pi_star - pi(theta)`) as an alternative to L-BFGS. Compare running time of L-BFGS vs fixed-point iteration.
 - [ ] L-BFGS fitting convergence is much slower than the old Newton-CG (24 iterations vs 5 for N=10, non-monotone). Consider restoring Newton-CG as the default optimizer (requires HVP internally, not as public API) or tuning L-BFGS parameters.
+- [ ] Remove boundary handling (w=0/inf) from `conditional_poisson/numpy.py` — forced_in/forced_out/interior/reduced instance delegation. Already removed from torch impl for simplicity; numpy should match.
 - [ ] Rename `conditional_poisson/numpy.py` → `tree_numpy.py` and `conditional_poisson/torch.py` → `tree_torch.py` (or `fft_numpy.py`/`fft_torch.py`)? The current names don't distinguish the algorithm from the sequential variants.
+- [ ] Remove stupid wrapper methods — unnecessary indirection that obscures the actual logic.
 
 ### Sequential implementations
 - [ ] Add `fit` and `log_prob` to `ConditionalPoissonSequentialNumPy`
@@ -46,6 +48,7 @@
 
 ### Other
 - [ ] NumPy tree timing slopes (~1.15–1.45 in $N$) are higher than expected for $O(N \log^2 N)$. Investigate whether forcing FFT throughout gives cleaner scaling.
+- [ ] Use numpy/pytorch's built-in bisect_left methods instead of manual binary search — likely faster. Verify empirically with a benchmark before switching.
 - [ ] Test GPU performance — `conditional_poisson/torch.py` (FFT) should be benchmarked on GPU. Float32 precision risk needs testing (contour scaling helps but may not fully compensate).
 - [x] Promote `conditional_poisson_torch.py` to the primary library implementation — merged `torch_fft_prototype.py` into it with full `ConditionalPoissonTorch` class (from_weights, fit, sample, log_prob, pi, hvp). Blog post Basic Usage updated.
 - [x] The maximum-entropy test could be strengthened by actually optimizing over the space of all distributions over size-$n$ sets, rather than just checking against a few specific alternatives.

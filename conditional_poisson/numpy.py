@@ -539,8 +539,8 @@ class ConditionalPoissonNumPy:
         """
         Update weights to match target inclusion probabilities pi*.
 
-        Minimizes -E_π★[log P_θ(S)] = -(π★ᵀθ - log Z(θ, n)) via L-BFGS.
-        The gradient is π(θ) - π★, so convergence means max|π - π★| ≤ tol.
+        Minimizes -E_π*[log P_θ(S)] = -(π*ᵀθ - log Z(θ, n)) via L-BFGS.
+        The gradient is π(θ) - π*, so convergence means max|π - π*| ≤ tol.
         Log-weights are zero-centered on completion (shift-invariant distribution).
 
         Returns self (for chaining).

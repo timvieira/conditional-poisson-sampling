@@ -333,25 +333,25 @@ class ConditionalPoissonTorch:
         """
         Fit to target inclusion probabilities via L-BFGS.
 
-        Minimizes -E_π★[log P_θ(S)] = -(π★ᵀθ - log Z(θ, n)).
-        The gradient is π(θ) - π★, so each L-BFGS step is driven
+        Minimizes -E_π*[log P_θ(S)] = -(π*ᵀθ - log Z(θ, n)).
+        The gradient is π(θ) - π*, so each L-BFGS step is driven
         directly by the gap between current and target inclusion
-        probabilities.  Convergence (max|π(θ) - π★| ≤ tol) is
+        probabilities.  Convergence (max|π(θ) - π*| ≤ tol) is
         therefore an infinity-norm gradient test — the optimizer's
         own stopping criterion.
 
-        All values in π★ must be in (0, 1) and sum to n.
+        All values in π* must be in (0, 1) and sum to n.
 
         Parameters
         ----------
-        tol : convergence tolerance on max|π(θ) - π★|.
+        tol : convergence tolerance on max|π(θ) - π*|.
         """
         pi_star = _to_tensor(pi_star, dtype).to(device=device)
         theta = torch.logit(pi_star).clone().requires_grad_(True)
 
         # L-BFGS (Nocedal & Wright, Ch. 7): memory m, Wolfe line search.
-        # The gradient is π(θ) - π★, so tolerance_grad = tol stops
-        # when max|π - π★| ≤ tol.
+        # The gradient is π(θ) - π*, so tolerance_grad = tol stops
+        # when max|π - π*| ≤ tol.
         optimizer = torch.optim.LBFGS(
             [theta],
             max_iter=200,
