@@ -448,11 +448,11 @@ class ConditionalPoissonTorch:
 
     # ── Sampling ──────────────────────────────────────────────────────────────
 
-    def _build_sample_tree(self):
-        """Build the product tree and precompute CDFs for sampling.
+    def _get_sample_cdfs(self):
+        """Build product tree and precompute CDFs for sampling (cached)."""
+        if self._sample_tree is not None:
+            return self._sample_tree
 
-        Cached on first call to sample().
-        """
         N = self._N
         n = self._n
         w = torch.exp(self._theta).detach()
@@ -499,51 +499,70 @@ class ConditionalPoissonTorch:
             cdfs[node] = node_cdfs
 
         self._sample_tree = (cdfs, tree_n)
+        return self._sample_tree
 
-    def sample(self, size: int = 1, rng: Optional[int] = None) -> torch.Tensor:
+    @staticmethod
+    def _draw_one(cdfs, tree_n, N, n, rng):
+        """Draw one sample via top-down quota splitting with precomputed CDFs.
+
+        Complexity: O(n log N).
         """
-        Draw independent samples.
+        selected = []
+        stack = [(1, n)]
+        while stack:
+            node, k = stack.pop()
+            if k == 0:
+                continue
+            if node >= tree_n:
+                if node - tree_n < N:
+                    selected.append(node - tree_n)
+                continue
+            cdf = cdfs[node][k]
+            j = _bisect_left(cdf, rng.random())
+            stack.append((2 * node + 1, k - j))
+            stack.append((2 * node, j))
+        selected.sort()
+        return selected
 
-        Returns (size, n) long tensor of sorted indices.
+    def sample(self, size: int = 1, rng=None) -> torch.Tensor:
+        """
+        Draw independent samples using the cached product tree.
+
+        Parameters
+        ----------
+        size : number of subsets to draw
+        rng  : int seed, random.Random, or np.random.Generator
+
+        Returns
+        -------
+        (size, n) long tensor of sorted indices.
+
+        Complexity: O(N log^2 n) to build tree [cached] + O(size * n * log N).
         """
         import random as _random
+        import numpy as np
 
-        if self._sample_tree is None:
-            self._build_sample_tree()
-
-        if self._n == 0:
-            return torch.empty(size, 0, dtype=torch.long)
-        if self._n == self._N:
-            return torch.arange(self._N).unsqueeze(0).expand(size, -1)
-
-        cdfs, tree_n = self._sample_tree
+        cdfs, tree_n = self._get_sample_cdfs()
         N, n = self._N, self._n
 
-        if rng is not None:
-            r = _random.Random(rng)
+        if n == 0:
+            return torch.empty(size, 0, dtype=torch.long)
+        if n == N:
+            return torch.arange(N).unsqueeze(0).expand(size, -1)
+
+        # Accept any object with .random() method (random.Random, np.random.Generator)
+        if isinstance(rng, np.random.Generator) or isinstance(rng, _random.Random):
+            pass  # use as-is
         else:
-            r = _random.Random()
+            rng = _random.Random(rng)
 
-        samples = []
-        for _ in range(size):
-            selected = []
-            stack = [(1, n)]
-            while stack:
-                node, k = stack.pop()
-                if k == 0:
-                    continue
-                if node >= tree_n:
-                    if node - tree_n < N:
-                        selected.append(node - tree_n)
-                    continue
-                cdf = cdfs[node][k]
-                j = _bisect_left(cdf, r.random())
-                stack.append((2 * node + 1, k - j))
-                stack.append((2 * node, j))
-            selected.sort()
-            samples.append(torch.tensor(selected, dtype=torch.long))
-
-        return torch.stack(samples)
+        if size == 1:
+            s = self._draw_one(cdfs, tree_n, N, n, rng)
+            return torch.tensor(s, dtype=torch.long).unsqueeze(0)
+        return torch.stack([
+            torch.tensor(self._draw_one(cdfs, tree_n, N, n, rng), dtype=torch.long)
+            for _ in range(size)
+        ])
 
     # ── Hessian-vector product ────────────────────────────────────────────────
 

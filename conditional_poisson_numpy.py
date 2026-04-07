@@ -614,6 +614,71 @@ class ConditionalPoissonNumPy:
             [_tree_sample(cdfs, S, self.N, self._n, rng) for _ in range(size)]
         )
 
+    def _get_seq_q(self):
+        """Build and cache the sequential conditional probability table q."""
+        if "seq_q" not in self._cache:
+            w = self.w
+            N, n = self.N, self._n
+            # Backward ESP recurrence: expa[i, k] = e_k(w[i:N])
+            expa = np.zeros((N, n))
+            for i in range(N):
+                expa[i, 0] = np.sum(w[i:N])
+            for i in range(N - n, N):
+                expa[i, N - i - 1] = np.prod(w[i:N])
+            for i in range(N - 3, -1, -1):
+                for k in range(1, min(N - i - 1, n)):
+                    expa[i, k] = w[i] * expa[i + 1, k - 1] + expa[i + 1, k]
+            # q[i, k] = P(include item i | k items left to select from i..N-1)
+            q = np.zeros((N, n))
+            for i in range(N - 1, -1, -1):
+                q[i, 0] = w[i] / expa[i, 0]
+            for i in range(N - n, N):
+                q[i, N - i - 1] = 1.0
+            for i in range(N - 3, -1, -1):
+                for k in range(1, min(N - i - 1, n)):
+                    q[i, k] = w[i] * expa[i + 1, k - 1] / expa[i, k]
+            self._cache["seq_q"] = q
+        return self._cache["seq_q"]
+
+    def sample_sequential(
+        self,
+        size: int = 1,
+        rng: Optional[Union[int, np.random.Generator]] = None,
+    ) -> np.ndarray:
+        """
+        Draw independent samples using O(N) sequential scan.
+
+        Builds an O(Nn) DP table (cached), then scans items sequentially,
+        including each with its conditional probability.
+
+        Parameters
+        ----------
+        size : number of subsets to draw
+        rng  : seed or np.random.Generator
+
+        Returns
+        -------
+        (size, n) int array; each row is a sorted list of n item indices.
+
+        Complexity: O(Nn) to build table [cached] + O(size * N).
+        """
+        if not isinstance(rng, np.random.Generator):
+            rng = np.random.default_rng(rng)
+        q = self._get_seq_q()
+        N, n = self.N, self._n
+        samples = np.empty((size, n), dtype=np.int32)
+        for m in range(size):
+            k = n
+            cursor = 0
+            for i in range(N):
+                if k == 0:
+                    break
+                if rng.random() < q[i, k - 1]:
+                    samples[m, cursor] = i
+                    cursor += 1
+                    k -= 1
+        return samples
+
     # ── Hessian-vector product ────────────────────────────────────────────────
 
     def hvp(self, v: np.ndarray) -> np.ndarray:

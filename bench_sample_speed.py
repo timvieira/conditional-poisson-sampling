@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Benchmark single-sample speed across sampler implementations.
 
-Compares: Python sequential, simple tree (precomputed CDFs), NumPy tree,
-PyTorch tree, and R sequential — all drawing one sample from a
-precomputed structure.
+Compares: NumPy tree, NumPy sequential, PyTorch tree, PyTorch sequential,
+and R sequential — all drawing one sample from a precomputed structure.
 
 Usage:
     python bench_sample_speed.py [--quick]
@@ -19,12 +18,8 @@ import numpy as np
 
 from conditional_poisson_numpy import ConditionalPoissonNumPy
 from conditional_poisson_torch import ConditionalPoissonTorch
-from bench_timing import (
-    build_q_table,
-    sequential_sample_from_q,
-    build_tree_cdfs,
-    simple_tree_sample,
-)
+from conditional_poisson_sequential_numpy import ConditionalPoissonSequentialNumPy
+from conditional_poisson_sequential_torch import ConditionalPoissonSequentialTorch
 
 
 def find_rscript():
@@ -66,8 +61,6 @@ def run_r_sample(rscript, N, n, seed, reps):
         r = json.loads(line)
         if "excl. DP" in r["method"]:
             times["R sequential"] = r["time_ms"]
-        elif "incl. DP" in r["method"]:
-            times["R sequential (incl. DP)"] = r["time_ms"]
     return times
 
 
@@ -85,10 +78,10 @@ def main():
     rscript = find_rscript()
 
     methods = [
-        "Python sequential",
-        "Simple tree",
         "NumPy tree",
+        "NumPy sequential",
         "PyTorch tree",
+        "PyTorch sequential",
         "R sequential",
     ]
 
@@ -104,31 +97,32 @@ def main():
         rng = np.random.default_rng(seed)
         timings = {}
 
-        # Python sequential
-        q_table = build_q_table(w, n)
-        timings["Python sequential"] = time_fn(
-            lambda: sequential_sample_from_q(q_table, rng), reps
-        )
-
-        # Simple tree (precomputed CDFs)
-        cp = ConditionalPoissonNumPy.from_weights(n, w)
-        Pc, _, S, _, _ = cp._get_p_tree()
-        tree_cdfs = build_tree_cdfs(Pc, S, N, n)
-        timings["Simple tree"] = time_fn(
-            lambda: simple_tree_sample(tree_cdfs, S, N, n, rng), reps
-        )
-
         # NumPy tree
-        cp.sample(1, rng=seed)  # warmup
+        cp = ConditionalPoissonNumPy.from_weights(n, w)
+        cp.sample(1, rng=rng)  # warmup
         timings["NumPy tree"] = time_fn(
-            lambda: cp.sample(1, rng=seed), reps
+            lambda: cp.sample(1, rng=rng), reps
+        )
+
+        # NumPy sequential
+        cp_seq = ConditionalPoissonSequentialNumPy.from_weights(n, w)
+        cp_seq.sample(1, rng=rng)  # warmup
+        timings["NumPy sequential"] = time_fn(
+            lambda: cp_seq.sample(1, rng=rng), reps
         )
 
         # PyTorch tree
         cpt = ConditionalPoissonTorch.from_weights(n, w)
-        cpt.sample(1, rng=seed)  # warmup (builds sample tree)
+        cpt.sample(1, rng=rng)  # warmup
         timings["PyTorch tree"] = time_fn(
-            lambda: cpt.sample(1, rng=seed), reps
+            lambda: cpt.sample(1, rng=rng), reps
+        )
+
+        # PyTorch sequential
+        cpt_seq = ConditionalPoissonSequentialTorch.from_weights(n, w)
+        cpt_seq.sample(1, rng=rng)  # warmup
+        timings["PyTorch sequential"] = time_fn(
+            lambda: cpt_seq.sample(1, rng=rng), reps
         )
 
         # R sequential
