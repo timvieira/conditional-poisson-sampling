@@ -1,4 +1,4 @@
-.PHONY: help test test-identity test-unit test-all test-r \
+.PHONY: help test test-identity test-unit test-all test-r test-js \
        bench bench-timing bench-grid bench-sample-speed bench-accuracy \
        figures data deploy dev clean install lint
 
@@ -47,6 +47,9 @@ test-all:
 
 test-r:
 	python -m pytest tests/test_r_agreement.py -v
+
+test-js:
+	node test_animation.mjs
 
 # ── Benchmarks ───────────────────────────────────────────────────────────────
 
