@@ -1452,14 +1452,14 @@ In the PyTorch implementation, the gradient comes for free via `torch.autograd`â
 
 Sampling reuses the product tree (no gradient computation needed).  The algorithm has two phases: a one-time $\mathcal{O}(Nn)$ precomputation that builds a CDF table from the tree, and an $\mathcal{O}(n \log N)$ per-sample walk that uses it.
 
-**Precomputation.** For each internal node and each possible quota $k = 1, \ldots, \min(n, |T|)$, precompute the CDF of the split distribution:
+**Precomputation.** Recall that the tree already stores the coefficients of each node's polynomial, and the parent's $k\textsuperscript{th}$ coefficient is the convolution $\llbracket P \rrbracket(\z^k) = \sum_{j=0}^{k} \llbracket P_L \rrbracket(\z^j) \cdot \llbracket P_R \rrbracket(\z^{k-j})$.  The individual terms of this sum are the (unnormalized) PMF of the split distributionâ€”we just need to normalize and cumsum:
 
 <div class="pseudocode">
 Initialize CDF table $F$ indexed by (node, quota $k$)<br>
-<b>for</b> each internal node with children $L$, $R$ and parent polynomial $P$:<br>
+<b>for</b> each internal node with children $L$, $R$:<br>
 $\quad$ <b>for</b> $k = 1, \ldots, \min(n, |T|)$:<br>
-$\quad\quad$ $\text{pmf}[j] \leftarrow \llbracket P_L \rrbracket(\z^{j}) \cdot \llbracket P_R \rrbracket(\z^{k-j}) \;/\; \llbracket P \rrbracket(\z^k)$ for $j = 0, \ldots, k$<br>
-$\quad\quad$ $F[k] \leftarrow \text{cumsum}(\text{pmf})$
+$\quad\quad$ $\text{pmf}[j] \leftarrow \llbracket P_L \rrbracket(\z^{j}) \cdot \llbracket P_R \rrbracket(\z^{k-j})$ for $j = 0, \ldots, k$ <span style="color:#888">(terms already computed for $\llbracket P \rrbracket(\z^k)$)</span><br>
+$\quad\quad$ $F[k] \leftarrow \text{cumsum}(\text{pmf} \;/\; \text{sum}(\text{pmf}))$
 </div>
 
 **Sampling.** Walk the tree top-down, splitting quotas using the cached CDFs via binary search:
