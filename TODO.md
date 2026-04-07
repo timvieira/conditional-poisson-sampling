@@ -21,7 +21,9 @@
 
 ### Code cleanup
 - [ ] Remove stale aliases and floating functions — `bench_samplers.py` has standalone `sequential_pi`, `sequential_sample`, `_build_dp_table` that duplicate the sequential classes
-- [ ] Remove `hvp` from `ConditionalPoissonNumPy` and `ConditionalPoissonTorch` (keep internal HVP for Newton-CG fitting; remove from public API). Update README which lists `hvp` in the API table and code example.
+- [ ] Replace Newton-CG fitting in `ConditionalPoissonNumPy` with L-BFGS (matching `ConditionalPoissonTorch.fit`). This removes the dependency on HVP/D-tree/CG solver for fitting.
+- [ ] Remove `hvp`, `_cg`, D-tree code (`_build_d_tree`, `_downward_pass` D-tree portions) from `ConditionalPoissonNumPy` — no longer needed once Newton-CG is replaced. Update README which lists `hvp` in the API table and code example.
+- [ ] Add fixed-point iteration `fit` method (matching R's `UPMEpiktildefrompik`: `theta += pi_star - pi(theta)`) as an alternative to L-BFGS. Compare running time of L-BFGS vs fixed-point iteration.
 - [ ] Remove `sample_sequential` from `ConditionalPoissonNumPy` — use `ConditionalPoissonSequentialNumPy.sample` instead
 
 ### Sequential implementations
