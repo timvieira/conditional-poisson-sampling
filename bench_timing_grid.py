@@ -14,12 +14,11 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(__file__))
 
 from conditional_poisson_numpy import ConditionalPoissonNumPy
-from bench_samplers import sequential_pi
-from bench_timing import (dp_forward_Z, dp_loo_pi, tree_loo_pi,
-                          run_r_benchmark, time_fn)
+from conditional_poisson_sequential_numpy import ConditionalPoissonSequentialNumPy
+from bench_timing import run_r_benchmark, time_fn
 
 import torch
-from conditional_poisson_torch import forward_log_Z, compute_pi
+from conditional_poisson_torch import ConditionalPoissonTorch, forward_log_Z, compute_pi
 
 
 def run_grid(quick=False):
@@ -46,11 +45,12 @@ def run_grid(quick=False):
 
         for n in valid_ns:
             reps = max(3, min(20, 500 // max(1, N // 50)))
+            sample_rng = np.random.default_rng(seed)
             print(f"  n={n}...", file=sys.stderr, end="", flush=True)
 
             # Z
-            ms = time_fn(lambda: dp_forward_Z(w, n), reps=reps)
-            add("DP forward", "Z", N, n, ms)
+            ms = time_fn(lambda: ConditionalPoissonSequentialNumPy.from_weights(n, w).log_normalizer, reps=reps)
+            add("Sequential DP", "Z", N, n, ms)
 
             ms = time_fn(lambda: ConditionalPoissonNumPy.from_weights(n, w).log_normalizer, reps=reps)
             add("NumPy tree", "Z", N, n, ms)
@@ -59,8 +59,8 @@ def run_grid(quick=False):
             add("PyTorch FFT", "Z", N, n, ms)
 
             # Pi
-            ms = time_fn(lambda: sequential_pi(w, n), reps=reps)
-            add("Fwd-bwd DP", "pi", N, n, ms)
+            ms = time_fn(lambda: ConditionalPoissonSequentialNumPy.from_weights(n, w).incl_prob, reps=reps)
+            add("Sequential DP", "pi", N, n, ms)
 
             ms = time_fn(lambda: ConditionalPoissonNumPy.from_weights(n, w).incl_prob, reps=reps)
             add("NumPy tree", "pi", N, n, ms)
@@ -68,17 +68,10 @@ def run_grid(quick=False):
             ms = time_fn(lambda: compute_pi(theta, n), reps=reps)
             add("PyTorch FFT + autograd", "pi", N, n, ms)
 
-            if N <= 500 and n <= 100:
-                ms = time_fn(lambda: dp_loo_pi(w, n), reps=3, warmup=1)
-                add("N×DP loo", "pi", N, n, ms)
-
-                ms = time_fn(lambda: tree_loo_pi(w, n), reps=3, warmup=1)
-                add("N×Tree loo", "pi", N, n, ms)
-
-            # Fitting benchmarks
-            pi_target = sequential_pi(w, n)
+            # Fitting
+            pi_target = ConditionalPoissonSequentialNumPy.from_weights(n, w).incl_prob
             ms = time_fn(lambda: ConditionalPoissonNumPy.fit(pi_target, n), reps=reps)
-            add("NumPy tree (Newton-CG)", "fit", N, n, ms)
+            add("NumPy tree (L-BFGS)", "fit", N, n, ms)
 
             # R benchmarks (pi + fit + samples)
             r_results = run_r_benchmark(N, n, seed, reps)
@@ -90,15 +83,21 @@ def run_grid(quick=False):
                 else:
                     add(r["method"], "samples", N, n, r["time_ms"])
 
-            # Sampling benchmarks
+            # Sampling (excl. precomputation)
             cp = ConditionalPoissonNumPy.from_weights(n, w)
-            sample_rng = np.random.RandomState(seed)
-
-            ms = time_fn(lambda: ConditionalPoissonNumPy.from_weights(n, w).sample(1, rng=sample_rng), reps=reps)
-            add("NumPy tree (1 sample, incl. build)", "samples", N, n, ms)
-
+            cp.sample(1, rng=sample_rng)  # warmup
             ms = time_fn(lambda: cp.sample(1, rng=sample_rng), reps=reps)
             add("NumPy tree (1 sample)", "samples", N, n, ms)
+
+            cpt = ConditionalPoissonTorch.from_weights(n, w)
+            cpt.sample(1, rng=sample_rng)  # warmup
+            ms = time_fn(lambda: cpt.sample(1, rng=sample_rng), reps=reps)
+            add("PyTorch tree (1 sample)", "samples", N, n, ms)
+
+            cp_seq = ConditionalPoissonSequentialNumPy.from_weights(n, w)
+            cp_seq.sample(1, rng=sample_rng)  # warmup
+            ms = time_fn(lambda: cp_seq.sample(1, rng=sample_rng), reps=reps)
+            add("Sequential (1 sample)", "samples", N, n, ms)
 
             print(f" done", file=sys.stderr)
 
