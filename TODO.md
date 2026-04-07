@@ -55,7 +55,7 @@
 
 ## Blog Polish
 
-- [ ] Add a note encouraging readers to report issues on the [GitHub issue tracker](https://github.com/timvieira/conditional-poisson-sampling/issues)
+- [x] ~~Add a note encouraging readers to report issues on the [GitHub issue tracker](https://github.com/timvieira/conditional-poisson-sampling/issues)~~ — done
 - [ ] Add a citation section at the end of the post (e.g., BibTeX snippet, suggested citation format)
 - [ ] Why are there still references to the NumPy implementation in the article? The timing section legitimately benchmarks the NumPy tree, but it should be framed as the reference/pedagogical implementation, not the recommended one.
 - [ ] Consistently color code math symbols and widgets — use the same colors for $P(S)$, $\pi$, and $w$ in both LaTeX and D3 widgets. Previously removed all color coding; bring it back in a principled way with a shared palette.
@@ -95,7 +95,7 @@
 ### Cleanup
 
 - [ ] Tidy up the repo (clean up unused files, organize structure)
-- [ ] Remove `memory/` directory (Claude session state, shouldn't be checked in)
+- [x] ~~Remove `memory/` directory (Claude session state, shouldn't be checked in)~~ — done
 - [x] ~~Remove `bench_scaling.png`~~ — done
 - [x] ~~Audit dead code: `torch_prototype.py`~~ — removed
 - [x] ~~Remove `display_utils.py`~~ — removed (only consumer was the deleted notebook)
@@ -107,7 +107,7 @@
 
 ### Packaging and Distribution
 
-- [ ] Add a `LICENSE` file (pyproject.toml says MIT but no license file exists)
+- [x] ~~Add a `LICENSE` file (pyproject.toml says MIT but no license file exists)~~ — done
 - [x] ~~Package as `conditional_poisson` with all four implementations~~ — done
 - [x] ~~Add optional-dependencies for dev/torch~~ — done
 - [ ] Package up the JavaScript library as an easy-to-install npm module

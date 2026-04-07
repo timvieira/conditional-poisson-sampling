@@ -9,5 +9,6 @@ build/
 node_modules/
 docs/css
 .claude/
+memory/
 timing_data.json
 timing_grid.json

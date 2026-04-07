@@ -3845,6 +3845,8 @@ The PyTorch implementation ([`conditional_poisson/torch.py`](https://github.com/
 
 **Acknowledgment.** This post was written with extensive help from [Claude Code](https://claude.ai/claude-code)—especially the interactive widgets, which would not have been possible without it.
 
+Found an error or have a suggestion? Please [open an issue](https://github.com/timvieira/conditional-poisson-sampling/issues) on GitHub.
+
 **References:**
 
 - [Hájek (1964)](https://doi.org/10.1214/aoms/1177700375). "Asymptotic Theory of Rejective Sampling with Varying Probabilities from a Finite Population." *The Annals of Mathematical Statistics*, 35(4), 1491–1523.

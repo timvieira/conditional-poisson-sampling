@@ -3830,6 +3830,7 @@ For non-diagonal $L$, the K-DPP introduces correlations between items (repulsion
 <p>There are no problem-specific derivations here—each row follows from a general theorem in automatic differentiation or computer algebra.</p>
 <p>The PyTorch implementation (<a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson/torch.py"><code>conditional_poisson/torch.py</code></a>) uses FFT-based polynomial multiplication with <strong>contour radius scaling</strong>—rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stable—achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.</p>
 <p><strong>Acknowledgment.</strong> This post was written with extensive help from <a href="https://claude.ai/claude-code">Claude Code</a>—especially the interactive widgets, which would not have been possible without it.</p>
+<p>Found an error or have a suggestion? Please <a href="https://github.com/timvieira/conditional-poisson-sampling/issues">open an issue</a> on GitHub.</p>
 <p><strong>References:</strong></p>
 <ul>
 <li>
