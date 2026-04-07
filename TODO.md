@@ -94,7 +94,8 @@
 - [ ] Remove `bench_scaling.png` from git tracking (114KB binary; `*.png` is in `.gitignore` but this was committed before the rule)
 - [x] ~~Audit dead code: `torch_prototype.py`~~ — removed
 - [ ] Decide: remove `display_utils.py`? Only imported by notebook cells, not source code.
-- [ ] Decide: remove `screenshot_test.mjs` / `test_animation.mjs`? Likely dead JS test files, not integrated into build or test pipeline.
+- [ ] Fix `test_animation.mjs` — update paths, verify it runs, integrate into CI
+- [ ] Add mathematical correctness tests for JS widget algorithms (product tree, quota splitting, polynomial multiplication, CDF computation). Either extend `test_animation.mjs` to check computed values against known answers, or extract JS algorithms into testable modules and test with Node.js.
 - [ ] Decide: remove `plot_timing_3d.py`? May be superseded by inline Plotly widget in the article.
 - [ ] Decide: remove `bench_scaling.py`? Standalone scaling analysis script. Still uses centralized classes but may be redundant with `bench_timing.py`.
 - [ ] Delete stale branches
