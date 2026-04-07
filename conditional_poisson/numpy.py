@@ -556,7 +556,8 @@ class ConditionalPoissonNumPy:
             raise ValueError("all pi_star must lie strictly in (0, 1)")
 
         # Warm start: logit(pi*)
-        theta0 = np.log(pi_star / (1.0 - pi_star))
+        from scipy.special import logit
+        theta0 = logit(pi_star)
 
         iter_count = [0]
 

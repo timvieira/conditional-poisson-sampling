@@ -347,7 +347,7 @@ class ConditionalPoissonTorch:
         tol : convergence tolerance on max|π(θ) - π★|.
         """
         pi_star = _to_tensor(pi_star, dtype).to(device=device)
-        theta = torch.log(pi_star / (1.0 - pi_star)).clone().requires_grad_(True)
+        theta = torch.logit(pi_star).clone().requires_grad_(True)
 
         # L-BFGS (Nocedal & Wright, Ch. 7): memory m, Wolfe line search.
         # The gradient is π(θ) - π★, so tolerance_grad = tol stops
