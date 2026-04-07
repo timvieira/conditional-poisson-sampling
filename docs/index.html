@@ -3111,7 +3111,7 @@ $$
 $$
 
 <p>
-<p>where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n} = \sum_{|S|=n} \prod_{i \in S} \w_i$ is the normalizing constant.  This is exactly the conditional Poisson distribution!  So the max-entropy distribution with inclusion-probability constraints must be a conditional Poisson sampling (CPS) distribution—the only question is <em>which</em> weights.</p>
+<p>where $\w_i = \exp(\theta_i)$ and $\Zw{\bw}{n} = \sum_{|S|=n} \prod_{i \in S} \w_i$ is the normalizing constant.  This is exactly the conditional Poisson distribution!  So the max-entropy distribution with inclusion-probability constraints must be a conditional Poisson sampling (CPS) distribution—the only question is <em>which</em> weights.</p>
 </p>
 
 <p>
@@ -3155,7 +3155,7 @@ $$
 </p>
 
 <p>
-<p><b>Why it works.</b>  Because the inclusion-probability constraints are linear in $\Ps$ and a feasible $\Ps$ exists (whenever $0 < \piptgt_i < 1$ and $\sum_{i=1}^{N} \piptgt_i = n$), there is no gap between the primal and dual optima.  So the optimal $\btheta$ from the dual gives weights $\w_i = e^{\theta_i}$ whose conditional Poisson distribution solves the primal: it achieves maximum entropy among all distributions over size-$n$ subsets, and its inclusion probabilities match the targets exactly, $\bpip(\btheta) = \bpiptgt$.</p>
+<p><b>Why it works.</b>  Because the inclusion-probability constraints are linear in $\Ps$ and a feasible $\Ps$ exists (whenever $0 < \piptgt_i < 1$ and $\sum_{i=1}^{N} \piptgt_i = n$), there is no gap between the primal and dual optima.  So the optimal $\btheta$ from the dual gives weights $\w_i = \exp(\theta_i)$ whose conditional Poisson distribution solves the primal: it achieves maximum entropy among all distributions over size-$n$ subsets, and its inclusion probabilities match the targets exactly, $\bpip(\btheta) = \bpiptgt$.</p>
 </p>
 
 </details>

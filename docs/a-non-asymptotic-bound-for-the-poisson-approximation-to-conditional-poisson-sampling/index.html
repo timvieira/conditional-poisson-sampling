@@ -89,7 +89,7 @@
 <p><strong>Conjecture.</strong><a href="test_identities.py#test_poisson_approximation_bound" title="test_poisson_approximation_bound" class="verified" target="_blank">✓</a>  For all $N \geq 2$, $1 \leq n < N$, positive weights $\w_1, \ldots, \w_N$, and all items $i$:</p>
 <p>$$|\pip_i - p_i| \;\leq\; \frac{p_i(1 - p_i)}{d}$$</p>
 <p>where $d \defeq \sum_j p_j(1-p_j) = \text{Var}(K)$ is the variance of the Poisson sample size $K = \sum_j I_j$.</p>
-<p><strong>Numerical evidence.</strong> The ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ has been computed across $>10^6$ random instances with $N$ up to $200$ and weight spreads up to $e^{12}$.  It grows slowly with $N$—from $\approx 0.38$ at $N = 3$ to $\approx 0.71$ at $N = 34$.  No violation has been found.</p>
+<p><strong>Numerical evidence.</strong> The ratio $|\pip_i - p_i| \cdot d / (p_i(1-p_i))$ has been computed across $>10^6$ random instances with $N$ up to $200$ and weight spreads up to $\exp(12)$.  It grows slowly with $N$—from $\approx 0.38$ at $N = 3$ to $\approx 0.71$ at $N = 34$.  No violation has been found.</p>
 <h2 id="the-extremal-family">The Extremal Family</h2>
 <p>The worst case has a clean structure: <strong>one outlier item with $p_0 \to 0$ among $N-1$ identical items with $p_j = q$</strong>.  For this family, the $N-1$ uniform items have $e_k = \binom{N-1}{k} w_q^k$, giving</p>
 <p>$$R_0 = \frac{w_q(N-n)}{n}, \qquad \pip_0 = \frac{w_0}{R_0 + w_0}.$$</p>
@@ -186,7 +186,7 @@ where $a$ is an explicit polynomial in the $p_{i_j}$ and the population summarie
 </ul>
 <p>Combining: $|\log R_i| \leq |p_i - 1/2|/\tilde{d} + 1/(2\tilde{d}) = \max(p_i, 1{-}p_i)/\tilde{d}$.</p>
 <p>This bound is numerically verified (max ratio 0.71) and the "slack" of $1/2$ in $\max(p_i, 1{-}p_i)$ vs $|p_i - 1/2|$ exactly absorbs the Edgeworth $P_1$ correction.</p>
-<p><strong>Gap.</strong>  The log-ratio bound $|\log R_i| \leq \max(p_i, 1{-}p_i)/\tilde{d}$ does <strong>not</strong> imply the original bound $(1+\w_i)|1-R_i|d \leq R_i + \w_i$ (the $|1 - e^\alpha|$ step is lossy—verified: 2.5M violations in the implication).</p>
+<p><strong>Gap.</strong>  The log-ratio bound $|\log R_i| \leq \max(p_i, 1{-}p_i)/\tilde{d}$ does <strong>not</strong> imply the original bound $(1+\w_i)|1-R_i|d \leq R_i + \w_i$ (the $|1 - \exp(\alpha)|$ step is lossy—verified: 2.5M violations in the implication).</p>
 <p>Moreover, the <strong>leading saddlepoint term exceeds the bound</strong> in some regimes (small $p_i$, small $d$).  The bound holds only through exact cancellation between leading and correction terms.  This rules out any proof that bounds these separately.</p>
 <h2 id="proof-attempt-4-induction-via-deletion-contraction">Proof Attempt 4: Induction via Deletion-Contraction</h2>
 <p>By deletion-contraction on item $j \neq i$:</p>
@@ -225,7 +225,7 @@ where $a$ is an explicit polynomial in the $p_{i_j}$ and the population summarie
 <td>Tilting/Edgeworth</td>
 <td>$\|\log R_i\| \leq \max(p,1{-}p)/\tilde{d}$</td>
 <td>Implication to original</td>
-<td>$\|1-e^\alpha\|$ step too lossy</td>
+<td>$\|1-\exp(\alpha)\|$ step too lossy</td>
 </tr>
 <tr>
 <td>Induction</td>
