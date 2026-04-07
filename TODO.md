@@ -21,13 +21,13 @@
 ## Implementation
 
 ### Code cleanup
-- [ ] Remove stale aliases and floating functions — `bench_samplers.py` has standalone `sequential_pi`, `sequential_sample`, `_build_dp_table` that duplicate the sequential classes
-- [ ] Replace Newton-CG fitting in `ConditionalPoissonNumPy` with L-BFGS (matching `ConditionalPoissonTorch.fit`). This removes the dependency on HVP/D-tree/CG solver for fitting.
-- [ ] Remove `hvp`, `_cg`, D-tree code (`_build_d_tree`, `_downward_pass` D-tree portions) from `ConditionalPoissonNumPy` — no longer needed once Newton-CG is replaced. Update README which lists `hvp` in the API table and code example.
+- [x] ~~Remove stale aliases and floating functions~~ — done
+- [x] ~~Replace Newton-CG with L-BFGS; remove hvp/D-tree/CG~~ — done
+- [x] ~~Remove `sample_sequential`~~ — done
+- [x] ~~Move tests to `tests/`~~ — done
 - [ ] Add fixed-point iteration `fit` method (matching R's `UPMEpiktildefrompik`: `theta += pi_star - pi(theta)`) as an alternative to L-BFGS. Compare running time of L-BFGS vs fixed-point iteration.
 - [ ] L-BFGS fitting convergence is much slower than the old Newton-CG (24 iterations vs 5 for N=10, non-monotone). Consider restoring Newton-CG as the default optimizer (requires HVP internally, not as public API) or tuning L-BFGS parameters.
-- [ ] Remove `sample_sequential` from `ConditionalPoissonNumPy` — use `ConditionalPoissonSequentialNumPy.sample` instead
-- [ ] Move tests modules to a `tests/` folder.
+- [ ] Rename `conditional_poisson/numpy.py` → `tree_numpy.py` and `conditional_poisson/torch.py` → `tree_torch.py` (or `fft_numpy.py`/`fft_torch.py`)? The current names don't distinguish the algorithm from the sequential variants.
 
 ### Sequential implementations
 - [ ] Add `fit` and `log_prob` to `ConditionalPoissonSequentialNumPy`
