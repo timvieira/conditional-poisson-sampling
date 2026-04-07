@@ -107,7 +107,7 @@ def run_grid(quick=False):
 if __name__ == "__main__":
     quick = "--quick" in sys.argv
     results = run_grid(quick=quick)
-    out_path = os.path.join(os.path.dirname(__file__), "timing_grid.json")
+    out_path = os.path.join(os.path.dirname(__file__), "results/timing_grid.json")
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\nWrote {len(results)} results to {out_path}", file=sys.stderr)

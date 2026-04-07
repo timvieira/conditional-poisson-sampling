@@ -129,7 +129,7 @@ def make_plot(data, experiment, title, out_path, label_map=None, figsize=(7, 4.5
 
 
 def main():
-    data_path = sys.argv[1] if len(sys.argv) > 1 else "timing_data.json"
+    data_path = sys.argv[1] if len(sys.argv) > 1 else "results/timing_data.json"
     data = load_data(data_path)
 
     base = os.path.dirname(__file__)

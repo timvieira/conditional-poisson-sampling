@@ -21,13 +21,13 @@ GITHUB_BASE = f"https://github.com/{REPO}/blob/{BRANCH}"
 
 PYTHON_FILES = [
     "tests/test_identities.py",
-    "bench_timing.py",
-    "bench_samplers.py",
+    "bench/bench_timing.py",
+    "bench/bench_samplers.py",
     "conditional_poisson/torch.py",
     "conditional_poisson/numpy.py",
 ]
 
-R_FILES = ["bench_timing_r.R"]
+R_FILES = ["bench/bench_timing_r.R"]
 
 OUTPUT = Path("content/figures/popover.js")
 

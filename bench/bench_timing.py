@@ -198,7 +198,7 @@ if __name__ == "__main__":
     quick = "--quick" in sys.argv
     results = run_benchmarks(quick=quick)
 
-    out_path = os.path.join(os.path.dirname(__file__), "timing_data.json")
+    out_path = os.path.join(os.path.dirname(__file__), "results/timing_data.json")
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\nWrote {len(results)} results to {out_path}", file=sys.stderr)

@@ -3173,12 +3173,12 @@ cp_fit = ConditionalPoissonNumPy.fit(pi_star, n, verbose=True)
 
 ## Timing
 
-The plots below compare wall-clock time across methods for four operations: computing the normalizing constant $\Z$, computing inclusion probabilities $\bpip$, fitting target $\bpip$ to weights, and drawing samples.  All timings use $n = 0.4N$ with weights drawn from $\text{Exp}(1)$.  Source code for each method is linked via the ✓ pills; the full benchmark script is <a href="bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.
+The plots below compare wall-clock time across methods for four operations: computing the normalizing constant $\Z$, computing inclusion probabilities $\bpip$, fitting target $\bpip$ to weights, and drawing samples.  All timings use $n = 0.4N$ with weights drawn from $\text{Exp}(1)$.  Source code for each method is linked via the ✓ pills; the full benchmark script is <a href="bench/bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.
 
 ### Computing $\Z$
 
 Three methods for computing the normalizing constant:
-<a href="bench_timing.py#dp_forward_Z" title="dp_forward_Z" class="verified" target="_blank">✓</a> DP forward pass $\mathcal{O}(Nn)$ ·
+<a href="bench/bench_timing.py#dp_forward_Z" title="dp_forward_Z" class="verified" target="_blank">✓</a> DP forward pass $\mathcal{O}(Nn)$ ·
 <a href="conditional_poisson/numpy.py" title="ConditionalPoissonNumPy.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
 <a href="conditional_poisson/torch.py#forward_log_Z" title="forward_log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$
 
@@ -3192,10 +3192,10 @@ The DP approach is fastest at small $N$ (no overhead), but the FFT tree overtake
 
 This is the main event.  The naive approach computes each $\pip_i$ independently via a leave-one-out forward pass; backpropagation replaces $N$ forward passes with a single backward pass, giving a factor-of-$N$ speedup:
 
-<a href="bench_timing.py#dp_loo_pi" title="dp_loo_pi" class="verified" target="_blank">✓</a> $N \times$ DP leave-one-out $\mathcal{O}(N^2 n)$ ·
-<a href="bench_timing.py#tree_loo_pi" title="tree_loo_pi" class="verified" target="_blank">✓</a> $N \times$ Tree leave-one-out $\mathcal{O}(N^2 \log^2 n)$ ·
-<a href="bench_samplers.py#sequential_pi" title="sequential_pi" class="verified" target="_blank">✓</a> Forward-backward DP $\mathcal{O}(Nn)$ ·
-<a href="bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R `sampling` package ·
+<a href="bench/bench_timing.py#dp_loo_pi" title="dp_loo_pi" class="verified" target="_blank">✓</a> $N \times$ DP leave-one-out $\mathcal{O}(N^2 n)$ ·
+<a href="bench/bench_timing.py#tree_loo_pi" title="tree_loo_pi" class="verified" target="_blank">✓</a> $N \times$ Tree leave-one-out $\mathcal{O}(N^2 \log^2 n)$ ·
+<a href="bench/bench_samplers.py#sequential_pi" title="sequential_pi" class="verified" target="_blank">✓</a> Forward-backward DP $\mathcal{O}(Nn)$ ·
+<a href="bench/bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R `sampling` package ·
 <a href="conditional_poisson/numpy.py" title="ConditionalPoissonNumPy.incl_prob" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
 <a href="conditional_poisson/torch.py#compute_pi" title="compute_pi" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$
 
@@ -3210,7 +3210,7 @@ The leave-one-out methods (gray, dashed) are $\sim\!N\times$ slower than their b
 Given target inclusion probabilities $\bpiptgt$, find weights $\bw$ such that $\bpip(\bw) = \bpiptgt$:
 
 <a href="conditional_poisson/numpy.py#fit" title="ConditionalPoissonNumPy.fit" class="verified" target="_blank">✓</a> Product tree + Newton-CG ·
-<a href="bench_timing_r.R" title="UPMEpiktildefrompik" class="verified" target="_blank">✓</a> R `sampling::UPMEpiktildefrompik` (fixed-point iteration)
+<a href="bench/bench_timing_r.R" title="UPMEpiktildefrompik" class="verified" target="_blank">✓</a> R `sampling::UPMEpiktildefrompik` (fixed-point iteration)
 
 <figure>
 <img src="../figures/timing_fit.svg" alt="Log-log plot: fitting target pi to weights" style="width:100%">
@@ -3220,7 +3220,7 @@ Our Newton-CG optimizer uses true Hessian-vector products computed via the produ
 
 ### Drawing Samples
 
-<a href="bench_timing_r.R" title="UPMEqfromw + UPMEsfromq" class="verified" target="_blank">✓</a> R `sampling` (1 sample, with and without DP rebuild) ·
+<a href="bench/bench_timing_r.R" title="UPMEqfromw + UPMEsfromq" class="verified" target="_blank">✓</a> R `sampling` (1 sample, with and without DP rebuild) ·
 <a href="conditional_poisson/numpy.py" title="ConditionalPoissonNumPy.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (with and without tree build)
 
 <figure>

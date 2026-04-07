@@ -180,7 +180,7 @@ def plot_crosssections(data, experiment, title, out_path):
 
 
 def main():
-    data_path = sys.argv[1] if len(sys.argv) > 1 else "timing_grid.json"
+    data_path = sys.argv[1] if len(sys.argv) > 1 else "results/timing_grid.json"
     data = load_data(data_path)
     base = os.path.dirname(__file__)
 
