@@ -20,7 +20,7 @@ BRANCH = "main"
 GITHUB_BASE = f"https://github.com/{REPO}/blob/{BRANCH}"
 
 PYTHON_FILES = [
-    "test_identities.py",
+    "tests/test_identities.py",
     "bench_timing.py",
     "bench_samplers.py",
     "conditional_poisson_torch.py",

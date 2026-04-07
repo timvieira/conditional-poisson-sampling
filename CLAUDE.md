@@ -54,14 +54,14 @@ When changing notation or API names, update **all** of these in the same commit:
 
 ## Blog post ↔ identity tests (critical)
 
-The blog post (`content/conditional-poisson-sampling.ipynb`) and the identity test suite (`test_identities.py`) must be kept in exact correspondence. Every mathematical identity, equality, and theorem stated in the blog post has a matching test that verifies it numerically. Inline `<small>` references in the notebook link each claim to its test.
+The blog post (`content/conditional-poisson-sampling.md`) and the identity test suite (`tests/test_identities.py`) must be kept in exact correspondence. Every mathematical identity, equality, and theorem stated in the blog post has a matching test that verifies it numerically. Inline `<small>` references in the notebook link each claim to its test.
 
 **Rules:**
-- When adding or changing a mathematical claim in the blog post, add or update the corresponding test in `test_identities.py` in the same commit.
+- When adding or changing a mathematical claim in the blog post, add or update the corresponding test in `tests/test_identities.py` in the same commit.
 - When fixing a test, verify the blog post statement still matches what the test checks.
 - Never delete a test without also removing or correcting the claim it verified.
 - If a test fails, the blog post is wrong until proven otherwise — do not weaken the test to make it pass.
-- Run `python3 test_identities.py` before committing any change to the notebook or the test file.
+- Run `python3 tests/test_identities.py` before committing any change to the article or the test file.
 
 The code informs the tests and the tests inform the code. They are two views of the same truth. **Testing is not optional — it is the ground truth.** If the test says the math is wrong, the math is wrong. No exceptions, no "we'll fix it later."
 
@@ -86,5 +86,5 @@ The build system (`~/projects/blog/main/build.py`) renders the .md file using Py
 - Commit and push after every logical change
 - Run `blog deploy` to publish changes to the live site
 - Run tests before committing
-- **Deploy after any change to snippet source files.** The blog's popover code snippets are extracted from Python and R source files listed in `extract_snippets.py` (`test_identities.py`, `bench_timing.py`, `bench_samplers.py`, `conditional_poisson_torch.py`, `conditional_poisson_numpy.py`, `bench_timing_r.R`). Any change to these files changes the deployed snippets and requires `blog deploy`.
+- **Deploy after any change to snippet source files.** The blog's popover code snippets are extracted from Python and R source files listed in `extract_snippets.py` (`tests/test_identities.py`, `bench_timing.py`, `bench_samplers.py`, `conditional_poisson_torch.py`, `conditional_poisson_numpy.py`, `bench_timing_r.R`). Any change to these files changes the deployed snippets and requires `blog deploy`.
 - **Never write citations without verifying them** — check title, authors, year, venue, and URL against the actual publication. Hallucinated references are unacceptable.

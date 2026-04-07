@@ -6,6 +6,10 @@ Each test function is named after the claim it verifies, with a docstring
 quoting or paraphrasing the relevant passage.
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
 from itertools import combinations
 from scipy.signal import convolve as poly_mul

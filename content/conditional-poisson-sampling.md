@@ -28,23 +28,23 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 </div>
 
 <div class="margin-note">
-<a href="test_identities.py" class="verified" target="_blank">✓</a> = numerically verified—each links to its test case in <a href="test_identities.py" style="color:#999">test_identities.py</a>.
+<a href="tests/test_identities.py" class="verified" target="_blank">✓</a> = numerically verified—each links to its test case in <a href="tests/test_identities.py" style="color:#999">test_identities.py</a>.
 </div>
 
 Suppose you want to draw a random subset of exactly $n$ items from a universe of $N$ items, where each item $i$ has a positive weight $\w_i$.<footnote>We assume $\w_i \in (0, \infty)$.  This is without loss of generality: items with $\w_i = 0$ are excluded from the universe (they are never selected), and items with $\w_i = \infty$ are deterministically included (reduce $n$ and $N$ by 1 each).  The general case reduces to the finite positive case by preprocessing.</footnote>
-The **conditional Poisson distribution** assigns each size-$n$ subset a probability proportional to the product of its weights:<a href="test_identities.py#test_distribution_definition" title="test_distribution_definition, test_Z_is_elementary_symmetric_poly" class="verified" target="_blank">✓</a>
+The **conditional Poisson distribution** assigns each size-$n$ subset a probability proportional to the product of its weights:<a href="tests/test_identities.py#test_distribution_definition" title="test_distribution_definition, test_Z_is_elementary_symmetric_poly" class="verified" target="_blank">✓</a>
 
 $$
 \Ps(S) \propto \mathbf{1}\big[ |S| = n\big] \prod_{i \in S} \w_i
 $$
 
-The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is a weighted generalization of the binomial coefficient, which recovers $\binom{N}{n} = \Zw{\bw}{n}$ when $\bw = \mathbf{1}^N$.<a href="test_identities.py#test_Z_equals_binomial_when_uniform" title="test_Z_equals_binomial_when_uniform" class="verified" target="_blank">✓</a>
+The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is a weighted generalization of the binomial coefficient, which recovers $\binom{N}{n} = \Zw{\bw}{n}$ when $\bw = \mathbf{1}^N$.<a href="tests/test_identities.py#test_Z_equals_binomial_when_uniform" title="test_Z_equals_binomial_when_uniform" class="verified" target="_blank">✓</a>
 
 **Inclusion probabilities.** The inclusion probability $\pip_i \defeq \sum_{S} \Ps(S)\, \mathbf{1}[i \in S]$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$, as the other items push back through the size constraint $|S| = n$. Later in this article, we provide an interactive widget for exploring the nonlinear relationship between $\bw$ and $\bpip$.
 
-**Why is this distribution special?** The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, it is the unique *maximum-entropy* one<a href="test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>—making the fewest assumptions beyond the marginals ([Jaynes, 1957](https://doi.org/10.1103/PhysRev.106.620); [Chen, Dempster & Liu, 1994](https://academic.oup.com/biomet/article-abstract/81/3/457/256956)), in the same sense that the Gaussian is max-entropy for given mean and variance.  The log-normalizer $\log \Zw{\bw}{n}$ is convex in $\btheta$, so many properties follow mechanically: inclusion probabilities are the gradient ($\pip_i = \partial \log \Z / \partial \theta_i$) and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the *exponential fixed-size design* for this reason.
+**Why is this distribution special?** The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, it is the unique *maximum-entropy* one<a href="tests/test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>—making the fewest assumptions beyond the marginals ([Jaynes, 1957](https://doi.org/10.1103/PhysRev.106.620); [Chen, Dempster & Liu, 1994](https://academic.oup.com/biomet/article-abstract/81/3/457/256956)), in the same sense that the Gaussian is max-entropy for given mean and variance.  The log-normalizer $\log \Zw{\bw}{n}$ is convex in $\btheta$, so many properties follow mechanically: inclusion probabilities are the gradient ($\pip_i = \partial \log \Z / \partial \theta_i$) and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the *exponential fixed-size design* for this reason.
 
-**Relationship to Poisson sampling.** In Poisson sampling,<footnote>Named after mathematician [Siméon Denis Poisson](https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson).  Although poisson is the French word for fish, no fishing metaphor is intended.</footnote> each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_{i=1}^{N} \mathbf{1}[i \in S]$ is random.  The *conditional* Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.  The weight $\w_i$ is the *odds* of the $i$<sup>th</sup> coin: $\w_i = p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a>
+**Relationship to Poisson sampling.** In Poisson sampling,<footnote>Named after mathematician [Siméon Denis Poisson](https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson).  Although poisson is the French word for fish, no fishing metaphor is intended.</footnote> each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_{i=1}^{N} \mathbf{1}[i \in S]$ is random.  The *conditional* Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.  The weight $\w_i$ is the *odds* of the $i$<sup>th</sup> coin: $\w_i = p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="tests/test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a>
 
 **Sampling without replacement.** The following construction shows how conditional
 Poisson can be used for sampling without replacement.  Draw $n$ items
@@ -60,8 +60,8 @@ $\quad$ $S \leftarrow \{s_1, \ldots, s_n\}$<br>
 <b>return</b> $S$
 </div>
 
-The resulting distribution over size-$n$ subsets is exactly $\Ps(S)$.<a href="test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a>
-This rejection sampler is not a practical sampling algorithm;<footnote>The acceptance probability of this construction is $n! \cdot \Zw{\bw}{n} / \W^n$.<a href="test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a></footnote>
+The resulting distribution over size-$n$ subsets is exactly $\Ps(S)$.<a href="tests/test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a>
+This rejection sampler is not a practical sampling algorithm;<footnote>The acceptance probability of this construction is $n! \cdot \Zw{\bw}{n} / \W^n$.<a href="tests/test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a></footnote>
 it simply establishes what the distribution *is*.  We will derive sampling algorithms that sample from $\Ps(S)$ efficiently.
 
 
@@ -338,7 +338,7 @@ $$
 
 **Why does this work?** When you expand the product, each factor $(1 + \w_i \z)$ contributes either $1$ (item $i$ excluded) or $\w_i \z$ (item $i$ included).  A single term in the expansion picks one choice per factor, giving $\prod_{i \in S} \w_i \cdot \z^{|S|}$ for some subset $S$.  The exponent of $\z$ counts how many items were included.  Summing over all $2^N$ terms and collecting by powers of $\z$, the coefficient of $\z^k$ is exactly $\sum_{|S|=k} \prod_{i \in S} \w_i = \Zw{\bw}{k}$.
 
-So the $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the *subproduct tree* (see [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065), Chapter 10).
+So the $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="tests/test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the *subproduct tree* (see [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065), Chapter 10).
 
 **Polynomials as arrays.** In code, a polynomial like $1 + 3\z + 2\z^2$ is just the array `[1, 3, 2]`.  The $\z$ is a *formal* variable—we never substitute a number into it; it just tracks which coefficient is which.  Multiplying two polynomials corresponds to *convolving* their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ convolves `[1, 2]` with `[1, 3]` to get `[1, 5, 6]`.  It turns out that convolution can be done efficiently using the [fast Fourier transform](https://en.wikipedia.org/wiki/Fast_Fourier_transform) (FFT), costing $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.
 
@@ -2826,7 +2826,7 @@ $S \leftarrow \text{sample}(\text{root}, n)$
 
 The tree is built once ($\mathcal{O}(N \log^2 N)$) and reused for each sample ($\mathcal{O}(n \log N)$ per sample)—at each of the $\mathcal{O}(\log N)$ levels, only nodes whose quota is nonzero are visited, and there are at most $n$ such nodes.  (When $n \approx N$, nearly all nodes are visited, so the per-sample cost approaches $\mathcal{O}(N \log N)$.)  No $\binom{N}{n}$-sized table is ever constructed.
 
-All computations are verified against brute-force enumeration in the test suite.<a href="test_identities.py" class="verified" target="_blank">✓</a>
+All computations are verified against brute-force enumeration in the test suite.<a href="tests/test_identities.py" class="verified" target="_blank">✓</a>
 
 
 ## Basic Usage
@@ -2858,7 +2858,7 @@ tensor(6.53e-08)
 
 ## The Poisson Approximation
 
-The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="test_identities.py#test_pi_sums_to_n" title="test_pi_sums_to_n" class="verified" target="_blank">✓</a> and each $\pip_i \in [0, 1]$.<a href="test_identities.py#test_pi_in_unit_interval" title="test_pi_in_unit_interval" class="verified" target="_blank">✓</a>  Items with larger weights get higher inclusion probabilities, but the relationship is nonlinear—the other weights push back through the size constraint $|S| = n$.
+The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="tests/test_identities.py#test_pi_sums_to_n" title="test_pi_sums_to_n" class="verified" target="_blank">✓</a> and each $\pip_i \in [0, 1]$.<a href="tests/test_identities.py#test_pi_in_unit_interval" title="test_pi_in_unit_interval" class="verified" target="_blank">✓</a>  Items with larger weights get higher inclusion probabilities, but the relationship is nonlinear—the other weights push back through the size constraint $|S| = n$.
 
 **Poisson approximation.**  If each item were included independently with probability $p_i = \w_i r/(1+\w_i r)$, where $r$ is the **tilting parameter** that makes $\sum_{i=1}^{N} p_i = n$, we would get
 
@@ -3072,7 +3072,7 @@ $$\pip_i \;\approx\; \frac{\w_i \, r}{1 + \w_i \, r}.$$
 
 ## Fitting Weights to Target Probabilities
 
-A common use case: you know the inclusion probabilities you *want* and need to find weights that produce them.<a href="test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a>
+A common use case: you know the inclusion probabilities you *want* and need to find weights that produce them.<a href="tests/test_identities.py#test_fitting_recovers_target" title="test_fitting_recovers_target" class="verified" target="_blank">✓</a>
 
 **Objective.**  Given target inclusion probabilities $\bpiptgt$, we find weights $\bw$ (equivalently, log-weights $\btheta$ where $\theta_i = \log \w_i$) by maximizing
 
@@ -3151,7 +3151,7 @@ $$
 
 </details>
 
-**Gradient.**  $\nabla_{\btheta} \ell(\btheta) = \bpiptgt - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpiptgt$ exactly, so the gradient is zero.  Each evaluation of $\ell(\btheta)$ and $\nabla \ell(\btheta)$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
+**Gradient.**  $\nabla_{\btheta} \ell(\btheta) = \bpiptgt - \bpip(\btheta)$.<a href="tests/test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpiptgt$ exactly, so the gradient is zero.  Each evaluation of $\ell(\btheta)$ and $\nabla \ell(\btheta)$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
 
 **Optimizer.**  L-BFGS uses only the gradient $\bpip(\btheta) - \bpiptgt$ (no second-order machinery needed).  The [Poisson approximation](#The-Poisson-Approximation) provides a warm start: $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.
 
@@ -3388,7 +3388,7 @@ The computation is just the product tree: build $\prod_{i=1}^{N} (1 + \w_i \z)$ 
 
 Using FFT for the polynomial multiplications gives $\mathcal{O}(N \log^2 n)$ complexity (with truncation to degree $n$).  But naively, FFT introduces rounding errors $\approx \varepsilon \cdot \max_k|c_k|$ per coefficient, where $c_k$ denotes the $k$<sup>th</sup> coefficient of the product polynomial $\prod_{i=1}^{N}(1 + \w_i \z) = \sum_{k=0}^{N} c_k \z^k$.  The largest coefficient (near degree $N/2$) can be $\approx 10^{300}$ times larger than $c_n$, the coefficient we need—so FFT noise drowns the signal.
 
-**The key identity.**  For any $r > 0$:<a href="test_identities.py#test_contour_scaling" title="test_contour_scaling" class="verified" target="_blank">✓</a>
+**The key identity.**  For any $r > 0$:<a href="tests/test_identities.py#test_contour_scaling" title="test_contour_scaling" class="verified" target="_blank">✓</a>
 
 $$\Zw{\bw}{n} = r^{-n} \cdot \llbracket \textstyle\prod_{i=1}^{N}(1 + \w_i r\, \z) \rrbracket(\z^n)$$
 
@@ -3396,7 +3396,7 @@ This is immediate: each $\z^n$ term in the product picks up a factor of $r$ per 
 
 **Choosing $r$.**  The FFT error in $c_n$ is $\mathcal{O}(\varepsilon \cdot \max_k |c_k|)$, so the relative error is $\max_k |c_k| / |c_n|$ times machine epsilon.  If $c_n$ is the largest coefficient, the relative error is just $\mathcal{O}(\varepsilon)$.  After rescaling by $r$, the $k$<sup>th</sup> coefficient becomes $c_k(r) = \Zw{\bw}{k} \cdot r^k$.  We want $r$ such that $c_n(r) \approx \max_k c_k(r)$.
 
-This is where the [Poisson approximation](#The-Poisson-Approximation) reappears.  Define $p_i \defeq \w_i r/(1 + \w_i r)$—the same Poisson inclusion probabilities from earlier.  Then $c_k(r) = \Pr[K = k] \cdot \prod_{i=1}^{N}(1+\w_i r)$ where $K \defeq \sum_{i=1}^{N} \text{Bernoulli}(p_i)$ and $\prod_{i=1}^{N}(1+\w_i r)$ is independent of $k$.  So $\arg\max_k c_k(r) = \text{mode}(K)$.  For a sum of independent Bernoullis, $|\text{mode}(K) - \mathbb{E}[K]| \le 1$ ([Darroch, 1964](https://doi.org/10.1214/aoms/1177703287)).  Setting $\mathbb{E}[K] = n$ places the mode at degree $n \pm 1$, which means the optimal contour radius is exactly the tilting parameter from the Poisson approximation:<a href="test_identities.py#test_contour_r_solves_expected_size" title="test_contour_r_solves_expected_size" class="verified" target="_blank">✓</a>
+This is where the [Poisson approximation](#The-Poisson-Approximation) reappears.  Define $p_i \defeq \w_i r/(1 + \w_i r)$—the same Poisson inclusion probabilities from earlier.  Then $c_k(r) = \Pr[K = k] \cdot \prod_{i=1}^{N}(1+\w_i r)$ where $K \defeq \sum_{i=1}^{N} \text{Bernoulli}(p_i)$ and $\prod_{i=1}^{N}(1+\w_i r)$ is independent of $k$.  So $\arg\max_k c_k(r) = \text{mode}(K)$.  For a sum of independent Bernoullis, $|\text{mode}(K) - \mathbb{E}[K]| \le 1$ ([Darroch, 1964](https://doi.org/10.1214/aoms/1177703287)).  Setting $\mathbb{E}[K] = n$ places the mode at degree $n \pm 1$, which means the optimal contour radius is exactly the tilting parameter from the Poisson approximation:<a href="tests/test_identities.py#test_contour_r_solves_expected_size" title="test_contour_r_solves_expected_size" class="verified" target="_blank">✓</a>
 
 $$\sum_{i=1}^{N} \frac{\w_i \cdot r}{1 + \w_i \cdot r} = \sum_{i=1}^{N} p_i = n$$
 
@@ -3645,7 +3645,7 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
 
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
-**Numerical validation.** The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$).  With $r=1$ the dynamic range is $\approx 10^{16}$, destroying all precision.  The optimal $r^*$ brings it to $\approx 1$.<a href="test_identities.py#test_rescaling_dynamic_range" title="test_rescaling_dynamic_range" class="verified" target="_blank">✓</a>
+**Numerical validation.** The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$).  With $r=1$ the dynamic range is $\approx 10^{16}$, destroying all precision.  The optimal $r^*$ brings it to $\approx 1$.<a href="tests/test_identities.py#test_rescaling_dynamic_range" title="test_rescaling_dynamic_range" class="verified" target="_blank">✓</a>
 
 <div id="r-comparison"></div>
 <script>
@@ -3755,7 +3755,7 @@ $$
 \hat{\mu}_{\text{HT}}(S) = \sum_{i \in S} \frac{p(i)}{\pip_i}\, f(i), \quad S \sim \Ps_n
 $$
 
-This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.
+This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="tests/test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.
 
 **Example.** With $N = 100$ items and $n = 5$, set weights proportional to $p(i)$ so that high-probability items are more likely to be selected.  Each sample gives 5 distinct evaluations of $f$; the HT formula reweights them to produce an unbiased estimate of the full sum.
 
@@ -3771,9 +3771,9 @@ The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> [elementary symme
 The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:
 
 $$\pip_i = \frac{\partial \log \Z}{\partial \theta_i} = \frac{\w_i \cdot \Zw{\bw^{(-i)}}{n-1}}{\Zw{\bw}{n}}$$
-<a href="test_identities.py#test_pi_is_gradient_of_log_Z" title="test_pi_is_gradient_of_log_Z, test_pi_leave_one_out, test_pi_matches_brute_force" class="verified" target="_blank">✓</a>
+<a href="tests/test_identities.py#test_pi_is_gradient_of_log_Z" title="test_pi_is_gradient_of_log_Z, test_pi_leave_one_out, test_pi_matches_brute_force" class="verified" target="_blank">✓</a>
 
-The leave-one-out formula generalizes to **higher-order inclusion probabilities**: $\pip(X) = P(X \subseteq S) = \prod_{i \in X} \w_i \cdot \Zw{\bw^{(-X)}}{n-|X|} / \Zw{\bw}{n}$.<a href="test_identities.py#test_higher_order_inclusion" title="test_higher_order_inclusion" class="verified" target="_blank">✓</a>
+The leave-one-out formula generalizes to **higher-order inclusion probabilities**: $\pip(X) = P(X \subseteq S) = \prod_{i \in X} \w_i \cdot \Zw{\bw^{(-X)}}{n-|X|} / \Zw{\bw}{n}$.<a href="tests/test_identities.py#test_higher_order_inclusion" title="test_higher_order_inclusion" class="verified" target="_blank">✓</a>
 
 ### Recurrences and Algorithms
 
@@ -3781,7 +3781,7 @@ The leave-one-out formula generalizes to **higher-order inclusion probabilities*
 
 $$\Zw{\w_1, \ldots, \w_m}{k} = \Zw{\w_1, \ldots, \w_{m-1}}{k} + \w_m \cdot \Zw{\w_1, \ldots, \w_{m-1}}{k-1}$$
 
-with base cases $\Zw{\cdot}{0} = 1$ and $\Zw{\cdot}{k} = 0$ for $k < 0$ or $k > m$.  This is a weighted generalization of Pascal's identity $\binom{m}{k} = \binom{m-1}{k} + \binom{m-1}{k-1}$.  Include item $m$ (second term) or exclude it (first term).<a href="test_identities.py#test_weighted_pascal_recurrence" title="test_weighted_pascal_recurrence" class="verified" target="_blank">✓</a>
+with base cases $\Zw{\cdot}{0} = 1$ and $\Zw{\cdot}{k} = 0$ for $k < 0$ or $k > m$.  This is a weighted generalization of Pascal's identity $\binom{m}{k} = \binom{m-1}{k} + \binom{m-1}{k-1}$.  Include item $m$ (second term) or exclude it (first term).<a href="tests/test_identities.py#test_weighted_pascal_recurrence" title="test_weighted_pascal_recurrence" class="verified" target="_blank">✓</a>
 
 
 Running this DP forward gives $\Z$; running backpropagation on it gives $\bpip$—all in $\mathcal{O}(Nn)$.  This is simpler than the product tree for moderate $N$, and illustrates the same principle: the gradient comes for free via automatic differentiation.
@@ -3790,7 +3790,7 @@ Running this DP forward gives $\Z$; running backpropagation on it gives $\bpip$�
 
 $$\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$$
 
-This is a weighted generalization of [Vandermonde's identity](https://en.wikipedia.org/wiki/Vandermonde%27s_identity) $\binom{a+b}{k} = \sum_{j=0}^{k} \binom{a}{j}\binom{b}{k-j}$.<a href="test_identities.py#test_weighted_vandermonde" title="test_weighted_vandermonde" class="verified" target="_blank">✓</a>  The proof is immediate from the generating function: $\Zw{\bw}{k}$ is the $k$<sup>th</sup> coefficient of $\prod_{i=1}^{N}(1 + \w_i \z)$, and factoring this product over $A \cup B$ turns coefficient extraction into a convolution.
+This is a weighted generalization of [Vandermonde's identity](https://en.wikipedia.org/wiki/Vandermonde%27s_identity) $\binom{a+b}{k} = \sum_{j=0}^{k} \binom{a}{j}\binom{b}{k-j}$.<a href="tests/test_identities.py#test_weighted_vandermonde" title="test_weighted_vandermonde" class="verified" target="_blank">✓</a>  The proof is immediate from the generating function: $\Zw{\bw}{k}$ is the $k$<sup>th</sup> coefficient of $\prod_{i=1}^{N}(1 + \w_i \z)$, and factoring this product over $A \cup B$ turns coefficient extraction into a convolution.
 
 <details class="derivation">
 <summary>Proof</summary>
@@ -3810,7 +3810,7 @@ This is why polynomial multiplication computes $\Z$: the product tree exploits t
 
 $$\Zw{\bw}{k} = \sum_{i=1}^{k} \frac{(-1)^{i-1}}{k}\, \Zw{\bw}{k-i} \cdot g_i$$
 
-<a href="test_identities.py#test_newtons_identities" title="test_newtons_identities" class="verified" target="_blank">✓</a> This is an $\mathcal{O}(Nn)$ algorithm that only needs the power sums, not the individual weights—useful when the universe is implicitly defined (e.g., paths in a weighted finite-state automaton, where $g_k$ can be computed via matrix methods).
+<a href="tests/test_identities.py#test_newtons_identities" title="test_newtons_identities" class="verified" target="_blank">✓</a> This is an $\mathcal{O}(Nn)$ algorithm that only needs the power sums, not the individual weights—useful when the universe is implicitly defined (e.g., paths in a weighted finite-state automaton, where $g_k$ can be computed via matrix methods).
 
 ### Connection to K-DPPs
 
@@ -3821,7 +3821,7 @@ A $K$-DPP (fixed-size determinantal point process) on $\{1, \ldots, N\}$ with a 
 
 $$\mathcal{P}_L^K(S) = \frac{\det(L_S)}{\sum_{|S'|=K} \det(L_{S'})} = \frac{\prod_{i \in S} \w_i}{\Zw{\bw}{K}}$$
 
-since the determinant of a diagonal submatrix is the product of its diagonal entries.<a href="test_identities.py#test_kdpp_diagonal" title="test_kdpp_diagonal" class="verified" target="_blank">✓</a>  The normalizer $\sum_{|S|=K} \det(L_S) = e_K(\lambda_1, \ldots, \lambda_N)$ is an elementary symmetric polynomial of the eigenvalues—which for a diagonal matrix are just the weights.  Newton's identities connect the two: compute $e_K$ from the power sums $g_k = \text{tr}(L^k)$.
+since the determinant of a diagonal submatrix is the product of its diagonal entries.<a href="tests/test_identities.py#test_kdpp_diagonal" title="test_kdpp_diagonal" class="verified" target="_blank">✓</a>  The normalizer $\sum_{|S|=K} \det(L_S) = e_K(\lambda_1, \ldots, \lambda_N)$ is an elementary symmetric polynomial of the eigenvalues—which for a diagonal matrix are just the weights.  Newton's identities connect the two: compute $e_K$ from the power sums $g_k = \text{tr}(L^k)$.
 
 For non-diagonal $L$, the K-DPP introduces correlations between items (repulsion), while the conditional Poisson distribution has only the size constraint.  See [Kulesza & Taskar (2012)](https://arxiv.org/abs/1207.6083) for details.
 
