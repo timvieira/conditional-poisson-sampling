@@ -44,7 +44,6 @@ STYLE = {
     "R:sampling (1 sample, excl. DP)":      {"color": "#FF9800", "marker": "h", "ls": ":",  "lw": 1.5, "ms": 7},
     "NumPy tree (1 sample, incl. build)":   {"color": "#5b9bd5", "marker": "D", "ls": "--", "lw": 1.5, "ms": 5},
     "NumPy tree (1 sample)":     {"color": "#5b9bd5", "marker": "o", "ls": "--", "lw": 1.5, "ms": 5},
-    "NumPy tree (10k samples)":  {"color": "#5b9bd5", "marker": "o", "ls": "-",  "lw": 2,   "ms": 6},
 }
 
 # Map method names in pi experiment that reuse Z names
@@ -73,7 +72,6 @@ COMPLEXITY = {
     "R:sampling (1 sample, excl. DP)":      r"R sampling (1 sample, excl. DP)",
     "NumPy tree (1 sample, incl. build)":   r"product tree (1 sample, incl. build)",
     "NumPy tree (1 sample)":     r"product tree (1 sample, excl. build)",
-    "NumPy tree (10k samples)":  r"product tree (10k samples, excl. build)",
 }
 
 

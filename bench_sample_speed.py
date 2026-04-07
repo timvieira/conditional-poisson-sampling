@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Benchmark single-sample speed across sampler implementations.
 
-Compares: Python sequential, simple tree (precomputed CDFs), NumPy tree
-(vectorized), PyTorch tree, and R sequential — all drawing one sample
-from a precomputed structure.
+Compares: Python sequential, simple tree (precomputed CDFs), NumPy tree,
+PyTorch tree, and R sequential — all drawing one sample from a
+precomputed structure.
 
 Usage:
     python bench_sample_speed.py [--quick]
@@ -118,7 +118,7 @@ def main():
             lambda: simple_tree_sample(tree_cdfs, S, N, n, rng), reps
         )
 
-        # NumPy tree (vectorized)
+        # NumPy tree
         cp.sample(1, rng=seed)  # warmup
         timings["NumPy tree"] = time_fn(
             lambda: cp.sample(1, rng=seed), reps

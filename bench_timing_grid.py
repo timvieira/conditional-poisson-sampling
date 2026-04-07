@@ -100,10 +100,6 @@ def run_grid(quick=False):
             ms = time_fn(lambda: cp.sample(1, rng=sample_rng), reps=reps)
             add("NumPy tree (1 sample)", "samples", N, n, ms)
 
-            ms = time_fn(lambda: cp.sample(10_000, rng=sample_rng),
-                         reps=max(1, reps // 2), warmup=1)
-            add("NumPy tree (10k samples)", "samples", N, n, ms)
-
             print(f" done", file=sys.stderr)
 
     return results
