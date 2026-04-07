@@ -266,8 +266,7 @@ class ConditionalPoissonNumPy:
     -------
     log_prob(S)         scalar or (M,) log-probabilities
     sample(M, rng)      (M, n) int array of sorted subsets
-    hvp(v)              Cov[Z] v  (positive semi-definite, null-space = span{1})
-    fit_inplace(pi_star)  update theta in-place; returns self
+    fit_inplace(pi_star)  update theta in-place via L-BFGS; returns self
 
     Notes
     -----

@@ -19,7 +19,6 @@ draws one sample by scanning items and flipping biased coins.
 from __future__ import annotations
 import torch
 import math
-from bisect import bisect_left as _bisect_left
 from typing import Optional
 
 

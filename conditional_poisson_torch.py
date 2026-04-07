@@ -5,9 +5,8 @@ conditional_poisson_torch.py
 PyTorch implementation of the conditional Poisson distribution.
 
 Uses FFT-based polynomial product tree with contour radius scaling for
-O(N log² n) complexity and full autograd support.  Gradients (π), HVP
-(Cov·v), and fitting come from torch.autograd — no hand-coded downward
-pass or D-tree needed.
+O(N log² n) complexity and full autograd support.  Gradients (π) and
+fitting come from torch.autograd — no hand-coded downward pass needed.
 
 Weights must be finite and positive.  For forced inclusion/exclusion,
 pre-filter the universe before constructing.
@@ -304,7 +303,6 @@ class ConditionalPoissonTorch:
     -------
     log_prob(S)         log-probability of subset(s)
     sample(M)           draw M independent subsets
-    hvp(v)              Cov[1_S] v
     """
 
     def __init__(self, n: int, theta, *, dtype=torch.float64, device=None):

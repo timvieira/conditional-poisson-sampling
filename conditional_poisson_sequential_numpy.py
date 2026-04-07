@@ -18,7 +18,6 @@ draws one sample by scanning items and flipping biased coins.
 
 from __future__ import annotations
 import numpy as np
-from bisect import bisect_left
 from typing import Optional, Union
 
 

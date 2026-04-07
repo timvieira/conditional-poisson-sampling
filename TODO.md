@@ -26,6 +26,7 @@
 - [ ] Remove `hvp`, `_cg`, D-tree code (`_build_d_tree`, `_downward_pass` D-tree portions) from `ConditionalPoissonNumPy` — no longer needed once Newton-CG is replaced. Update README which lists `hvp` in the API table and code example.
 - [ ] Add fixed-point iteration `fit` method (matching R's `UPMEpiktildefrompik`: `theta += pi_star - pi(theta)`) as an alternative to L-BFGS. Compare running time of L-BFGS vs fixed-point iteration.
 - [ ] Remove `sample_sequential` from `ConditionalPoissonNumPy` — use `ConditionalPoissonSequentialNumPy.sample` instead
+- [ ] Move tests modules to a `tests/` folder.
 
 ### Sequential implementations
 - [ ] Add `fit` and `log_prob` to `ConditionalPoissonSequentialNumPy`
@@ -54,7 +55,6 @@
 - [ ] Add a citation section at the end of the post (e.g., BibTeX snippet, suggested citation format)
 - [ ] Why are there still references to the NumPy implementation in the article? The timing section legitimately benchmarks the NumPy tree, but it should be framed as the reference/pedagogical implementation, not the recommended one.
 - [ ] Consistently color code math symbols and widgets — use the same colors for $P(S)$, $\pi$, and $w$ in both LaTeX and D3 widgets. Previously removed all color coding; bring it back in a principled way with a shared palette.
-- [x] Make the $P(S)$ horizontal bars in the interactive explorer taller — ideally same width as the other bars.
 
 ## Interactive Documentation
 

@@ -486,8 +486,6 @@ def test_horvitz_thompson_unbiased():
 
 def test_max_entropy():
     """CPS is the max-entropy distribution over size-n subsets with given pi."""
-    from scipy.optimize import minimize
-
     w, n = W_SMALL[:6], 2
     N = len(w)
     probs_cps, _ = all_probs_bf(w, n)

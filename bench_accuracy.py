@@ -10,97 +10,7 @@ import numpy as np
 import time
 from itertools import combinations
 from conditional_poisson_numpy import ConditionalPoissonNumPy
-
-
-# ── Sequential forward-backward DP ────────────────────────────────────────────
-
-def _build_fwd_bwd_table(q, n):
-    """
-    Build forward DP table with row-wise scaling.
-
-    True value: Z(q[0:i] choose k) = W[i, k] * exp(ls[i])  for k >= 1
-    W[i, 0] = 1 always (unscaled).
-    """
-    N = len(q)
-    W = np.zeros((N + 1, n + 1))
-    ls = np.zeros(N + 1)
-    W[0, 0] = 1.0
-    for i in range(1, N + 1):
-        row = np.empty(n + 1)
-        row[0] = 1.0
-        if n >= 1:
-            row[1] = W[i-1, 1] + q[i-1] * np.exp(-ls[i-1])
-        if n >= 2:
-            row[2:] = W[i-1, 2:] + q[i-1] * W[i-1, 1:n]
-        mx = np.max(np.abs(row[1:])) if n >= 1 else 1.0
-        if mx > 0:
-            row[1:] /= mx
-            ls[i] = ls[i-1] + np.log(mx)
-        else:
-            ls[i] = ls[i-1]
-        W[i] = row
-    return W, ls
-
-
-def sequential_pi(w, n):
-    """
-    Compute inclusion probabilities via forward-backward DP.
-
-    Forward:  F[i, k] = Z(q[0:i] choose k)
-    Backward: B[i, k] = Z(q[i:N] choose k)
-    pi_i = q[i] * sum_j F[i,j] * B[i+1, n-1-j] / Z
-
-    O(Nn) time, O(Nn) space.
-    """
-    N = len(w)
-    log_gm = np.mean(np.log(w))
-    q = w / np.exp(log_gm)
-
-    F, Fls = _build_fwd_bwd_table(q, n)
-
-    B = np.zeros((N + 1, n + 1))
-    Bls = np.zeros(N + 1)
-    B[N, 0] = 1.0
-    for i in range(N - 1, -1, -1):
-        row = np.empty(n + 1)
-        row[0] = 1.0
-        if n >= 1:
-            row[1] = B[i+1, 1] + q[i] * np.exp(-Bls[i+1])
-        if n >= 2:
-            row[2:] = B[i+1, 2:] + q[i] * B[i+1, 1:n]
-        mx = np.max(np.abs(row[1:])) if n >= 1 else 1.0
-        if mx > 0:
-            row[1:] /= mx
-            Bls[i] = Bls[i+1] + np.log(mx)
-        else:
-            Bls[i] = Bls[i+1]
-        B[i] = row
-
-    log_Z = np.log(abs(F[N, n])) + Fls[N]
-
-    pi = np.zeros(N)
-    for i in range(N):
-        max_j = min(n, i + 1)
-        total_log = -np.inf
-        for j in range(max_j):
-            k = n - 1 - j
-            if k < 0 or k > N - i - 1:
-                continue
-            f_val, b_val = F[i, j], B[i+1, k]
-            if f_val == 0 or b_val == 0:
-                continue
-            log_f = np.log(abs(f_val)) + (Fls[i] if j >= 1 else 0.0)
-            log_b = np.log(abs(b_val)) + (Bls[i+1] if k >= 1 else 0.0)
-            log_term = log_f + log_b
-            if total_log == -np.inf:
-                total_log = log_term
-            else:
-                mx = max(total_log, log_term)
-                total_log = mx + np.log(
-                    np.exp(total_log - mx) + np.exp(log_term - mx)
-                )
-        pi[i] = q[i] * np.exp(total_log - log_Z)
-    return pi
+from conditional_poisson_sequential_numpy import ConditionalPoissonSequentialNumPy
 
 
 # ── Brute force ───────────────────────────────────────────────────────────────
@@ -153,12 +63,11 @@ def main():
         w = rng.exponential(1.0, N)
 
         t0 = time.perf_counter()
-        cp = ConditionalPoissonNumPy.from_weights(n, w)
-        pi_tree = cp.incl_prob
+        pi_tree = ConditionalPoissonNumPy.from_weights(n, w).incl_prob
         tree_ms = (time.perf_counter() - t0) * 1000
 
         t0 = time.perf_counter()
-        pi_seq = sequential_pi(w, n)
+        pi_seq = ConditionalPoissonSequentialNumPy.from_weights(n, w).incl_prob
         seq_ms = (time.perf_counter() - t0) * 1000
 
         tree_sum_err = abs(pi_tree.sum() - n)
@@ -202,7 +111,6 @@ def r_accuracy():
     # Check if R is available
     rscript = shutil.which("Rscript")
     if not rscript:
-        # Try conda env
         try:
             result = subprocess.run(
                 ["conda", "run", "-n", "cps-r", "which", "Rscript"],
@@ -213,20 +121,18 @@ def r_accuracy():
             pass
     if not rscript:
         print("R not available — skipping R accuracy comparison.")
-        print("Install R and the 'sampling' package to run this test.")
         return
 
     import torch
     from conditional_poisson_torch import compute_pi
 
-    # Write a temporary R script that computes pi and prints JSON
     r_script = """\
 library(sampling)
 args <- commandArgs(trailingOnly = TRUE)
 N <- as.integer(args[1])
 n <- as.integer(args[2])
 seed <- as.integer(args[3])
-weight_type <- args[4]  # "moderate" or "extreme"
+weight_type <- args[4]
 
 set.seed(seed)
 if (weight_type == "moderate") {
@@ -243,12 +149,10 @@ if (is.null(q)) {
     if (is.null(pik) || any(is.nan(pik))) {
         cat(sprintf('{"status":"nan","sum_pi":%.6f}\\n', sum(pik)))
     } else {
-        # Output pi as JSON array
         cat(sprintf('{"status":"ok","sum_pi":%.15e,"pi":[%s]}\\n',
             sum(pik), paste(sprintf("%.15e", pik), collapse=",")))
     }
 }
-# Also output the weights so Python can replicate
 set.seed(seed)
 if (weight_type == "moderate") {
     w <- rexp(N)
@@ -280,7 +184,6 @@ cat(sprintf('{"weights":[%s]}\\n', paste(sprintf("%.15e", w), collapse=",")))
 
     for N, n in cases:
         for wt in weight_types:
-            # Run R
             try:
                 result = subprocess.run(
                     ["conda", "run", "-n", "cps-r", "Rscript", r_script_path,
@@ -298,9 +201,7 @@ cat(sprintf('{"weights":[%s]}\\n', paste(sprintf("%.15e", w), collapse=",")))
             r_result = json.loads(lines[0])
             w = np.array(json.loads(lines[1])["weights"])
 
-            # Our implementations
-            cp = ConditionalPoissonNumPy.from_weights(n, w)
-            pi_tree = cp.incl_prob
+            pi_tree = ConditionalPoissonNumPy.from_weights(n, w).incl_prob
             tree_sum_err = abs(pi_tree.sum() - n)
 
             theta = torch.tensor(np.log(w), dtype=torch.float64)
