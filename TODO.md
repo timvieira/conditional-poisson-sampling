@@ -19,6 +19,23 @@
 
 ## Implementation
 
+### Code cleanup
+- [ ] Remove stale aliases and floating functions — `bench_samplers.py` has standalone `sequential_pi`, `sequential_sample`, `_build_dp_table` that duplicate the sequential classes
+- [ ] Remove `hvp` from `ConditionalPoissonNumPy` and `ConditionalPoissonTorch`
+- [ ] Remove `sample_sequential` from `ConditionalPoissonNumPy` — use `ConditionalPoissonSequentialNumPy.sample` instead
+
+### Sequential implementations
+- [ ] Add `fit` and `log_prob` to `ConditionalPoissonSequentialNumPy`
+- [ ] Add `fit` and `log_prob` to `ConditionalPoissonSequentialTorch`
+- [ ] Fix numerical overflow in `ConditionalPoissonSequentialNumPy._get_seq_q` — the ESP recurrence operates in linear space without log-scaling, producing NaN at N ≥ 500
+- [ ] `ConditionalPoissonSequentialTorch` should use `torch.autograd` for `incl_prob` (backprop on `log_normalizer`) instead of manual forward-backward DP
+- [ ] All four implementations should have the same public interface: `from_weights`, `fit`, `sample`, `log_prob`, `incl_prob`, `log_normalizer`, `n`, `N`, `theta`, `w`
+
+### Benchmarks
+- [ ] Rerun `bench_timing.py` and regenerate `timing_data.json` + SVG plots (sampling data is stale after sampler rewrite)
+- [ ] Rerun `bench_timing_grid.py` and update inline 3D widget data in the article (sampling rows are stale)
+
+### Other
 - [ ] NumPy tree timing slopes (~1.15–1.45 in $N$) are higher than expected for $O(N \log^2 N)$. Investigate whether forcing FFT throughout gives cleaner scaling.
 - [ ] Test GPU performance — both `conditional_poisson_torch.py` (FFT) and `torch_prototype.py` (direct conv1d) should be benchmarked on GPU. Float32 precision risk needs testing (contour scaling helps but may not fully compensate).
 - [x] Promote `conditional_poisson_torch.py` to the primary library implementation — merged `torch_fft_prototype.py` into it with full `ConditionalPoissonTorch` class (from_weights, fit, sample, log_prob, pi, hvp). Blog post Basic Usage updated.
