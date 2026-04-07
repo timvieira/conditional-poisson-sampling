@@ -16,10 +16,10 @@ import time
 
 import numpy as np
 
-from conditional_poisson_numpy import ConditionalPoissonNumPy
-from conditional_poisson_torch import ConditionalPoissonTorch
-from conditional_poisson_sequential_numpy import ConditionalPoissonSequentialNumPy
-from conditional_poisson_sequential_torch import ConditionalPoissonSequentialTorch
+from conditional_poisson.numpy import ConditionalPoissonNumPy
+from conditional_poisson.torch import ConditionalPoissonTorch
+from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNumPy
+from conditional_poisson.sequential_torch import ConditionalPoissonSequentialTorch
 
 
 def find_rscript():

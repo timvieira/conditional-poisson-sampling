@@ -13,7 +13,7 @@ import torch
 from itertools import combinations
 from collections import Counter
 
-from conditional_poisson_torch import (
+from conditional_poisson.torch import (
     ConditionalPoissonTorch,
     forward_log_Z,
     compute_pi,

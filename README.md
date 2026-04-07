@@ -22,7 +22,7 @@ Requires Python 3.8+, NumPy, and SciPy.
 
 ```python
 import numpy as np
-from conditional_poisson_numpy import ConditionalPoissonNumPy
+from conditional_poisson import ConditionalPoissonNumPy
 
 # From weights (Bernoulli odds)
 w = np.array([1.0, 2.0, 3.0, 0.5, 1.5])

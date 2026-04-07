@@ -13,12 +13,12 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from conditional_poisson_numpy import ConditionalPoissonNumPy
-from conditional_poisson_sequential_numpy import ConditionalPoissonSequentialNumPy
+from conditional_poisson.numpy import ConditionalPoissonNumPy
+from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNumPy
 from bench_timing import run_r_benchmark, time_fn
 
 import torch
-from conditional_poisson_torch import ConditionalPoissonTorch, forward_log_Z, compute_pi
+from conditional_poisson.torch import ConditionalPoissonTorch, forward_log_Z, compute_pi
 
 
 def run_grid(quick=False):

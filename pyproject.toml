@@ -8,10 +8,14 @@ version = "0.1.0"
 description = "Conditional Poisson distribution over fixed-size subsets"
 requires-python = ">=3.8"
 license = "MIT"
-dependencies = ["numpy"]
+dependencies = ["numpy", "scipy"]
 
-[tool.setuptools]
-py-modules = ["conditional_poisson_numpy"]
+[project.optional-dependencies]
+torch = ["torch"]
+dev = ["pytest", "scipy", "torch", "matplotlib", "cvxpy"]
+
+[tool.setuptools.packages.find]
+include = ["conditional_poisson*"]
 
 [tool.blog]
 static = ["figures"]

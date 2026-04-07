@@ -19,7 +19,7 @@ import time
 
 import numpy as np
 
-from conditional_poisson_numpy import ConditionalPoissonNumPy
+from conditional_poisson.numpy import ConditionalPoissonNumPy
 
 
 def time_fn(fn, reps=5, warmup=2):
@@ -84,8 +84,8 @@ def run_r_benchmark(N, n, seed, reps):
 
 def run_benchmarks(quick=False):
     import torch
-    from conditional_poisson_torch import ConditionalPoissonTorch, forward_log_Z, compute_pi
-    from conditional_poisson_sequential_numpy import ConditionalPoissonSequentialNumPy
+    from conditional_poisson.torch import ConditionalPoissonTorch, forward_log_Z, compute_pi
+    from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNumPy
 
     if quick:
         sizes = [(50, 20), (100, 40), (200, 80)]

@@ -23,8 +23,8 @@ PYTHON_FILES = [
     "tests/test_identities.py",
     "bench_timing.py",
     "bench_samplers.py",
-    "conditional_poisson_torch.py",
-    "conditional_poisson_numpy.py",
+    "conditional_poisson/torch.py",
+    "conditional_poisson/numpy.py",
 ]
 
 R_FILES = ["bench_timing_r.R"]

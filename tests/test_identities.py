@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import numpy as np
 from itertools import combinations
 from scipy.signal import convolve as poly_mul
-from conditional_poisson_numpy import ConditionalPoissonNumPy
+from conditional_poisson.numpy import ConditionalPoissonNumPy
 
 
 # ---------------------------------------------------------------------------

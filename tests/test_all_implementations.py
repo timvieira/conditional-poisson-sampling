@@ -11,18 +11,18 @@ import numpy as np
 import pytest
 from itertools import combinations
 
-from conditional_poisson_numpy import ConditionalPoissonNumPy
-from conditional_poisson_sequential_numpy import ConditionalPoissonSequentialNumPy
+from conditional_poisson.numpy import ConditionalPoissonNumPy
+from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNumPy
 
 # Torch imports may fail if torch not installed
 torch_classes = []
 try:
-    from conditional_poisson_torch import ConditionalPoissonTorch
+    from conditional_poisson.torch import ConditionalPoissonTorch
     torch_classes.append(ConditionalPoissonTorch)
 except ImportError:
     pass
 try:
-    from conditional_poisson_sequential_torch import ConditionalPoissonSequentialTorch
+    from conditional_poisson.sequential_torch import ConditionalPoissonSequentialTorch
     torch_classes.append(ConditionalPoissonSequentialTorch)
 except ImportError:
     pass

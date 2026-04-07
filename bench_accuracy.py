@@ -9,8 +9,8 @@ Brute-force enumeration is used as ground truth for small instances.
 import numpy as np
 import time
 from itertools import combinations
-from conditional_poisson_numpy import ConditionalPoissonNumPy
-from conditional_poisson_sequential_numpy import ConditionalPoissonSequentialNumPy
+from conditional_poisson.numpy import ConditionalPoissonNumPy
+from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNumPy
 
 
 # ── Brute force ───────────────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ def r_accuracy():
         return
 
     import torch
-    from conditional_poisson_torch import compute_pi
+    from conditional_poisson.torch import compute_pi
 
     r_script = """\
 library(sampling)
