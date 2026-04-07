@@ -64,6 +64,8 @@
 ## Widget UX
 
 - [ ] Inclusion probability widget: hard to distinguish forward values from adjoint (backward) values. Explore different layouts. Also, inclusion probabilities appear at the bottom rather than the top—keep the forward-value + backward-value visual metaphor consistent.
+- [ ] Scrutinize the little histograms in the sampling animation. What are they supposed to be? Why do they appear to change after sampling?
+- [ ] Make sure the sampling animation widget is faithful to the implementation.
 - [ ] Several widgets overflow their containers on mobile. Fix the layout to fill viewport width on small screens, then add horizontal scroll for wide SVGs.
 - [ ] Centralize widget/layout styles into the blog's CSS (`~/projects/blog/main/content/css/blog.css`) instead of inline styles in the .md file.
 - [x] Clicking "Gradient Descent" and "Archive" in the header should navigate to the blog's archive page.

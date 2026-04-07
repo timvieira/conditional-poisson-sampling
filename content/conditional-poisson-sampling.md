@@ -1455,10 +1455,11 @@ Sampling reuses the product tree (no gradient computation needed).  The algorith
 **Precomputation.** For each internal node and each possible quota $k = 1, \ldots, \min(n, |T|)$, precompute the CDF of the split distribution:
 
 <div class="pseudocode">
-<b>for</b> each internal node with children $L$, $R$:<br>
+Initialize CDF table $F$ indexed by (node, quota $k$)<br>
+<b>for</b> each internal node with children $L$, $R$ and parent polynomial $P$:<br>
 $\quad$ <b>for</b> $k = 1, \ldots, \min(n, |T|)$:<br>
-$\quad\quad$ $F[k, j] \leftarrow \sum_{j'=0}^{j} \llbracket P_L \rrbracket(\z^{j'}) \cdot \llbracket P_R \rrbracket(\z^{k-j'})$ for $j = 0, \ldots, k$<br>
-$\quad\quad$ Normalize: $F[k, j] \leftarrow F[k, j] \,/\, F[k, k]$
+$\quad\quad$ $\text{pmf}[j] \leftarrow \llbracket P_L \rrbracket(\z^{j}) \cdot \llbracket P_R \rrbracket(\z^{k-j}) \;/\; \llbracket P \rrbracket(\z^k)$ for $j = 0, \ldots, k$<br>
+$\quad\quad$ $F[k] \leftarrow \text{cumsum}(\text{pmf})$
 </div>
 
 **Sampling.** Walk the tree top-down, splitting quotas using the cached CDFs via binary search:

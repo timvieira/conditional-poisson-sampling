@@ -464,23 +464,28 @@ class ConditionalPoissonTorch:
                 p = p / mx
             Pc[i] = p.tolist()
 
-        # Precompute normalized CDFs for each (node, quota) pair
+        # Precompute normalized CDFs for each (node, quota) pair.
+        # PMF of split distribution: pmf[j] = L[j] * R[k-j]
         cdfs = [None] * (2 * tree_n)
         for node in range(1, tree_n):
             L, R = Pc[2 * node], Pc[2 * node + 1]
             max_k = min(n, len(L) - 1 + len(R) - 1)
             node_cdfs = [None] * (max_k + 1)
             for k in range(1, max_k + 1):
-                cdf = []
-                total = 0.0
+                pmf = []
                 for j in range(k + 1):
                     rem = k - j
                     lv = L[j] if j < len(L) else 0.0
                     rv = R[rem] if rem < len(R) else 0.0
-                    total += max(lv, 0.0) * max(rv, 0.0)
-                    cdf.append(total)
+                    pmf.append(max(lv, 0.0) * max(rv, 0.0))
+                total = sum(pmf)
                 if total > 0:
-                    node_cdfs[k] = [c / total for c in cdf]
+                    acc = 0.0
+                    cdf = []
+                    for p in pmf:
+                        acc += p / total
+                        cdf.append(acc)
+                    node_cdfs[k] = cdf
             cdfs[node] = node_cdfs
 
         self._sample_tree = (cdfs, tree_n)

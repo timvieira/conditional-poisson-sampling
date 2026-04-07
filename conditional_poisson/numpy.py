@@ -71,7 +71,6 @@ than the peak coefficient at degree ~subtree_size/2.
 from __future__ import annotations
 import numpy as np
 from typing import Optional, Union
-from bisect import bisect_left
 from scipy.signal import convolve
 
 __all__ = ["ConditionalPoissonNumPy"]
@@ -191,26 +190,32 @@ def _extract(q_s, log_gm, Pc, Pls, oPc, oPls, S, N, n):
 def _build_sample_cdfs(Pc, S, n):
     """Precompute normalized CDFs for every (node, quota) pair.
 
+    For each internal node with children L, R and quota k, the split
+    distribution has PMF  pmf[j] = L[j] * R[k-j].  The normalizer is
+    the parent's k-th coefficient (the convolution sum), which is already
+    stored in the tree (up to a scale factor that cancels).
+
     Returns cdfs: list where cdfs[node][k] is a list of cumulative
     probabilities for splitting quota k at that node, or None if
     that quota is impossible.
     """
     cdfs = [None] * (2 * S)
     for node in range(1, S):
-        L, R = Pc[2 * node], Pc[2 * node + 1]
-        max_k = min(n, len(L) - 1 + len(R) - 1)
+        La = np.maximum(np.asarray(Pc[2 * node]), 0.0)
+        Ra = np.maximum(np.asarray(Pc[2 * node + 1]), 0.0)
+        max_k = min(n, len(La) - 1 + len(Ra) - 1)
+        # Pad to length max_k+1 so indexing is unconditional
+        Lp = np.pad(La, (0, max(0, max_k + 1 - len(La))))
+        Rp = np.pad(Ra, (0, max(0, max_k + 1 - len(Ra))))
         node_cdfs = [None] * (max_k + 1)
         for k in range(1, max_k + 1):
-            cdf = []
-            total = 0.0
-            for j in range(k + 1):
-                r = k - j
-                lv = L[j] if j < len(L) else 0.0
-                rv = R[r] if r < len(R) else 0.0
-                total += max(lv, 0.0) * max(rv, 0.0)
-                cdf.append(total)
+            # PMF of split distribution: pmf[j] = L[j] * R[k-j]
+            pmf = Lp[:k+1] * Rp[k::-1]
+            total = pmf.sum()
             if total > 0:
-                node_cdfs[k] = [c / total for c in cdf]
+                np.cumsum(pmf, out=pmf)
+                pmf /= total
+                node_cdfs[k] = pmf
         cdfs[node] = node_cdfs
     return cdfs
 
@@ -234,7 +239,7 @@ def _tree_sample(cdfs, S, N, n, rng):
                 selected.append(node - S)
             continue
         cdf = cdfs[node][k]
-        j = bisect_left(cdf, rng.random())
+        j = int(np.searchsorted(cdf, rng.random()))
         stack.append((2 * node + 1, k - j))
         stack.append((2 * node, j))
     selected.sort()
