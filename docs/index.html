@@ -3111,7 +3111,7 @@ $$
 $$
 
 <p>
-<p>where $\w_i \defeq e^{\theta_i}$ and $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ is the normalizing constant.  This is exactly the conditional Poisson distribution!  So the max-entropy distribution with inclusion-probability constraints must be a conditional Poisson sampling (CPS) distribution—the only question is <em>which</em> weights.</p>
+<p>where $\w_i = e^{\theta_i}$ and $\Zw{\bw}{n} = \sum_{|S|=n} \prod_{i \in S} \w_i$ is the normalizing constant.  This is exactly the conditional Poisson distribution!  So the max-entropy distribution with inclusion-probability constraints must be a conditional Poisson sampling (CPS) distribution—the only question is <em>which</em> weights.</p>
 </p>
 
 <p>
@@ -3151,7 +3151,7 @@ $$
 </p>
 
 <p>
-<p><b>The dual problem.</b>  The dual minimizes $\mathcal{L}(\Ps, \btheta)$ over $\btheta$.  Negating to turn this into a maximization, we get $\ell(\btheta) \defeq \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$.  This is concave because $\log \Zw{\bw}{n}$ is convex in $\btheta$ (it is a log of a sum of exponentials).</p>
+<p><b>The dual problem.</b>  The dual minimizes $\mathcal{L}(\Ps, \btheta)$ over $\btheta$.  Negating to turn this into a maximization, we get $\ell(\btheta) = \bpiptgt^{\top}\btheta - \log \Zw{\bw}{n}$.  This is concave because $\log \Zw{\bw}{n}$ is convex in $\btheta$ (it is a log of a sum of exponentials).</p>
 </p>
 
 <p>
