@@ -369,7 +369,7 @@ small { font-size: smaller; }
 
 </div>
 
-<h2 id="computing-math86-math87-and-samples">Computing $\Zw{\bw}{n}$, $\bpip$, and Samples</h2>
+<h2 id="computing-math95-math96-and-samples">Computing $\Zw{\bw}{n}$, $\bpip$, and Samples</h2>
 <p>The key idea is that $\Zw{\bw}{n}$ is hiding inside a product of polynomials:</p>
 <p>$$
 (1 + \w_1 \z)(1 + \w_2 \z) \cdots (1 + \w_N \z) = \sum_{k=0}^{N} \Zw{\bw}{k}\, \z^k
@@ -378,7 +378,7 @@ $$</p>
 <p>So the $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the <em>subproduct tree</em> (see <a href="https://doi.org/10.1017/CBO9781139856065">von zur Gathen &amp; Gerhard (2013)</a>, Chapter 10).</p>
 <p><strong>Polynomials as arrays.</strong> In code, a polynomial like $1 + 3\z + 2\z^2$ is just the array <code>[1, 3, 2]</code>.  The $\z$ is a <em>formal</em> variable—we never substitute a number into it; it just tracks which coefficient is which.  Multiplying two polynomials corresponds to <em>convolving</em> their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ convolves <code>[1, 2]</code> with <code>[1, 3]</code> to get <code>[1, 5, 6]</code>.  It turns out that convolution can be done efficiently using the <a href="https://en.wikipedia.org/wiki/Fast_Fourier_transform">fast Fourier transform</a> (FFT), costing $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.</p>
 <p><strong>Notation.</strong> We write $\llbracket f \rrbracket(\z^k)$ for the coefficient of $\z^k$ in a formal power series $f(\z) = \sum_k a_k \z^k$, i.e., $\llbracket f \rrbracket(\z^k) = a_k$.  This is sometimes written $[\z^k]\, f(\z)$; we use the Scott bracket notation to avoid ambiguity with other uses of square brackets.</p>
-<h3 id="computing-the-normalizing-constant-math117">Computing the Normalizing Constant $\Z$</h3>
+<h3 id="computing-the-normalizing-constant-math126">Computing the Normalizing Constant $\Z$</h3>
 <p>Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.</p>
 <style>
 #content { overflow: visible !important; }
@@ -923,7 +923,7 @@ svg text { font-family: 'EB Garamond', serif; }
 <p>$$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N)$$</p>
 <p>which solves to $T(N) = \mathcal{O}(N \log^2 n)$.
 The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be <strong>truncated to degree $n$</strong> without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.</p>
-<h3 id="computing-inclusion-probabilities-math143">Computing Inclusion Probabilities $\bpip$</h3>
+<h3 id="computing-inclusion-probabilities-math152">Computing Inclusion Probabilities $\bpip$</h3>
 <p>The inclusion probability is the gradient of the log-normalizer (an exponential family identity):</p>
 <p>$$\pip_i = \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$</p>
 <p>Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running <a href="./evaluating-fx-is-as-fast-as-fx/">backpropagation</a> on the same tree—no new algorithm needed.  By the Baur-Strassen theorem (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">1983</a>), the gradient costs at most a constant factor more than the forward computation.</p>
@@ -3181,47 +3181,27 @@ $$
 </details>
 
 <p><strong>Gradient.</strong>  $\nabla_{\btheta} \ell(\btheta) = \bpiptgt - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpiptgt$ exactly, so the gradient is zero.  Each evaluation of $\ell(\btheta)$ and $\nabla \ell(\btheta)$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.</p>
-<p><strong>Optimizer.</strong>  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The <a href="#The-Poisson-Approximation">Poisson approximation</a> provides a warm start: $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.</p>
-
-<main><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Target: the inclusion probabilities from our earlier example</span>
+<p><strong>Optimizer.</strong>  L-BFGS uses only the gradient $\bpip(\btheta) - \bpiptgt$ (no second-order machinery needed).  The <a href="#The-Poisson-Approximation">Poisson approximation</a> provides a warm start: $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Target: the inclusion probabilities from our earlier example</span>
 <span class="n">pi_star</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">incl_prob</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
 <span class="c1"># Fit from scratch</span>
 <span class="n">cp_fit</span> <span class="o">=</span> <span class="n">ConditionalPoissonNumPy</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">pi_star</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child">
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>  iter   0:  max|pi*-pi| = 3.332e-02
-  iter   1:  max|pi*-pi| = 2.606e-03
-  iter   2:  max|pi*-pi| = 2.036e-05
-  iter   3:  max|pi*-pi| = 1.994e-09
-  iter   4:  max|pi*-pi| = 7.661e-15
+</code></pre></div>
+
+<pre class="output">
+<p>iter   0:  max|pi<em>-pi| = 3.332e-02
+  iter   1:  max|pi</em>-pi| = 1.020e-01
+  iter   2:  max|pi<em>-pi| = 1.153e-02
+  ...
+  iter  17:  max|pi</em>-pi| = 4.370e-06
+  ...
+  iter  23:  max|pi*-pi| = 3.588e-10</p>
 </pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-</main>
 
 <h2 id="timing">Timing</h2>
 <p>The plots below compare wall-clock time across methods for four operations: computing the normalizing constant $\Z$, computing inclusion probabilities $\bpip$, fitting target $\bpip$ to weights, and drawing samples.  All timings use $n = 0.4N$ with weights drawn from $\text{Exp}(1)$.  Source code for each method is linked via the ✓ pills; the full benchmark script is <a href="bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.</p>
-<h3 id="computing-math14">Computing $\Z$</h3>
+<h3 id="computing-math333">Computing $\Z$</h3>
 <p>Three methods for computing the normalizing constant:
 <a href="bench_timing.py#dp_forward_Z" title="dp_forward_Z" class="verified" target="_blank">✓</a> DP forward pass $\mathcal{O}(Nn)$ ·
 <a href="conditional_poisson_numpy.py" title="ConditionalPoissonNumPy.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
@@ -3231,7 +3211,7 @@ $$
 </figure>
 
 <p>The DP approach is fastest at small $N$ (no overhead), but the FFT tree overtakes it by $N \approx 200$ and is $\sim\!100\times$ faster by $N = 5000$.</p>
-<h3 id="computing-math22">Computing $\bpip$</h3>
+<h3 id="computing-math341">Computing $\bpip$</h3>
 <p>This is the main event.  The naive approach computes each $\pip_i$ independently via a leave-one-out forward pass; backpropagation replaces $N$ forward passes with a single backward pass, giving a factor-of-$N$ speedup:</p>
 <p><a href="bench_timing.py#dp_loo_pi" title="dp_loo_pi" class="verified" target="_blank">✓</a> $N \times$ DP leave-one-out $\mathcal{O}(N^2 n)$ ·
 <a href="bench_timing.py#tree_loo_pi" title="tree_loo_pi" class="verified" target="_blank">✓</a> $N \times$ Tree leave-one-out $\mathcal{O}(N^2 \log^2 n)$ ·
@@ -3262,7 +3242,7 @@ $$
 
 <p>For fair comparison, the plot shows both "including setup" and "excluding setup" variants.  R's <a href="https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R"><code>UPMEqfromw</code></a> computes the $\mathcal{O}(Nn)$ DP table; <a href="https://github.com/cran/sampling/blob/master/R/UPMEsfromq.R"><code>UPMEsfromq</code></a> draws one $\mathcal{O}(N)$ sequential sample from it.  Our product tree costs $\mathcal{O}(N \log^2 n)$ to build plus $\mathcal{O}(Nn)$ to precompute the CDF tables, then $\mathcal{O}(n \log N)$ per sample via quota splitting with binary search on the cached CDFs.  The "incl. build/DP" lines give apples-to-apples single-sample cost; the "excl." lines show the marginal cost of additional samples from a precomputed structure.</p>
 <p>The R <code>sampling</code> package does not expose the normalizing constant $\Z$, and has numerical stability limitations: its <a href="https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R#L11">DP recurrence</a> operates in linear space without log-scaling, producing NaN at moderate sizes or when weights span several orders of magnitude.  Our FFT implementation maintains machine-epsilon accuracy at all tested sizes and weight ranges.<a href="bench_accuracy.py#r_accuracy" title="R vs tree vs FFT accuracy comparison" class="verified" target="_blank">✓</a></p>
-<h3 id="scaling-in-math50-and-math51">Scaling in $N$ and $n$</h3>
+<h3 id="scaling-in-math369-and-math370">Scaling in $N$ and $n$</h3>
 <p>The static plots above fix $n = 0.4N$.  The interactive 3D plots below sweep $N$ and $n$ independently, confirming the claimed complexities.  Drag to rotate, scroll to zoom, hover for values.  Use the dropdown to switch between operations.</p>
 <div id="timing-3d">
 
@@ -3762,7 +3742,7 @@ $$</p>
 <p>This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.</p>
 <p><strong>Example.</strong> With $N = 100$ items and $n = 5$, set weights proportional to $p(i)$ so that high-probability items are more likely to be selected.  Each sample gives 5 distinct evaluations of $f$; the HT formula reweights them to produce an unbiased estimate of the full sum.</p>
 <p>For more on SWOR-based estimation (including the near-optimal priority sampling scheme), see my earlier post on <a href="./post/2017/07/03/estimating-means-in-a-finite-universe/">estimating means in a finite universe</a>.</p>
-<h2 id="identities-for-math171-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
+<h2 id="identities-for-math490-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
 <p>The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> <a href="https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial">elementary symmetric polynomial</a> $e_n(\bw)$.  Here are some useful identities.</p>
 <h3 id="differential-identities">Differential Identities</h3>
 <p>The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:</p>

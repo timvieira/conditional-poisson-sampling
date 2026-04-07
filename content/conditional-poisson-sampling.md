@@ -3153,9 +3153,23 @@ $$
 
 **Gradient.**  $\nabla_{\btheta} \ell(\btheta) = \bpiptgt - \bpip(\btheta)$.<a href="test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpiptgt$ exactly, so the gradient is zero.  Each evaluation of $\ell(\btheta)$ and $\nabla \ell(\btheta)$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
 
-**Optimizer.**  L-BFGS converges in a few iterations using only the gradient—no second-order machinery needed.  The [Poisson approximation](#The-Poisson-Approximation) provides a warm start: $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.
+**Optimizer.**  L-BFGS uses only the gradient $\bpip(\btheta) - \bpiptgt$ (no second-order machinery needed).  The [Poisson approximation](#The-Poisson-Approximation) provides a warm start: $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.
 
-{% notebook conditional-poisson-sampling.ipynb cells[4:5] %}
+```python
+# Target: the inclusion probabilities from our earlier example
+pi_star = cp.incl_prob.copy()
+
+# Fit from scratch
+cp_fit = ConditionalPoissonNumPy.fit(pi_star, n, verbose=True)
+```
+
+<pre class="output">  iter   0:  max|pi*-pi| = 3.332e-02
+  iter   1:  max|pi*-pi| = 1.020e-01
+  iter   2:  max|pi*-pi| = 1.153e-02
+  ...
+  iter  17:  max|pi*-pi| = 4.370e-06
+  ...
+  iter  23:  max|pi*-pi| = 3.588e-10</pre>
 
 ## Timing
 
