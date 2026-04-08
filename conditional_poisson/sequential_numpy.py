@@ -65,13 +65,12 @@ class ConditionalPoissonSequentialNumPy:
         log_gm = np.mean(self.theta)
         q = w / np.exp(log_gm)
 
-        F, Fls = self._forward_dp(q)
+        F, F_sf = self._forward_dp(q)
 
         # Backward: B[i, k] = e_k(q[i:N]) with uniform row-wise scaling.
-        # scale_factor[i] is the rescaling applied at row i; the true value
-        # is B[i,k] * prod(scale_factor[i:N]).
+        # true value: e_k(q[i:N]) = B[i,k] * prod(B_sf[i:N])
         B = np.zeros((N + 1, n + 1))
-        scale_factor = np.ones(N + 1)
+        B_sf = np.ones(N + 1)
         B[N, 0] = 1.0
         for i in range(N - 1, -1, -1):
             B[i] = B[i+1].copy()
@@ -79,23 +78,20 @@ class ConditionalPoissonSequentialNumPy:
             mx = np.max(B[i])
             if mx > 0:
                 B[i] /= mx
-                scale_factor[i] = mx
+                B_sf[i] = mx
 
-        # Cumulative log scale (only needed for incl_prob, not sampling)
-        Bls = np.cumsum(np.log(scale_factor[::-1]))[::-1].copy()
-
-        return (q, F, Fls, B, Bls, scale_factor, log_gm)
+        return (q, F, F_sf, B, B_sf, log_gm)
 
     def _forward_dp(self, q):
         """Weighted Pascal DP table with uniform row-wise scaling.
 
-        true value: e_k(q[0:i]) = W[i, k] * exp(ls[i])
+        true value: e_k(q[0:i]) = W[i, k] * prod(scale_factor[1:i+1])
 
         Recurrence: W[i, k] = W[i-1, k] + q[i-1] * W[i-1, k-1]
         """
         N, n = self.N, self.n
         W = np.zeros((N + 1, n + 1))
-        ls = np.zeros(N + 1)
+        scale_factor = np.ones(N + 1)
         W[0, 0] = 1.0
         for i in range(1, N + 1):
             W[i] = W[i-1]
@@ -103,10 +99,8 @@ class ConditionalPoissonSequentialNumPy:
             mx = np.max(W[i])
             if mx > 0:
                 W[i] /= mx
-                ls[i] = ls[i-1] + np.log(mx)
-            else:
-                ls[i] = ls[i-1]
-        return W, ls
+                scale_factor[i] = mx
+        return W, scale_factor
 
     # ── Log normalizer ───────────────────────────────────────────────────────
 
@@ -114,9 +108,9 @@ class ConditionalPoissonSequentialNumPy:
     def log_normalizer(self) -> float:
         """log Z(w, n).  O(Nn)."""
         if "log_Z" not in self._cache:
-            _, F, Fls, _, _, _, log_gm = self._get_dp()
+            _, F, F_sf, _, _, log_gm = self._get_dp()
             self._cache["log_Z"] = (
-                np.log(F[self.N, self.n]) + Fls[self.N]
+                np.log(F[self.N, self.n]) + np.sum(np.log(F_sf[1:]))
                 + self.n * log_gm
             )
         return self._cache["log_Z"]
@@ -127,12 +121,18 @@ class ConditionalPoissonSequentialNumPy:
     def incl_prob(self) -> np.ndarray:
         """Inclusion probability vector pi.  O(Nn)."""
         if "pi" not in self._cache:
-            q, F, Fls, B, Bls, _, _ = self._get_dp()
+            q, F, F_sf, B, B_sf, _ = self._get_dp()
             N, n = self.N, self.n
+
+            # Cumulative log scales: Fls[i] = sum(log(F_sf[1:i+1]))
+            Fls = np.cumsum(np.log(F_sf))
+            # Bls[i] = sum(log(B_sf[i:N]))
+            Bls = np.cumsum(np.log(B_sf[::-1]))[::-1].copy()
+
             log_Z = np.log(F[N, n]) + Fls[N]
 
-            # TODO: this looks does not look efficient -- remember that the
-            # algorithm to compute the incl_prob should match backpropagation for \nabla_{\theta} log Z
+            # TODO: this does not look efficient -- the algorithm to compute
+            # incl_prob should match backpropagation for nabla_theta log Z
 
             pi = np.zeros(N)
             for i in range(N):
@@ -170,8 +170,8 @@ class ConditionalPoissonSequentialNumPy:
         Complexity: O(Nn) to build tables [cached] + O(N).
         """
         if "sample_data" not in self._cache:
-            q, _, _, B, _, scale_factor, _ = self._get_dp()
-            self._cache["sample_data"] = (q.tolist(), B.tolist(), scale_factor.tolist())
+            q, _, _, B, B_sf, _ = self._get_dp()
+            self._cache["sample_data"] = (q.tolist(), B.tolist(), B_sf.tolist())
         q, B, sf = self._cache["sample_data"]
         N, n = self.N, self.n
         selected = []
