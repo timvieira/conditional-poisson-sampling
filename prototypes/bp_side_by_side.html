@@ -4,75 +4,65 @@
 <meta charset="utf-8">
 <title>Backprop Visualization — Side-by-Side Prototype</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$', '$']] },
+  startup: { typeset: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
 <style>
-body { font-family: system-ui, sans-serif; margin: 20px; background: #f8f9fa; }
-h2 { margin-top: 30px; }
-.container { display: flex; gap: 40px; align-items: flex-start; }
-.panel { background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; }
-.panel h3 { margin-top: 0; text-align: center; }
-.controls { margin-bottom: 20px; }
-.controls label { margin-right: 16px; }
+body { font-family: system-ui, sans-serif; margin: 20px; }
 </style>
 </head>
 <body>
 
-<h2>Backprop on the Product Tree — Side-by-Side</h2>
+<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0; width: fit-content; min-width: 100%; max-width: none;">
 
-<div class="controls">
-  N = <input type="number" id="inputN" value="4" min="2" max="8" style="width:40px">
-  &ensp; n = <input type="number" id="inputn" value="2" min="0" max="8" style="width:40px">
-  &ensp;
-  <span id="sliders"></span>
-</div>
+<b>Interactive backpropagation tree (side-by-side prototype).</b>
+The <span style="color:#5b9bd5">forward pass</span> (left) computes the polynomial product tree bottom-up.
+The <span style="color:#7b2d8e">backward pass</span> (right) propagates adjoints top-down.
+At the leaves, $\pi_i = w_i \cdot \bar{c}_1^{(i)}$.
+Drag the weight sliders to explore.
 
-<div class="container">
-  <div class="panel">
-    <h3 style="color:#5b9bd5">Forward Pass</h3>
-    <div id="forward-tree"></div>
-  </div>
-  <div class="panel">
-    <h3 style="color:#7b2d8e">Backward Pass (Adjoints)</h3>
-    <div id="backward-tree"></div>
-  </div>
-</div>
-
-<div id="pi-output" style="margin-top: 20px;"></div>
-
+<div id="bp"></div>
 <script>
 (function() {
-  var CW = '#5b9bd5', CA = '#7b2d8e', CWEIGHT = '#d4a24e', CPI = '#c0504d';
+  var N = 4, n = 2;
+  var w = [0.5, 1.2, 0.3, 1.0];
   var WMAX = 3;
 
-  // --- Core math ---
+  var CW = '#5b9bd5', CR = '#c0504d', CI = '#d4a24e', CA = '#7b2d8e';
+  var root = d3.select('#bp');
+
   function polyMul(a, b) {
     var out = new Array(a.length + b.length - 1).fill(0);
     for (var i = 0; i < a.length; i++)
       for (var j = 0; j < b.length; j++)
-        out[i + j] += a[i] * b[j];
+        out[i+j] += a[i] * b[j];
     return out;
   }
 
   function buildTree(w, n) {
-    var N = w.length;
     var leaves = w.map(function(wi, i) {
-      return { poly: [1, wi], leaf: true, idx: i };
+      return { poly: [1, wi], items: [i], leaf: true };
     });
-    // Pad to power of 2
-    var S = 1; while (S < N) S <<= 1;
-    for (var i = N; i < S; i++) leaves.push({ poly: [1], pad: true });
-
-    var allLevels = [leaves];
+    var size = 1;
+    while (size < leaves.length) size *= 2;
+    while (leaves.length < size)
+      leaves.push({ poly: [1], items: [], leaf: true, pad: true });
     var level = leaves;
+    var allLevels = [level];
     while (level.length > 1) {
       var next = [];
       for (var i = 0; i < level.length; i += 2) {
-        var L = level[i], R = level[i + 1];
-        var p = polyMul(L.poly, R.poly);
+        var l = level[i], r = level[i+1];
+        var p = polyMul(l.poly, r.poly);
         if (p.length > n + 1) p = p.slice(0, n + 1);
-        next.push({ poly: p, left: L, right: R });
+        next.push({ left: l, right: r, poly: p, items: l.items.concat(r.items), leaf: false });
       }
-      allLevels.push(next);
       level = next;
+      allLevels.push(level);
     }
     return { root: level[0], levels: allLevels };
   }
@@ -92,204 +82,357 @@ h2 { margin-top: 30px; }
     var adjLen = Math.min(rt.poly.length, n + 1);
     rt.adj = new Array(adjLen).fill(0);
     if (n < adjLen && Z > 0) rt.adj[n] = 1 / Z;
-    (function walk(nd) {
+    (function walkDown(nd) {
       if (nd.leaf || !nd.left) return;
       var left = nd.left, right = nd.right;
       left.adj = crossCorr(nd.adj, right.poly, Math.min(left.poly.length, n + 1));
       right.adj = crossCorr(nd.adj, left.poly, Math.min(right.poly.length, n + 1));
-      walk(left); walk(right);
+      walkDown(left); walkDown(right);
     })(rt);
     return Z;
   }
 
-  // --- Rendering ---
-  var bW = 28, bH = 60, bGap = 4, nodePad = 12, vGap = 30, hGap = 20;
+  var bW = 28, bH = 70, bGap = 4, nodePad = 12, vGap = 30, hGap = 20, sliderH = 70;
+  var mathLabels = [];
 
-  function renderTree(container, levels, mode, n, w) {
-    // mode = 'forward' or 'backward'
-    d3.select(container).selectAll('*').remove();
+  function addMathLabel(container, x, y, html, opts) {
+    opts = opts || {};
+    var div = container.append('div')
+      .style('position', 'absolute')
+      .style('left', x + 'px').style('top', y + 'px')
+      .style('font-size', opts.fontSize || '10px')
+      .style('color', opts.color || '#999')
+      .style('pointer-events', 'none')
+      .style('white-space', 'nowrap');
+    if (opts.anchor === 'middle') div.style('transform', 'translateX(-50%)');
+    div.html(html);
+    mathLabels.push(div);
+    return div;
+  }
+
+  function fmtVal(v) {
+    if (v === 0) return '0';
+    if (Math.abs(v) < 0.005) return '';
+    if (Math.abs(v) >= 10) return v.toFixed(0);
+    if (Math.abs(v) >= 1) return v.toFixed(1);
+    return v.toFixed(2);
+  }
+
+  // Shared state for updates
+  var fwdState = {}, adjState = {};
+
+  function build() {
+    root.selectAll('*').remove();
+    mathLabels = [];
+
+    // Controls
+    var ctrl = root.append('div').style('display','flex').style('align-items','center')
+      .style('gap','12px').style('margin-bottom','8px').style('font-size','0.9em');
+    ctrl.append('span').html('$N$ = ');
+    ctrl.append('input').attr('type','number').attr('min',2).attr('value',N)
+      .style('width','44px').style('padding','2px 4px').style('font-family','inherit')
+      .style('font-size','inherit').style('border','1px solid #ccc').style('border-radius','3px')
+      .on('change input', function() {
+        var v = Math.max(2, Math.round(+this.value));
+        if (v === N) return;
+        while (w.length < v) w.push(0.5 + Math.random());
+        w = w.slice(0, v); N = v; n = Math.min(n, N); build();
+      });
+    ctrl.append('span').html('&ensp;$n$ = ');
+    ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n)
+      .style('width','44px').style('padding','2px 4px').style('font-family','inherit')
+      .style('font-size','inherit').style('border','1px solid #ccc').style('border-radius','3px')
+      .on('change input', function() {
+        var v = Math.max(0, Math.min(N, Math.round(+this.value)));
+        if (v === n) return; n = v; build();
+      });
+
+    var tree = buildTree(w, n);
+    var Z = backprop(tree, n);
+    var levels = tree.levels;
     var depth = levels.length;
-    var leafCount = levels[0].length;
 
-    function getCoeffs(nd) {
-      if (mode === 'forward') return nd.poly.slice(0, n + 1);
-      return (nd.adj || []).slice(0, n + 1);
-    }
-    var color = mode === 'forward' ? CW : CA;
-
-    function nodeW(nd) {
+    // Layout dimensions for one tree panel
+    function nodeBoxW(nd, mode) {
       if (nd.pad) return 0;
-      var nc = getCoeffs(nd).length;
+      var coeffs = mode === 'fwd' ? nd.poly : (nd.adj || []);
+      var nc = Math.min(coeffs.length, n + 1);
       return nc * (bW + bGap) - bGap + nodePad;
     }
 
+    var leafCount = levels[0].filter(function(nd) { return !nd.pad; }).length;
     var leafSpacing = 0;
     levels[0].forEach(function(nd) {
-      var ww = nodeW(nd) + hGap;
-      if (ww > leafSpacing) leafSpacing = ww;
+      var ww = Math.max(nodeBoxW(nd, 'fwd'), nodeBoxW(nd, 'adj'));
+      if (ww + hGap > leafSpacing) leafSpacing = ww + hGap;
     });
     leafSpacing = Math.max(leafSpacing, bW + hGap + 10);
 
+    var totalLeafCount = levels[0].length;
+    var panelW = totalLeafCount * leafSpacing + 40;
+    var topPad = 10, labelH = 16, sepGap = 20, arrowLen = 14;
     var nodeH = bH + nodePad;
-    var svgW = Math.max(250, leafCount * leafSpacing + 40);
-    var svgH = depth * (nodeH + vGap) + 40;
+    var inputZoneBot = topPad + sliderH + labelH + 10;
+    var sep1Y = inputZoneBot + sepGap / 2;
+    var leafY = sep1Y + sepGap / 2 + arrowLen;
+    var rootBot = leafY + (depth - 1) * (nodeH + vGap) + nodeH;
+    var piBarH = 50;
+    var sep2Y = rootBot + sepGap;
+    var outputY = sep2Y + sepGap / 2 + arrowLen;
+    var panelH = outputY + piBarH + 20;
 
-    var svg = d3.select(container).append('svg')
-      .attr('width', svgW).attr('height', svgH)
-      .style('display', 'block');
+    var gap = 30;
+    var totalW = panelW * 2 + gap;
 
-    // Position nodes
-    for (var i = 0; i < leafCount; i++) {
-      levels[0][i].x = 20 + i * leafSpacing + leafSpacing / 2;
-      levels[0][i].y = 20;
-    }
-    for (var li = 1; li < depth; li++) {
-      levels[li].forEach(function(nd) {
-        nd.x = (nd.left.x + (nd.right ? nd.right.x : nd.left.x)) / 2;
-        nd.y = 20 + li * (nodeH + vGap);
-      });
-    }
+    // Overall container
+    var wrap = root.append('div')
+      .style('display', 'flex').style('gap', gap + 'px')
+      .style('align-items', 'flex-start');
 
-    // Edges
-    for (var li = 1; li < depth; li++) {
-      levels[li].forEach(function(nd) {
-        [nd.left, nd.right].forEach(function(child) {
-          if (!child || child.pad) return;
-          svg.append('line')
-            .attr('x1', child.x).attr('y1', child.y + nodeH)
-            .attr('x2', nd.x).attr('y2', nd.y)
-            .attr('stroke', '#ddd').attr('stroke-width', 1.5);
+    // Render one panel
+    function renderPanel(parentDiv, mode, title, color) {
+      var panel = parentDiv.append('div')
+        .style('position', 'relative')
+        .style('width', panelW + 'px')
+        .style('height', panelH + 'px');
+
+      // Title
+      panel.append('div')
+        .style('text-align', 'center').style('font-weight', 'bold')
+        .style('color', color).style('margin-bottom', '4px')
+        .style('font-size', '13px')
+        .text(title);
+
+      var svg = panel.append('svg')
+        .attr('width', panelW).attr('height', panelH)
+        .style('display', 'block').style('user-select', 'none');
+
+      var defs = svg.append('defs');
+      defs.append('marker').attr('id', mode + 'Arrow').attr('viewBox','0 0 10 10')
+        .attr('refX',10).attr('refY',5).attr('markerWidth',7).attr('markerHeight',7).attr('orient','auto')
+        .append('path').attr('d','M0,0 L10,5 L0,10 Z').attr('fill', mode === 'fwd' ? '#ccc' : color);
+
+      // Assign positions
+      for (var ni = 0; ni < totalLeafCount; ni++) {
+        levels[0][ni].x = 20 + ni * leafSpacing + leafSpacing / 2;
+        levels[0][ni].y = leafY;
+      }
+      for (var li = 1; li < depth; li++) {
+        levels[li].forEach(function(nd) {
+          nd.x = (nd.left.x + (nd.right ? nd.right.x : nd.left.x)) / 2;
+          nd.y = leafY + li * (nodeH + vGap);
         });
-      });
-    }
+      }
 
-    // Find max value for bar scaling
-    var maxVal = 0;
-    levels.forEach(function(lev) {
-      lev.forEach(function(nd) {
-        if (nd.pad) return;
-        getCoeffs(nd).forEach(function(v) { if (v > maxVal) maxVal = v; });
-      });
-    });
-    if (maxVal === 0) maxVal = 1;
-
-    // Nodes
-    levels.forEach(function(lev) {
-      lev.forEach(function(nd) {
-        if (nd.pad) return;
-        var coeffs = getCoeffs(nd);
-        var nw = nodeW(nd);
-        var g = svg.append('g').attr('transform',
-          'translate(' + (nd.x - nw/2) + ',' + nd.y + ')');
-
-        g.append('rect').attr('width', nw).attr('height', nodeH)
-          .attr('rx', 4).attr('fill', '#f8f9fa').attr('stroke', '#e0e0e0');
-
-        var x0 = nodePad / 2;
-        coeffs.forEach(function(v, k) {
-          var h = Math.max(1, (v / maxVal) * (bH - 12));
-          g.append('rect')
-            .attr('x', x0 + k * (bW + bGap))
-            .attr('y', nodePad/2 + (bH - 12) - h)
-            .attr('width', bW).attr('height', h)
-            .attr('fill', color).attr('rx', 2).attr('opacity', 0.8);
-          g.append('text')
-            .attr('x', x0 + k * (bW + bGap) + bW/2)
-            .attr('y', nodePad/2 - 2)
-            .attr('text-anchor', 'middle').attr('font-size', '9px')
-            .attr('fill', '#666')
-            .text(v.toFixed(2));
+      // Edges
+      for (var li = 1; li < depth; li++) {
+        levels[li].forEach(function(nd) {
+          [nd.left, nd.right].forEach(function(child) {
+            if (!child || child.pad) return;
+            var x1 = nd.x, y1 = nd.y, x2 = child.x, y2 = child.y + nodeH;
+            var my = (y1 + y2) / 2;
+            if (mode === 'adj') {
+              svg.append('path')
+                .attr('d', 'M'+x1+','+y1+' C'+x1+','+my+' '+x2+','+my+' '+x2+','+y2)
+                .attr('fill','none').attr('stroke', color).attr('stroke-width',1.2)
+                .attr('stroke-dasharray','4,2').attr('opacity',0.5)
+                .attr('marker-end','url(#'+mode+'Arrow)');
+            } else {
+              svg.append('line')
+                .attr('x1', x2).attr('y1', y2).attr('x2', x1).attr('y2', y1)
+                .attr('stroke', '#ddd').attr('stroke-width', 1.5);
+            }
+          });
         });
+      }
 
-        // Label for root in backward mode
-        if (mode === 'backward' && !nd.left && !nd.right) {
-          // leaf
+      // Separators
+      svg.append('line').attr('x1',10).attr('x2',panelW-10).attr('y1',sep1Y).attr('y2',sep1Y)
+        .attr('stroke','#e0e0e0').attr('stroke-width',1).attr('stroke-dasharray','4,4');
+      svg.append('line').attr('x1',10).attr('x2',panelW-10).attr('y1',sep2Y).attr('y2',sep2Y)
+        .attr('stroke','#e0e0e0').attr('stroke-width',1).attr('stroke-dasharray','4,4');
+
+      var logMax = mode === 'fwd' ? Math.log1p(Math.pow(WMAX, n)) : Math.log1p(1);
+      var nodeRefs = [];
+
+      // Draw bars at each node
+      for (var li = 0; li < depth; li++) {
+        levels[li].forEach(function(nd) {
+          if (nd.pad) { nodeRefs.push(null); return; }
+          var coeffs = mode === 'fwd' ? nd.poly : (nd.adj || []);
+          var nCoeffs = Math.min(coeffs.length, n + 1);
+          if (nCoeffs === 0) { nodeRefs.push(null); return; }
+          var boxW = nCoeffs * (bW + bGap) - bGap + nodePad;
+          var gx = nd.x - boxW / 2;
+
+          var g = svg.append('g').attr('transform', 'translate(' + gx + ',' + nd.y + ')');
+          g.append('rect').attr('width', boxW).attr('height', nodeH)
+            .attr('fill', '#f9f9f9').attr('stroke', 'none').attr('rx', 5);
+
+          var rects = [], texts = [];
+          for (var k = 0; k < nCoeffs; k++) {
+            var bx = nodePad / 2 + k * (bW + bGap);
+            var val = k < coeffs.length ? coeffs[k] : 0;
+            var frac = Math.min(1, Math.log1p(Math.abs(val)) / logMax);
+            var px = Math.max(0.5, frac * (bH - 12));
+            var isRoot = li === depth - 1;
+            var isHighlight = isRoot && k === n;
+            var col = isHighlight ? CR : color;
+
+            var r = g.append('rect')
+              .attr('x', bx + 1).attr('width', bW - 2).attr('rx', 2)
+              .attr('y', nodePad/2 + (bH - 12) - px).attr('height', px)
+              .attr('fill', col).attr('opacity', 0.7);
+            rects.push(r);
+
+            var t = g.append('text')
+              .attr('x', bx + bW/2).attr('y', nodePad/2 + (bH - 12) - px - 3)
+              .attr('text-anchor', 'middle')
+              .style('font-size', '8px').style('fill', col)
+              .style('font-family', "'EB Garamond', serif")
+              .text(fmtVal(val));
+            texts.push(t);
+          }
+
+          nd['_barXs_' + mode] = [];
+          for (var k = 0; k < nCoeffs; k++)
+            nd['_barXs_' + mode].push(gx + nodePad/2 + k * (bW + bGap));
+
+          nodeRefs.push({ rects: rects, texts: texts, nCoeffs: nCoeffs });
+        });
+      }
+
+      // Sliders (only on forward panel)
+      var sliderFills = [], sliderLabels = [];
+      if (mode === 'fwd') {
+        levels[0].forEach(function(nd, idx) {
+          if (nd.pad) return;
+          (function(idx) {
+            var barXs = nd['_barXs_fwd'];
+            var barIdx = Math.min(1, barXs.length - 1);
+            var barX = barXs[barIdx];
+            var sliderTop = topPad;
+
+            var sg = svg.append('g');
+            var frac = Math.min(w[idx] / WMAX, 1);
+            var sf = sg.append('rect')
+              .attr('x', barX + 2).attr('width', bW - 4).attr('rx', 1)
+              .attr('y', sliderTop + sliderH - frac * sliderH).attr('height', frac * sliderH)
+              .attr('fill', CI).attr('opacity', 0.8).style('pointer-events', 'none');
+            sliderFills.push(sf);
+
+            var sl = sg.append('text')
+              .attr('x', barX + bW/2).attr('y', sliderTop + sliderH - frac * sliderH - 2)
+              .attr('text-anchor', 'middle')
+              .style('font-size', '9px').style('fill', CI).style('pointer-events', 'none')
+              .text(w[idx].toFixed(2));
+            sliderLabels.push(sl);
+
+            addMathLabel(panel, barX + bW/2, sliderTop + sliderH - 6,
+              '$w_{' + (idx+1) + '}$', {anchor:'middle', color:CI, fontSize:'13px'});
+
+            // Drag area
+            sg.append('rect')
+              .attr('x', barX - 4).attr('y', sliderTop - 2)
+              .attr('width', bW + 8).attr('height', sliderH + 4)
+              .attr('fill', 'transparent').attr('cursor', 'ns-resize')
+              .style('touch-action', 'none')
+              .call(d3.drag().on('drag', function(event) {
+                var fr = (sliderTop + sliderH - event.y) / sliderH;
+                w[idx] = Math.max(0.01, Math.min(WMAX, fr * WMAX));
+                build();
+              }));
+
+            // Arrow from slider to leaf
+            svg.append('line')
+              .attr('x1', barX + bW/2).attr('y1', inputZoneBot)
+              .attr('x2', barX + bW/2).attr('y2', nd.y)
+              .attr('stroke', '#ccc').attr('stroke-width', 1)
+              .attr('marker-end', 'url(#fwdArrow)');
+          })(idx);
+        });
+      }
+
+      // Seed annotation (only on adjoint panel)
+      if (mode === 'adj') {
+        var rootNd = levels[depth - 1][0];
+        var barXs = rootNd['_barXs_adj'];
+        if (barXs && n < barXs.length) {
+          addMathLabel(panel, barXs[n] + bW/2, rootNd.y - 14,
+            '$\\bar{c}_n = 1/Z$', {anchor:'middle', color:CR, fontSize:'10px'});
         }
-      });
-    });
+      }
 
-    // In backward mode, label the seed at root
-    if (mode === 'backward') {
-      var root = levels[depth - 1][0];
-      svg.append('text')
-        .attr('x', root.x).attr('y', root.y - 8)
-        .attr('text-anchor', 'middle').attr('font-size', '11px')
-        .attr('fill', CA).attr('font-style', 'italic')
-        .text('seed: c\u0304_n = 1/Z');
+      // Pi output (only on adjoint panel)
+      var piBars = [], piLabels = [];
+      if (mode === 'adj') {
+        var pi = [];
+        for (var i = 0; i < N; i++) {
+          var leaf = levels[0][i];
+          pi.push(leaf.adj && leaf.adj.length > 1 ? w[i] * leaf.adj[1] : 0);
+        }
+        levels[0].forEach(function(nd, idx) {
+          if (nd.pad) return;
+          var barXs = nd['_barXs_adj'];
+          if (!barXs) return;
+          var barIdx = Math.min(1, barXs.length - 1);
+          var bx = barXs[barIdx];
+          var piFrac = Math.min(pi[idx], 1);
+
+          var pb = svg.append('rect')
+            .attr('x', bx + 2).attr('width', bW - 4).attr('rx', 2)
+            .attr('y', outputY + piBarH - piFrac * piBarH).attr('height', piFrac * piBarH)
+            .attr('fill', CR).attr('opacity', 0.7);
+          piBars.push(pb);
+
+          svg.append('text')
+            .attr('x', bx + bW/2).attr('y', outputY + piBarH - piFrac * piBarH - 3)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '9px').style('fill', CR)
+            .style('font-family', "'EB Garamond', serif")
+            .text(pi[idx].toFixed(3));
+
+          // Arrow from leaf to pi
+          svg.append('line')
+            .attr('x1', bx + bW/2).attr('y1', nd.y + nodeH + 8)
+            .attr('x2', bx + bW/2).attr('y2', outputY)
+            .attr('stroke', '#d4a0a0').attr('stroke-width', 1)
+            .attr('marker-end', 'url(#adjArrow)');
+
+          addMathLabel(panel, bx + bW/2, outputY + piBarH - 6,
+            '$\\pi_{' + (idx+1) + '}$', {anchor:'middle', color:CR, fontSize:'13px'});
+        });
+      }
+
+      // Degree labels at root
+      var rootNd = levels[depth - 1][0];
+      var barXs = rootNd['_barXs_' + mode];
+      if (barXs) {
+        var nCoeffs = Math.min((mode === 'fwd' ? rootNd.poly : rootNd.adj || []).length, n + 1);
+        for (var k = 0; k < nCoeffs; k++) {
+          addMathLabel(panel, barXs[k] + bW/2, rootNd.y + nodeH + 2,
+            k === n ? '$\\mathbf{' + k + '}$' : '$' + k + '$',
+            {anchor:'middle', color: k === n ? CR : '#bbb', fontSize:'9px'});
+        }
+      }
+
+      return { nodeRefs: nodeRefs, sliderFills: sliderFills, sliderLabels: sliderLabels };
     }
 
-    return svg;
+    fwdState = renderPanel(wrap, 'fwd', 'Forward Pass', CW);
+    adjState = renderPanel(wrap, 'adj', 'Backward Pass (Adjoints)', CA);
+
+    setTimeout(function() {
+      if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([document.getElementById('bp')]);
+      }
+    }, 50);
   }
 
-  function renderPi(w, levels, n) {
-    var container = d3.select('#pi-output');
-    container.selectAll('*').remove();
-    var N = w.length;
-    var pi = [];
-    for (var i = 0; i < N; i++) {
-      var leaf = levels[0][i];
-      pi.push(leaf.adj && leaf.adj.length > 1 ? w[i] * leaf.adj[1] : 0);
-    }
-
-    var div = container.append('div').style('display', 'flex').style('gap', '30px')
-      .style('margin-top', '10px');
-    pi.forEach(function(p, i) {
-      var cell = div.append('div').style('text-align', 'center');
-      var barH = Math.max(2, p * 80);
-      cell.append('div').style('font-size', '12px').style('color', '#666').text(p.toFixed(3));
-      cell.append('div')
-        .style('width', '30px').style('height', barH + 'px')
-        .style('background', CPI).style('border-radius', '3px')
-        .style('margin', '4px auto');
-      cell.append('div').style('font-size', '13px').style('font-weight', 'bold')
-        .html('&pi;<sub>' + (i+1) + '</sub>');
-    });
-  }
-
-  // --- Controls & rebuild ---
-  var N = 4, n = 2;
-  var w = [0.5, 1.2, 0.3, 1.0];
-
-  function rebuild() {
-    var tree = buildTree(w, n);
-    var Z = backprop(tree, n);
-    renderTree('#forward-tree', tree.levels, 'forward', n, w);
-    renderTree('#backward-tree', tree.levels, 'backward', n, w);
-    renderPi(w, tree.levels, n);
-  }
-
-  // Weight sliders
-  var sliderDiv = d3.select('#sliders');
-  w.forEach(function(wi, i) {
-    sliderDiv.append('label').text('w' + (i+1) + ': ');
-    sliderDiv.append('input')
-      .attr('type', 'range').attr('min', 0.1).attr('max', WMAX).attr('step', 0.1)
-      .attr('value', wi).style('width', '80px')
-      .on('input', function() { w[i] = +this.value; rebuild(); });
-    sliderDiv.append('span').text('  ');
-  });
-
-  d3.select('#inputN').on('change', function() {
-    N = Math.max(2, Math.min(8, +this.value));
-    w = []; for (var i = 0; i < N; i++) w.push(1.0);
-    d3.select('#sliders').selectAll('*').remove();
-    w.forEach(function(wi, i) {
-      d3.select('#sliders').append('label').text('w' + (i+1) + ': ');
-      d3.select('#sliders').append('input')
-        .attr('type', 'range').attr('min', 0.1).attr('max', WMAX).attr('step', 0.1)
-        .attr('value', wi).style('width', '80px')
-        .on('input', function() { w[i] = +this.value; rebuild(); });
-      d3.select('#sliders').append('span').text('  ');
-    });
-    rebuild();
-  });
-  d3.select('#inputn').on('change', function() {
-    n = Math.max(0, Math.min(N, +this.value)); rebuild();
-  });
-
-  rebuild();
+  build();
 })();
 </script>
+</div>
 
 </body>
 </html>
