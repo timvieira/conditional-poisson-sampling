@@ -39,10 +39,10 @@ class ConditionalPoissonSequentialTorch:
 
     def clear(self):
         """Flush all cached computations."""
-        for attr in ('_E_differentiable', 'log_normalizer', 'incl_prob', '_sample_data'):
+        for attr in ('_forward', 'log_normalizer', 'incl_prob', '_sample_data'):
             self.__dict__.pop(attr, None)
 
-    def _build_E(self, theta):
+    def _build_forward(self, theta):
         """Build the full ESP table E[k, n] = e_k(w[0:n]).
 
         Returns (E, w) where E is a (K+1, N+1) tensor on the autograd graph.
@@ -61,21 +61,21 @@ class ConditionalPoissonSequentialTorch:
     @cached_property
     def log_normalizer(self) -> float:
         """log Z(w, n).  O(Nn).  Does not trigger backward pass."""
-        E, _ = self._build_E(self.theta.detach())
+        E, _ = self._build_forward(self.theta.detach())
         return float(torch.log(E[self.n, self.N]).item())
 
     @cached_property
     def incl_prob(self) -> torch.Tensor:
         """Inclusion probabilities pi_i = d(log Z)/d(theta_i) via autograd.  O(Nn)."""
         theta = self.theta.detach().requires_grad_(True)
-        E, _ = self._build_E(theta)
+        E, _ = self._build_forward(theta)
         log_Z = torch.log(E[self.n, self.N])
         return torch.autograd.grad(log_Z, theta)[0].detach()
 
     @cached_property
     def _sample_data(self):
         """Build ESP table as plain lists for fast sampling loop."""
-        E, w = self._build_E(self.theta.detach())
+        E, w = self._build_forward(self.theta.detach())
         return E.tolist(), w.tolist()
 
     def sample(self) -> torch.Tensor:
@@ -124,7 +124,7 @@ class ConditionalPoissonSequentialTorch:
         def closure():
             optimizer.zero_grad()
             cp.clear()
-            E, _ = cp._build_E(cp.theta)
+            E, _ = cp._build_forward(cp.theta)
             loss = torch.log(E[cp.n, cp.N]) - target_incl @ cp.theta
             loss.backward()
             return loss

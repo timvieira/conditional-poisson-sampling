@@ -71,7 +71,7 @@ class ConditionalPoissonTorch:
         def closure():
             optimizer.zero_grad()
             cp.__dict__.pop('_r', None)  # r depends on theta
-            tree, tree_n, log_r, root_log_scale, _ = cp._build_tree()
+            tree, tree_n, log_r, root_log_scale, _ = cp._build_forward()
             loss = torch.log(tree[1][n]) + root_log_scale - n * log_r - target_incl @ cp.theta
             loss.backward()
             return loss
@@ -84,7 +84,7 @@ class ConditionalPoissonTorch:
 
     def clear(self):
         """Flush all cached computations."""
-        for attr in ('_r', '_forward', 'log_normalizer', 'incl_prob', '_sample_tree'):
+        for attr in ('_r', '_forward', 'log_normalizer', 'incl_prob', '_sample_data'):
             self.__dict__.pop(attr, None)
 
     @cached_property
@@ -97,7 +97,7 @@ class ConditionalPoissonTorch:
         theta_grad = self.theta.detach().requires_grad_(True)
         saved = self.theta
         self.theta = theta_grad
-        tree, tree_n, log_r, root_log_scale, node_scale = self._build_tree()
+        tree, tree_n, log_r, root_log_scale, node_scale = self._build_forward()
         self.theta = saved
         log_Z = torch.log(tree[1][self.n]) + root_log_scale - self.n * log_r
         return log_Z, tree, tree_n, node_scale, theta_grad
@@ -128,7 +128,7 @@ class ConditionalPoissonTorch:
         return float(th[S].sum() - lz)
 
     @cached_property
-    def _sample_tree(self):
+    def _sample_data(self):
         """Convert cached tree to plain lists for fast sampling loop."""
         _, tree, tree_n, node_scale, _ = self._forward
         return (
@@ -142,7 +142,7 @@ class ConditionalPoissonTorch:
         Complexity: O(N log^2 n) to build tree [cached] + O(n log N).
         """
         import random
-        Pc, ratio, tree_n = self._sample_tree
+        Pc, ratio, tree_n = self._sample_data
         N, n = self.N, self.n
         selected = []
         stack = [(1, n)]
@@ -210,7 +210,7 @@ class ConditionalPoissonTorch:
             return cls._batch_poly_mul_direct(a_batch, b_batch)
         return cls._batch_poly_mul_fft(a_batch, b_batch)
 
-    def _build_tree(self):
+    def _build_forward(self):
         """Build the product tree via batched FFT with contour scaling.
 
         Returns (tree, tree_n, log_r, root_log_scale, node_scale).

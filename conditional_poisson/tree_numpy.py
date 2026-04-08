@@ -75,7 +75,7 @@ class ConditionalPoissonNumPy:
 
     def clear(self):
         """Flush all cached computations."""
-        for attr in ('_tree', 'log_normalizer', 'incl_prob', '_sample_tree'):
+        for attr in ('_forward', 'log_normalizer', 'incl_prob', '_sample_data'):
             self.__dict__.pop(attr, None)
 
     def _scale(self, c):
@@ -90,7 +90,7 @@ class ConditionalPoissonNumPy:
         return cn, als + bls + inc
 
     @cached_property
-    def _tree(self):
+    def _forward(self):
         """Build the product tree.  O(N (log N)^2)."""
         N, n = self.N, self.n
         log_gm = float(np.mean(self.theta))
@@ -118,7 +118,7 @@ class ConditionalPoissonNumPy:
     @cached_property
     def log_normalizer(self) -> float:
         """Log normalizing constant.  O(N (log N)^2).  Does not trigger downward pass."""
-        Pc, Pls, _, _, log_gm = self._tree
+        Pc, Pls, _, _, log_gm = self._forward
         n = self.n
         en_n = float(Pc[1][n]) if len(Pc[1]) > n else 0.0
         root_ls = float(Pls[1])
@@ -127,7 +127,7 @@ class ConditionalPoissonNumPy:
     @cached_property
     def incl_prob(self) -> np.ndarray:
         """Inclusion probabilities via downward pass.  O(N (log N)^2)."""
-        Pc, Pls, tree_n, q_s, _ = self._tree
+        Pc, Pls, tree_n, q_s, _ = self._forward
         N, n = self.N, self.n
 
         N2 = 2 * tree_n
@@ -154,9 +154,9 @@ class ConditionalPoissonNumPy:
         return pi
 
     @cached_property
-    def _sample_tree(self):
+    def _sample_data(self):
         """Prepare tree data for fast sampling loop."""
-        Pc, Pls, tree_n, _, _ = self._tree
+        Pc, Pls, tree_n, _, _ = self._forward
         ratio = [1.0] * (2 * tree_n)
         for i in range(1, tree_n):
             ratio[i] = np.exp(Pls[i] - Pls[2*i] - Pls[2*i+1])
@@ -171,7 +171,7 @@ class ConditionalPoissonNumPy:
         Complexity: O(N (log N)^2) to build tree [cached] + O(n log N).
         """
         import random
-        Pc, ratio, tree_n = self._sample_tree
+        Pc, ratio, tree_n = self._sample_data
         N, n = self.N, self.n
         selected = []
         stack = [(1, n)]
@@ -207,7 +207,6 @@ class ConditionalPoissonNumPy:
             return (th @ S.T - lz) if S.ndim == 2 else float(th[S].sum() - lz)
         else:
             return (th[S].sum(axis=1) - lz) if S.ndim == 2 else float(th[S].sum() - lz)
-
 
     def __repr__(self):
         return f"ConditionalPoissonNumPy(N={self.N}, n={self.n})"

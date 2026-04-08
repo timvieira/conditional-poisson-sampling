@@ -39,11 +39,11 @@ class ConditionalPoissonSequentialNumPy:
 
     def clear(self):
         """Flush all cached computations."""
-        for attr in ('_E', 'log_normalizer', 'incl_prob', '_sample_data'):
+        for attr in ('_forward', 'log_normalizer', 'incl_prob', '_sample_data'):
             self.__dict__.pop(attr, None)
 
     @cached_property
-    def _E(self):
+    def _forward(self):
         """Forward ESP table E[k, n] = e_k(w[0:n]).  O(Nn)."""
         w = np.exp(self.theta)
         N, K = self.N, self.n
@@ -56,13 +56,13 @@ class ConditionalPoissonSequentialNumPy:
     @cached_property
     def log_normalizer(self) -> float:
         """log Z(w, n).  O(Nn).  Does not trigger backward pass."""
-        E, _ = self._E
+        E, _ = self._forward
         return float(np.log(E[self.n, self.N]))
 
     @cached_property
     def incl_prob(self) -> np.ndarray:
         """Inclusion probabilities via reverse-mode AD on the ESP DP.  O(Nn)."""
-        E, w = self._E
+        E, w = self._forward
         N, K = self.N, self.n
         Z = E[K, N]
         dE = np.zeros((K + 1, N + 1))
@@ -78,7 +78,7 @@ class ConditionalPoissonSequentialNumPy:
     @cached_property
     def _sample_data(self):
         """Convert ESP table to plain lists for fast sampling loop."""
-        E, w = self._E
+        E, w = self._forward
         return E.tolist(), w.tolist()
 
     def sample(self) -> np.ndarray:
