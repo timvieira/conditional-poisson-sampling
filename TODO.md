@@ -7,6 +7,7 @@
 - [ ] Compare CPS to priority sampling in the HT estimation section — replicate the style of the "estimating means in a finite universe" blog post (https://timvieira.github.io/blog/post/2017/07/03/estimating-means-in-a-finite-universe/). Show variance reduction of CPS-HT vs priority sampling vs i.i.d. Monte Carlo on the same estimation problem. CPS gives optimal variance (max-entropy) but is more expensive to set up; priority sampling is $O(N \log N)$ but suboptimal. The comparison would make the HT section much more concrete.
 - [ ] Review the sampling pseudocode
 - [ ] Should we refer to polynomials more consistently as generating functions here?
+- [ ] Would evaluating/plotting the polynomial as a function of z tell us anything interesting?
 - [x] Add link to Wikipedia page on [elementary symmetric polynomials](https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial)
 
 ## Timing Section
