@@ -166,7 +166,11 @@ class ConditionalPoissonSequentialTorch:
         """
         import numpy as np
 
+        # Convert to numpy for fast sampling loop (no autograd needed)
         q, B, Bls = self._get_backward_table()
+        q_np = q.numpy()
+        B_np = B.numpy()
+        Bls_np = Bls.numpy()
         N, n = self.N, self.n
 
         if not isinstance(rng, np.random.Generator):
@@ -178,9 +182,9 @@ class ConditionalPoissonSequentialTorch:
             if k == 0:
                 break
             if k == 1:
-                prob = (q[i] * torch.exp(-Bls[i]) / B[i, k]).item()
+                prob = q_np[i] * np.exp(-Bls_np[i]) / B_np[i, k]
             else:
-                prob = (q[i] * B[i+1, k-1] / B[i, k] * torch.exp(Bls[i+1] - Bls[i])).item()
+                prob = q_np[i] * B_np[i+1, k-1] / B_np[i, k] * np.exp(Bls_np[i+1] - Bls_np[i])
             if rng.random() < prob:
                 selected.append(i)
                 k -= 1
