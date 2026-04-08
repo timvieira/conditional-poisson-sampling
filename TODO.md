@@ -34,13 +34,13 @@
 - [ ] apply a similar refactor to numpy implementation (and I'm guess the sequential implementations too)
 
 ### Sequential implementations
-- [ ] Add `fit` and `log_prob` to `ConditionalPoissonSequentialNumPy`
-- [ ] Add `fit` and `log_prob` to `ConditionalPoissonSequentialTorch`
+- [x] ~~Add `fit` and `log_prob` to `ConditionalPoissonSequentialNumPy`~~ — done
+- [x] ~~Add `fit` and `log_prob` to `ConditionalPoissonSequentialTorch`~~ — done
 - [ ] Fix numerical overflow in sequential `_get_seq_q` — the ESP recurrence operates in linear space without log-scaling, producing NaN at N ≥ 500. Affects both NumPy and Torch sequential classes.
 - [x] ~~`ConditionalPoissonSequentialTorch` should use `torch.autograd` for `incl_prob` (backprop on `log_normalizer`) instead of manual forward-backward DP~~ — done
 - [ ] Sequential sampling should work directly from the forward DP table instead of recomputing a separate backward ESP table (`_get_seq_q`)
 - [ ] All four implementations should have the same public interface: `from_weights`, `fit`, `sample`, `log_prob`, `incl_prob`, `log_normalizer`, `n`, `N`, `theta`, `w`
-- [ ] Extend `tests/test_all_implementations.py` to cover `fit` and `log_prob` once sequential classes implement them
+- [x] ~~Extend `tests/test_all_implementations.py` to cover `fit` and `log_prob`~~ — done
 
 ### Benchmarks
 - [ ] Rerun `bench_timing.py` and regenerate `timing_data.json` + SVG plots (sampling data is stale after sampler rewrite)

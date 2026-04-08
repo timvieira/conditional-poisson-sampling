@@ -194,5 +194,46 @@ class ConditionalPoissonSequentialTorch:
                 k -= 1
         return torch.tensor(selected, dtype=torch.long)
 
+    # ── Log probability ───────────────────────────────────────────────────────
+
+    def log_prob(self, S) -> float:
+        """log P(S) = sum_{i in S} theta_i - log Z."""
+        S = torch.as_tensor(S, dtype=torch.long)
+        return float(self._theta[S].sum() - self.log_normalizer)
+
+    # ── Fitting ──────────────────────────────────────────────────────────────
+
+    @classmethod
+    def fit(cls, target_incl, n, *, tol=1e-7,
+            dtype=torch.float64, device=None):
+        """Fit to target inclusion probabilities via L-BFGS."""
+        from conditional_poisson.torch import _to_tensor
+        target_incl = _to_tensor(target_incl, dtype).to(device=device)
+        cp = cls(n, torch.logit(target_incl))
+        cp._theta.requires_grad_(True)
+
+        optimizer = torch.optim.LBFGS(
+            [cp._theta],
+            max_iter=200,
+            history_size=5,
+            line_search_fn='strong_wolfe',
+            tolerance_grad=tol,
+            tolerance_change=0,
+        )
+
+        def closure():
+            optimizer.zero_grad()
+            loss = cp._log_Z() - target_incl @ cp._theta
+            loss.backward()
+            return loss
+
+        optimizer.step(closure)
+
+        with torch.no_grad():
+            cp._theta -= cp._theta.mean()
+        cp._theta = cp._theta.detach()
+
+        return cp
+
     def __repr__(self):
         return f"ConditionalPoissonSequentialTorch(N={self.N}, n={self.n})"

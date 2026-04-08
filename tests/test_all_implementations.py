@@ -13,21 +13,15 @@ from itertools import combinations
 
 from conditional_poisson.numpy import ConditionalPoissonNumPy
 from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNumPy
+from conditional_poisson.torch import ConditionalPoissonTorch
+from conditional_poisson.sequential_torch import ConditionalPoissonSequentialTorch
 
-# Torch imports may fail if torch not installed
-torch_classes = []
-try:
-    from conditional_poisson.torch import ConditionalPoissonTorch
-    torch_classes.append(ConditionalPoissonTorch)
-except ImportError:
-    pass
-try:
-    from conditional_poisson.sequential_torch import ConditionalPoissonSequentialTorch
-    torch_classes.append(ConditionalPoissonSequentialTorch)
-except ImportError:
-    pass
-
-ALL_CLASSES = [ConditionalPoissonNumPy, ConditionalPoissonSequentialNumPy] + torch_classes
+ALL_CLASSES = [
+    ConditionalPoissonNumPy,
+    ConditionalPoissonSequentialNumPy,
+    ConditionalPoissonTorch,
+    ConditionalPoissonSequentialTorch,
+]
 
 
 def to_numpy(x):
@@ -201,6 +195,41 @@ class TestEdgeCases:
         cp = cls.from_weights(N - 1, w)
         pi = to_numpy(cp.incl_prob)
         assert abs(pi.sum() - (N - 1)) < 1e-10
+
+
+# ── Log probability ──────────────────────────────────────────────────────────
+
+class TestLogProb:
+    def test_consistent_with_log_normalizer(self, cls):
+        """log_prob of every subset sums to 1 (in probability space)."""
+        w = np.array([1.5, 2.0, 0.5, 3.0])
+        cp = cls.from_weights(2, w)
+        total = 0.0
+        for S in combinations(range(4), 2):
+            total += np.exp(cp.log_prob(np.array(S)))
+        assert abs(total - 1.0) < 1e-10
+
+    def test_matches_brute_force(self, cls):
+        w = np.array([1.5, 2.0, 0.5, 3.0, 1.0])
+        n = 2
+        cp = cls.from_weights(n, w)
+        Z = sum(np.prod(w[list(S)]) for S in combinations(range(5), n))
+        for S in combinations(range(5), n):
+            expected = np.log(np.prod(w[list(S)]) / Z)
+            assert abs(cp.log_prob(np.array(S)) - expected) < 1e-10
+
+
+# ── Fitting ──────────────────────────────────────────────────────────────────
+
+class TestFit:
+    def test_fit_recovers_pi(self, cls):
+        w = np.random.default_rng(0).exponential(1.0, 10)
+        n = 4
+        cp_ref = cls.from_weights(n, w)
+        target = to_numpy(cp_ref.incl_prob)
+        cp_fit = cls.fit(target, n)
+        pi_fit = to_numpy(cp_fit.incl_prob)
+        assert np.max(np.abs(pi_fit - target)) < 1e-6
 
 
 # ── Cross-implementation agreement ───────────────────────────────────────────

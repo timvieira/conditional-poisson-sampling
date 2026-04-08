@@ -214,6 +214,44 @@ class ConditionalPoissonSequentialNumPy:
                 k -= 1
         return np.array(selected, dtype=np.int32)
 
+    # ── Log probability ───────────────────────────────────────────────────────
+
+    def log_prob(self, S) -> float:
+        """log P(S) = sum_{i in S} theta_i - log Z."""
+        S = np.asarray(S)
+        return float(self._theta[S].sum() - self.log_normalizer)
+
+    # ── Fitting ──────────────────────────────────────────────────────────────
+
+    @classmethod
+    def fit(cls, target_incl, n, *, tol=1e-10, max_iter=200, verbose=False):
+        """Fit to target inclusion probabilities via L-BFGS."""
+        from scipy.optimize import minimize
+        from scipy.special import logit
+
+        target_incl = np.asarray(target_incl, float)
+        obj = cls(n, logit(target_incl))
+
+        def neg_ll_and_grad(theta):
+            obj._theta = theta
+            obj._cache.clear()
+            pi = obj.incl_prob
+            loss = obj.log_normalizer - float(np.dot(target_incl, theta))
+            grad = pi - target_incl
+            if verbose:
+                err = float(np.max(np.abs(grad)))
+                print(f"  max|pi-pi*| = {err:.3e}")
+            return loss, grad
+
+        result = minimize(
+            neg_ll_and_grad, logit(target_incl),
+            method='L-BFGS-B', jac=True,
+            options={'maxiter': max_iter, 'gtol': tol, 'ftol': 0},
+        )
+        theta = result.x
+        theta -= theta.mean()
+        return cls(n, theta)
+
     def __repr__(self):
         return f"ConditionalPoissonSequentialNumPy(N={self.N}, n={self.n})"
 
