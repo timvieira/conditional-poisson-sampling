@@ -41,10 +41,8 @@ import torch
 import torch.nn.functional as F
 import math
 from bisect import bisect_left as _bisect_left
-from typing import Optional, Union
+from typing import Union
 
-
-# ── Utilities ────────────────────────────────────────────────────────────────
 
 def _to_tensor(x, dtype=torch.float64):
     """Convert input to a torch tensor if it isn't one already."""
@@ -53,233 +51,10 @@ def _to_tensor(x, dtype=torch.float64):
     return torch.tensor(x, dtype=dtype)
 
 
-# ── Find the optimal rescaling parameter r ───────────────────────────────────
-
-def _find_r(w, n, tol=1e-12, max_iter=100):
-    """Find r such that sum_i w_i*r / (1 + w_i*r) = n.
-
-    This is a monotone equation in log(r): the LHS is strictly increasing
-    from 0 (as r->0) to N (as r->inf).  Newton's method converges quickly.
-
-    Parameters
-    ----------
-    w : (N,) tensor of positive weights (detached, no grad needed)
-    n : target sum (int)
-
-    Returns
-    -------
-    r : scalar (float, not a tensor — this is a numerical parameter,
-        not part of the differentiable computation)
-    """
-    # Work in log-space: let t = log(r), solve g(t) = sum p_i(t) - n = 0
-    # where p_i(t) = w_i*exp(t) / (1 + w_i*exp(t)) = sigmoid(log(w_i) + t)
-    log_w = torch.log(w).detach().double()
-
-    # Initial guess: t such that n/N of the items have p_i ≈ 0.5
-    # i.e., median(log_w) + t ≈ 0 => t ≈ -median(log_w)
-    t = -torch.median(log_w).item()
-
-    for _ in range(max_iter):
-        s = log_w + t
-        # Numerically stable sigmoid and its derivative
-        # Clamp to avoid exp overflow in the tails
-        s_clamped = s.clamp(-500, 500)
-        p = torch.sigmoid(s_clamped)
-        g = p.sum().item() - n
-        gp = (p * (1 - p)).sum().item()
-
-        if abs(g) < tol:
-            break
-        if gp < 1e-100:
-            # All probabilities saturated; do a bisection-style step
-            if g > 0:
-                t -= 1.0
-            else:
-                t += 1.0
-            continue
-
-        t -= g / gp
-
-    return math.exp(t)
-
-
-# ── Batched FFT polynomial multiplication ────────────────────────────────────
-
-def _batch_poly_mul_fft(a_batch, b_batch):
-    """Multiply pairs of polynomials via batched FFT.
-
-    O(B * d log d) where d = La + Lb.  Uses torch.fft which is
-    differentiable, so autograd can backpropagate through this.
-
-    Parameters
-    ----------
-    a_batch : (B, La) tensor
-    b_batch : (B, Lb) tensor
-
-    Returns
-    -------
-    (B, La + Lb - 1) tensor of product polynomials
-    """
-    La = a_batch.shape[1]
-    Lb = b_batch.shape[1]
-    n_out = La + Lb - 1
-    # Convolution theorem: poly_mul(a, b) = ifft(fft(a) * fft(b))
-    fa = torch.fft.rfft(a_batch, n=n_out)
-    fb = torch.fft.rfft(b_batch, n=n_out)
-    return torch.fft.irfft(fa * fb, n=n_out)
-
-
-def _batch_poly_mul_direct(a_batch, b_batch):
-    """Multiply pairs of polynomials via grouped conv1d (direct O(d²))."""
-    B = a_batch.shape[0]
-    Lb = b_batch.shape[1]
-    out = F.conv1d(
-        a_batch.unsqueeze(0),
-        b_batch.flip(-1).unsqueeze(1),
-        padding=Lb - 1,
-        groups=B,
-    )
-    return out.squeeze(0)
-
-
 # Threshold: use FFT when polynomials are large enough to amortize overhead.
 # With contour scaling, FFT precision is no longer a concern.
 _FFT_THRESHOLD = 64
 
-def _batch_poly_mul(a_batch, b_batch):
-    """Hybrid: direct for small polys, FFT for large."""
-    if a_batch.shape[1] + b_batch.shape[1] <= _FFT_THRESHOLD:
-        return _batch_poly_mul_direct(a_batch, b_batch)
-    return _batch_poly_mul_fft(a_batch, b_batch)
-
-
-# ── Forward pass: product tree with contour scaling ──────────────────────────
-
-def forward_log_Z(theta, n):
-    """Compute log Z via FFT-based product tree with contour scaling.
-
-    Steps:
-    1. Compute r = optimal contour radius (non-differentiable root-find)
-    2. Rescale weights: w_i' = w_i * r  (differentiable)
-    3. Build product tree: prod_i (1 + w_i' z) via batched FFT
-    4. Extract: log Z = log(root[n]) - n * log(r)
-
-    Parameters
-    ----------
-    theta : (N,) tensor of log-weights (requires_grad=True)
-    n     : subset size (int)
-
-    Returns
-    -------
-    log_Z : scalar tensor (differentiable w.r.t. theta)
-    """
-    N = theta.shape[0]
-    dtype = theta.dtype
-    device = theta.device
-
-    w = torch.exp(theta)
-
-    # Step 1: find optimal contour radius (not on autograd graph).
-    #
-    # Why this works: the product polynomial P(z) = prod_i (1 + w_i z) has
-    # its peak coefficient near degree N/2 (for uniform weights).  The
-    # coefficient at degree n can be ~10^{-300} smaller.  FFT introduces
-    # errors ~eps * max|c|, which drowns the small coefficient.
-    #
-    # Rescaling z -> r*z gives P(r*z) = prod_i (1 + w_i*r*z).  The k-th
-    # coefficient of P(r*z) is c_k * r^k, so choosing r shifts the peak.
-    # The optimal r makes the expected sample size under Poisson sampling
-    # equal n, placing the peak at degree n — exactly where we need it.
-    #
-    # r is NOT on the autograd graph: it's a numerical conditioning choice,
-    # not part of the mathematical function.  The gradient of log_Z w.r.t.
-    # theta flows through w_scaled = w * r (where r is a constant).
-    r = _find_r(w.detach(), n)
-    log_r = math.log(r)
-
-    # Step 2: rescale weights (this IS on the autograd graph).
-    # After rescaling, the product polynomial's peak is near degree n,
-    # so FFT rounding errors are relative to the coefficient we need.
-    w_scaled = w * r
-
-    # Step 3: build leaf polynomials (1 + w_i' * z)
-    ones = torch.ones(N, dtype=dtype, device=device)
-    polys = torch.stack([ones, w_scaled], dim=1)  # (N, 2)
-
-    # Per-polynomial log-scale for renormalization.
-    # True polynomial = polys[i] * exp(log_scales[i]).
-    # Keeps convolution inputs O(1) for numerical stability.
-    log_scales = torch.zeros(N, dtype=dtype, device=device)
-
-    # Bottom-up tree with batched multiplication
-    while polys.shape[0] > 1:
-        B = polys.shape[0]
-        if B % 2 == 1:
-            leftover_poly = polys[-1:]
-            leftover_scale = log_scales[-1:]
-            polys = polys[:-1]
-            log_scales = log_scales[:-1]
-            B -= 1
-        else:
-            leftover_poly = None
-            leftover_scale = None
-
-        left = polys[0::2]
-        right = polys[1::2]
-
-        # Truncate inputs to degree n (we only need coeff[0..n] of root)
-        if left.shape[1] > n + 1:
-            left = left[:, :n + 1]
-        if right.shape[1] > n + 1:
-            right = right[:, :n + 1]
-
-        products = _batch_poly_mul(left, right)
-
-        # Truncate output to degree n
-        if products.shape[1] > n + 1:
-            products = products[:, :n + 1]
-
-        # Renormalize: scale to max|c| = 1
-        new_scales = log_scales[0::2] + log_scales[1::2]
-        max_abs = products.abs().max(dim=1).values.clamp(min=1e-300)
-        products = products / max_abs.unsqueeze(1)
-        new_scales = new_scales + torch.log(max_abs)
-
-        if leftover_poly is not None:
-            pad_size = products.shape[1] - leftover_poly.shape[1]
-            if pad_size > 0:
-                leftover_poly = F.pad(leftover_poly, (0, pad_size))
-            products = torch.cat([products, leftover_poly], dim=0)
-            new_scales = torch.cat([new_scales, leftover_scale], dim=0)
-
-        polys = products
-        log_scales = new_scales
-
-    root = polys[0]
-    # root[n] * exp(log_scales[0]) = [z^n] prod(1 + w_i*r*z) = Z(w,n) * r^n
-    # => log Z = log(root[n]) + log_scales[0] - n * log(r)
-    log_Z = torch.log(root[n]) + log_scales[0] - n * log_r
-    return log_Z
-
-
-# ── Convenience wrappers ─────────────────────────────────────────────────────
-
-def compute_pi(theta, n):
-    """Inclusion probabilities via autograd on log_Z.
-
-    pi_i = d(log Z) / d(theta_i).  This is backpropagation (reverse-mode AD)
-    applied to the forward pass — the Baur-Strassen theorem guarantees the
-    cost is O(1)x the forward pass.  Griewank-Walther guarantees the numerical
-    stability is inherited from the forward pass.
-    """
-    theta = theta.detach().requires_grad_(True)
-    log_Z = forward_log_Z(theta, n)
-    pi = torch.autograd.grad(log_Z, theta, create_graph=True)[0]
-    return pi
-
-
-
-# ── Class interface ──────────────────────────────────────────────────────────
 
 class ConditionalPoissonTorch:
     """
@@ -291,7 +66,7 @@ class ConditionalPoissonTorch:
     ------------
     ConditionalPoissonTorch(n, theta)                direct from log-weights
     ConditionalPoissonTorch.from_weights(n, w)       from positive weights
-    ConditionalPoissonTorch.fit(pi_star, n)           fit to target probs
+    ConditionalPoissonTorch.fit(target_incl, n)           fit to target probs
 
     Properties
     ----------
@@ -308,12 +83,12 @@ class ConditionalPoissonTorch:
     def __init__(self, n: int, theta, *, dtype=torch.float64, device=None):
         """Construct from log-weights theta_i = log(w_i)."""
         self._theta = _to_tensor(theta, dtype).detach().clone().to(device=device)
-        self._n = int(n)
-        self._N = len(self._theta)
+        self.n = int(n)
+        self.N = len(self._theta)
         self._sample_tree = None
 
-        if self._n < 0 or self._n > self._N:
-            raise ValueError(f"n={self._n} must be in [0, {self._N}]")
+        if self.n < 0 or self.n > self.N:
+            raise ValueError(f"n={self.n} must be in [0, {self.N}]")
 
     # ── Constructors ──────────────────────────────────────────────────────────
 
@@ -328,70 +103,56 @@ class ConditionalPoissonTorch:
         return cls(n, theta, **kw)
 
     @classmethod
-    def fit(cls, pi_star, n: int, *, tol: float = 1e-7,
+    def fit(cls, target_incl, n: int, *, tol: float = 1e-7,
             dtype=torch.float64, device=None, **kw) -> "ConditionalPoissonTorch":
         """
         Fit to target inclusion probabilities via L-BFGS.
 
-        Minimizes -E_π*[log P_θ(S)] = -(π*ᵀθ - log Z(θ, n)).
+        Minimizes log Z(θ, n) - π*ᵀθ (negative log-likelihood under π*).
         The gradient is π(θ) - π*, so each L-BFGS step is driven
         directly by the gap between current and target inclusion
         probabilities.  Convergence (max|π(θ) - π*| ≤ tol) is
         therefore an infinity-norm gradient test — the optimizer's
         own stopping criterion.
 
-        All values in π* must be in (0, 1) and sum to n.
+        All values in target_incl must be in (0, 1) and sum to n.
 
         Parameters
         ----------
+        target_incl : (N,) target inclusion probabilities
         tol : convergence tolerance on max|π(θ) - π*|.
         """
-        pi_star = _to_tensor(pi_star, dtype).to(device=device)
-        theta = torch.logit(pi_star).clone().requires_grad_(True)
+        target_incl = _to_tensor(target_incl, dtype).to(device=device)
+        cp = cls(n, torch.logit(target_incl), dtype=dtype, device=device, **kw)
+        cp._theta.requires_grad_(True)
 
         # L-BFGS (Nocedal & Wright, Ch. 7): memory m, Wolfe line search.
         # The gradient is π(θ) - π*, so tolerance_grad = tol stops
         # when max|π - π*| ≤ tol.
         optimizer = torch.optim.LBFGS(
-            [theta],
+            [cp._theta],
             max_iter=200,
             history_size=5,
             line_search_fn='strong_wolfe',
             tolerance_grad=tol,
-            tolerance_change=0,
+            tolerance_change=0,   # only stop on gradient criterion, not loss plateau
         )
 
         def closure():
             optimizer.zero_grad()
-            loss = -(pi_star @ theta - forward_log_Z(theta, n))
+            loss = cp._log_Z() - target_incl @ cp._theta
             loss.backward()
             return loss
 
         optimizer.step(closure)
 
-        # Check fit quality: how close are the fitted π to the targets?
-        pi_fit = compute_pi(theta.detach(), n)
-        fit_err = (pi_fit - pi_star).abs().max().item()
-        if fit_err > tol:
-            import warnings
-            warnings.warn(
-                f"fit did not reach tol={tol:.0e}: max|pi - pi*| = {fit_err:.2e}. "
-                f"L-BFGS exhausted max_iter=200 without converging.")
-
         with torch.no_grad():
-            theta -= theta.mean()
+            cp._theta -= cp._theta.mean()   # zero-center (shift-invariant)
+        cp._theta = cp._theta.detach()
 
-        return cls(n, theta.detach(), dtype=dtype, device=device, **kw)
+        return cp
 
     # ── Properties ────────────────────────────────────────────────────────────
-
-    @property
-    def n(self) -> int:
-        return self._n
-
-    @property
-    def N(self) -> int:
-        return self._N
 
     @property
     def theta(self) -> torch.Tensor:
@@ -403,13 +164,24 @@ class ConditionalPoissonTorch:
 
     @property
     def incl_prob(self) -> torch.Tensor:
-        """Inclusion probabilities pi_i = P(i in S)."""
-        return compute_pi(self._theta, self._n).detach()
+        """Inclusion probabilities pi_i = P(i in S).
+
+        pi_i = d(log Z) / d(theta_i).  This is backpropagation (reverse-mode AD)
+        applied to the forward pass — the Baur-Strassen theorem guarantees the
+        cost is O(1)x the forward pass.  Griewank-Walther guarantees the numerical
+        stability is inherited from the forward pass.
+        """
+        saved = self._theta
+        self._theta = saved.detach().requires_grad_(True)
+        log_Z = self._log_Z()
+        pi = torch.autograd.grad(log_Z, self._theta)[0].detach()
+        self._theta = saved
+        return pi
 
     @property
     def log_normalizer(self) -> float:
         """Log normalizing constant."""
-        return forward_log_Z(self._theta, self._n).item()
+        return self._log_Z().item()
 
     # ── Log probability ───────────────────────────────────────────────────────
 
@@ -438,11 +210,11 @@ class ConditionalPoissonTorch:
         if self._sample_tree is not None:
             return self._sample_tree
 
-        N = self._N
-        n = self._n
+        N = self.N
+        n = self.n
         w = torch.exp(self._theta).detach()
 
-        r = _find_r(w, n)
+        r = self._find_r(w, n)
         w_scaled = w * r
 
         tree_n = 1 << (N - 1).bit_length()
@@ -456,7 +228,7 @@ class ConditionalPoissonTorch:
         for i in range(tree_n - 1, 0, -1):
             L = torch.tensor(Pc[2 * i], dtype=self._theta.dtype)
             R = torch.tensor(Pc[2 * i + 1], dtype=self._theta.dtype)
-            p = _batch_poly_mul(L.unsqueeze(0), R.unsqueeze(0)).squeeze(0)
+            p = self._batch_poly_mul(L.unsqueeze(0), R.unsqueeze(0)).squeeze(0)
             if len(p) > n + 1:
                 p = p[:n + 1]
             mx = p.abs().max()
@@ -533,8 +305,9 @@ class ConditionalPoissonTorch:
         import numpy as np
 
         cdfs, tree_n = self._get_sample_cdfs()
-        N, n = self._N, self._n
+        N, n = self.N, self.n
 
+        # XXX: are these special cases necessary?
         if n == 0:
             return torch.empty(size, 0, dtype=torch.long)
         if n == N:
@@ -546,6 +319,7 @@ class ConditionalPoissonTorch:
         else:
             rng = _random.Random(rng)
 
+        # XXX: remove the option to sampled more than one element; eliminate the size argument
         if size == 1:
             s = self._draw_one(cdfs, tree_n, N, n, rng)
             return torch.tensor(s, dtype=torch.long).unsqueeze(0)
@@ -554,8 +328,196 @@ class ConditionalPoissonTorch:
             for _ in range(size)
         ])
 
+    # ── Internal: product tree with contour scaling ───────────────────────────
+
+    @staticmethod
+    def _find_r(w, n, tol=1e-12, max_iter=100):
+        """Find r such that sum_i w_i*r / (1 + w_i*r) = n.
+
+        This is a monotone equation in log(r): the LHS is strictly increasing
+        from 0 (as r->0) to N (as r->inf).  Newton's method converges quickly.
+
+        Parameters
+        ----------
+        w : (N,) tensor of positive weights (detached, no grad needed)
+        n : target sum (int)
+
+        Returns
+        -------
+        r : scalar (float, not a tensor — this is a numerical parameter,
+            not part of the differentiable computation)
+        """
+
+        # XXX: make find_r a proper method that uses theta and n
+
+        # Work in log-space: let t = log(r), solve g(t) = sum p_i(t) - n = 0
+        # where p_i(t) = w_i*exp(t) / (1 + w_i*exp(t)) = sigmoid(log(w_i) + t)
+        log_w = torch.log(w).detach().double()
+
+        # Initial guess: t such that n/N of the items have p_i ≈ 0.5
+        # i.e., median(log_w) + t ≈ 0 => t ≈ -median(log_w)
+        t = -torch.median(log_w).item()
+
+        for _ in range(max_iter):
+            s = log_w + t
+            # Numerically stable sigmoid and its derivative
+            # Clamp to avoid exp overflow in the tails
+            s_clamped = s.clamp(-500, 500)
+            p = torch.sigmoid(s_clamped)
+            g = p.sum().item() - n
+            gp = (p * (1 - p)).sum().item()
+
+            if abs(g) < tol:
+                break
+            if gp < 1e-100:
+                # All probabilities saturated; do a bisection-style step
+                if g > 0:
+                    t -= 1.0
+                else:
+                    t += 1.0
+                continue
+
+            t -= g / gp
+
+        return math.exp(t)
+
+    @staticmethod
+    def _batch_poly_mul_fft(a_batch, b_batch):
+        """Multiply pairs of polynomials via batched FFT.
+
+        O(B * d log d) where d = La + Lb.  Uses torch.fft which is
+        differentiable, so autograd can backpropagate through this.
+        """
+        La = a_batch.shape[1]
+        Lb = b_batch.shape[1]
+        n_out = La + Lb - 1
+        fa = torch.fft.rfft(a_batch, n=n_out)
+        fb = torch.fft.rfft(b_batch, n=n_out)
+        return torch.fft.irfft(fa * fb, n=n_out)
+
+    @staticmethod
+    def _batch_poly_mul_direct(a_batch, b_batch):
+        """Multiply pairs of polynomials via grouped conv1d (direct O(d²))."""
+        B = a_batch.shape[0]
+        Lb = b_batch.shape[1]
+        out = F.conv1d(
+            a_batch.unsqueeze(0),
+            b_batch.flip(-1).unsqueeze(1),
+            padding=Lb - 1,
+            groups=B,
+        )
+        return out.squeeze(0)
+
+    @classmethod
+    def _batch_poly_mul(cls, a_batch, b_batch):
+        """Hybrid: direct for small polys, FFT for large."""
+        if a_batch.shape[1] + b_batch.shape[1] <= _FFT_THRESHOLD:
+            return cls._batch_poly_mul_direct(a_batch, b_batch)
+        return cls._batch_poly_mul_fft(a_batch, b_batch)
+
+    def _log_Z(self):
+        """Compute log Z via FFT-based product tree with contour scaling.
+
+        Returns a scalar tensor (differentiable w.r.t. self._theta).
+
+        Steps:
+        1. Compute r = optimal contour radius (non-differentiable root-find)
+        2. Rescale weights: w_i' = w_i * r  (differentiable)
+        3. Build product tree: prod_i (1 + w_i' z) via batched FFT
+        4. Extract: log Z = log(root[n]) - n * log(r)
+        """
+        n = self.n
+        N = self.N
+        theta = self._theta
+        dtype = theta.dtype
+        device = theta.device
+
+        w = torch.exp(theta)
+
+        # Step 1: find optimal contour radius (not on autograd graph).
+        #
+        # Why this works: the product polynomial P(z) = prod_i (1 + w_i z) has
+        # its peak coefficient near degree N/2 (for uniform weights).  The
+        # coefficient at degree n can be ~10^{-300} smaller.  FFT introduces
+        # errors ~eps * max|c|, which drowns the small coefficient.
+        #
+        # Rescaling z -> r*z gives P(r*z) = prod_i (1 + w_i*r*z).  The k-th
+        # coefficient of P(r*z) is c_k * r^k, so choosing r shifts the peak.
+        # The optimal r makes the expected sample size under Poisson sampling
+        # equal n, placing the peak at degree n — exactly where we need it.
+        #
+        # r is NOT on the autograd graph: it's a numerical conditioning choice,
+        # not part of the mathematical function.  The gradient of log_Z w.r.t.
+        # theta flows through w_scaled = w * r (where r is a constant).
+        r = self._find_r(w.detach(), n)
+        log_r = math.log(r)
+
+        # Step 2: rescale weights (this IS on the autograd graph).
+        # After rescaling, the product polynomial's peak is near degree n,
+        # so FFT rounding errors are relative to the coefficient we need.
+        w_scaled = w * r
+
+        # Step 3: build leaf polynomials (1 + w_i' * z)
+        ones = torch.ones(N, dtype=dtype, device=device)
+        polys = torch.stack([ones, w_scaled], dim=1)  # (N, 2)
+
+        # Per-polynomial log-scale for renormalization.
+        # True polynomial = polys[i] * exp(log_scales[i]).
+        # Keeps convolution inputs O(1) for numerical stability.
+        log_scales = torch.zeros(N, dtype=dtype, device=device)
+
+        # Bottom-up tree with batched multiplication
+        while polys.shape[0] > 1:
+            B = polys.shape[0]
+            if B % 2 == 1:
+                leftover_poly = polys[-1:]
+                leftover_scale = log_scales[-1:]
+                polys = polys[:-1]
+                log_scales = log_scales[:-1]
+                B -= 1
+            else:
+                leftover_poly = None
+                leftover_scale = None
+
+            left = polys[0::2]
+            right = polys[1::2]
+
+            # Truncate inputs to degree n (we only need coeff[0..n] of root)
+            if left.shape[1] > n + 1:
+                left = left[:, :n + 1]
+            if right.shape[1] > n + 1:
+                right = right[:, :n + 1]
+
+            products = self._batch_poly_mul(left, right)
+
+            # Truncate output to degree n
+            if products.shape[1] > n + 1:
+                products = products[:, :n + 1]
+
+            # Renormalize: scale to max|c| = 1
+            new_scales = log_scales[0::2] + log_scales[1::2]
+            max_abs = products.abs().max(dim=1).values.clamp(min=1e-300)
+            products = products / max_abs.unsqueeze(1)
+            new_scales = new_scales + torch.log(max_abs)
+
+            if leftover_poly is not None:
+                pad_size = products.shape[1] - leftover_poly.shape[1]
+                if pad_size > 0:
+                    leftover_poly = F.pad(leftover_poly, (0, pad_size))
+                products = torch.cat([products, leftover_poly], dim=0)
+                new_scales = torch.cat([new_scales, leftover_scale], dim=0)
+
+            polys = products
+            log_scales = new_scales
+
+        root = polys[0]
+        # root[n] * exp(log_scales[0]) = [z^n] prod(1 + w_i*r*z) = Z(w,n) * r^n
+        # => log Z = log(root[n]) + log_scales[0] - n * log(r)
+        log_Z = torch.log(root[n]) + log_scales[0] - n * log_r
+        return log_Z
+
     # ── Repr ──────────────────────────────────────────────────────────────────
 
     def __repr__(self):
-        return (f"ConditionalPoissonTorch(n={self._n}, N={self._N}, "
+        return (f"ConditionalPoissonTorch(n={self.n}, N={self.N}, "
                 f"log_Z={self.log_normalizer:.4f})")

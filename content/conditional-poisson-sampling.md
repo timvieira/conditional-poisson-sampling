@@ -3181,7 +3181,7 @@ The plots below compare wall-clock time across methods for four operations: comp
 Three methods for computing the normalizing constant:
 <a href="bench/bench_timing.py#dp_forward_Z" title="dp_forward_Z" class="verified" target="_blank">✓</a> DP forward pass $\mathcal{O}(Nn)$ ·
 <a href="conditional_poisson/numpy.py" title="ConditionalPoissonNumPy.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
-<a href="conditional_poisson/torch.py#forward_log_Z" title="forward_log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$
+<a href="conditional_poisson/torch.py#_log_Z" title="ConditionalPoissonTorch._log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$
 
 <figure>
 <img src="../figures/timing_Z.svg" alt="Log-log plot: computing Z" style="width:100%">
@@ -3198,7 +3198,7 @@ This is the main event.  The naive approach computes each $\pip_i$ independently
 <a href="bench/bench_samplers.py#sequential_pi" title="sequential_pi" class="verified" target="_blank">✓</a> Forward-backward DP $\mathcal{O}(Nn)$ ·
 <a href="bench/bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R `sampling` package ·
 <a href="conditional_poisson/numpy.py" title="ConditionalPoissonNumPy.incl_prob" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
-<a href="conditional_poisson/torch.py#compute_pi" title="compute_pi" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$
+<a href="conditional_poisson/torch.py#incl_prob" title="ConditionalPoissonTorch.incl_prob" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$
 
 <figure>
 <img src="../figures/timing_pi.svg" alt="Log-log plot: computing inclusion probabilities" style="width:100%">

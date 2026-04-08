@@ -18,7 +18,7 @@ from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNum
 from bench_timing import run_r_benchmark, time_fn
 
 import torch
-from conditional_poisson.torch import ConditionalPoissonTorch, forward_log_Z, compute_pi
+from conditional_poisson.torch import ConditionalPoissonTorch
 
 
 def run_grid(quick=False):
@@ -55,7 +55,7 @@ def run_grid(quick=False):
             ms = time_fn(lambda: ConditionalPoissonNumPy.from_weights(n, w).log_normalizer, reps=reps)
             add("NumPy tree", "Z", N, n, ms)
 
-            ms = time_fn(lambda: forward_log_Z(theta, n), reps=reps)
+            ms = time_fn(lambda: ConditionalPoissonTorch(n, theta).log_normalizer, reps=reps)
             add("PyTorch FFT", "Z", N, n, ms)
 
             # Pi
@@ -65,7 +65,7 @@ def run_grid(quick=False):
             ms = time_fn(lambda: ConditionalPoissonNumPy.from_weights(n, w).incl_prob, reps=reps)
             add("NumPy tree", "pi", N, n, ms)
 
-            ms = time_fn(lambda: compute_pi(theta, n), reps=reps)
+            ms = time_fn(lambda: ConditionalPoissonTorch(n, theta).incl_prob, reps=reps)
             add("PyTorch FFT + autograd", "pi", N, n, ms)
 
             # Fitting

@@ -84,7 +84,7 @@ def run_r_benchmark(N, n, seed, reps):
 
 def run_benchmarks(quick=False):
     import torch
-    from conditional_poisson.torch import ConditionalPoissonTorch, forward_log_Z, compute_pi
+    from conditional_poisson.torch import ConditionalPoissonTorch
     from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNumPy
 
     if quick:
@@ -125,7 +125,7 @@ def run_benchmarks(quick=False):
         print(f" {ms:.1f}ms", file=sys.stderr)
 
         print("  Z: PyTorch FFT...", file=sys.stderr, end="", flush=True)
-        ms = time_fn(lambda: forward_log_Z(theta, n).item(), reps=reps)
+        ms = time_fn(lambda: ConditionalPoissonTorch(n, theta).log_normalizer, reps=reps)
         add("PyTorch FFT", "Z", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 
@@ -141,7 +141,7 @@ def run_benchmarks(quick=False):
         print(f" {ms:.1f}ms", file=sys.stderr)
 
         print("  pi: PyTorch FFT...", file=sys.stderr, end="", flush=True)
-        ms = time_fn(lambda: compute_pi(theta, n).detach(), reps=reps)
+        ms = time_fn(lambda: ConditionalPoissonTorch(n, theta).incl_prob, reps=reps)
         add("PyTorch FFT + autograd", "pi", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 

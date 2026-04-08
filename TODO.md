@@ -29,7 +29,8 @@
 - [ ] L-BFGS fitting convergence is much slower than the old Newton-CG (24 iterations vs 5 for N=10, non-monotone). Consider restoring Newton-CG as the default optimizer (requires HVP internally, not as public API) or tuning L-BFGS parameters.
 - [ ] Remove boundary handling (w=0/inf) from `conditional_poisson/numpy.py` — forced_in/forced_out/interior/reduced instance delegation. Already removed from torch impl for simplicity; numpy should match.
 - [ ] Rename `conditional_poisson/numpy.py` → `tree_numpy.py` and `conditional_poisson/torch.py` → `tree_torch.py` (or `fft_numpy.py`/`fft_torch.py`)? The current names don't distinguish the algorithm from the sequential variants.
-- [ ] Remove stupid wrapper methods — unnecessary indirection that obscures the actual logic.
+- [x] ~~Remove stupid wrapper methods~~ — done (moved `compute_pi`, `forward_log_Z`, `_find_r`, poly mul into class as instance/static methods)
+- [ ]  _get_sample_cdfs look way too complicated (and potentially slow) - I suspect it can be simplified considerably.
 
 ### Sequential implementations
 - [ ] Add `fit` and `log_prob` to `ConditionalPoissonSequentialNumPy`
@@ -103,7 +104,7 @@
 - [ ] Add mathematical correctness tests for JS widget algorithms (product tree, quota splitting, polynomial multiplication, CDF computation). Either extend `test_animation.mjs` to check computed values against known answers, or extract JS algorithms into testable modules and test with Node.js.
 - [x] ~~Decide: remove `plot_timing_3d.py`?~~ — removed (superseded by inline Plotly widget)
 - [x] ~~Decide: remove `bench_scaling.py`?~~ — removed (redundant with `bench_timing.py`)
-- [ ] Delete stale branches
+- [x] ~~Delete stale branches~~ — done
 
 ### Packaging and Distribution
 

@@ -13,11 +13,7 @@ import torch
 from itertools import combinations
 from collections import Counter
 
-from conditional_poisson.torch import (
-    ConditionalPoissonTorch,
-    forward_log_Z,
-    compute_pi,
-)
+from conditional_poisson.torch import ConditionalPoissonTorch
 
 
 # ---------------------------------------------------------------------------
@@ -92,17 +88,17 @@ N_MED = 5
 # ===========================================================================
 
 class TestLogZ(unittest.TestCase):
-    """Test forward_log_Z against brute-force."""
+    """Test log_normalizer against brute-force."""
 
     def test_small(self):
         theta = torch.tensor(np.log(W_SMALL), dtype=torch.float64)
-        log_Z = forward_log_Z(theta, N_SMALL).item()
+        log_Z = ConditionalPoissonTorch(N_SMALL, theta).log_normalizer
         expected = math.log(Z_bf(W_SMALL, N_SMALL))
         self.assertAlmostEqual(log_Z, expected, places=10)
 
     def test_medium(self):
         theta = torch.tensor(np.log(W_MED), dtype=torch.float64)
-        log_Z = forward_log_Z(theta, N_MED).item()
+        log_Z = ConditionalPoissonTorch(N_MED, theta).log_normalizer
         expected = math.log(Z_bf(W_MED, N_MED))
         self.assertAlmostEqual(log_Z, expected, places=10)
 
@@ -110,25 +106,25 @@ class TestLogZ(unittest.TestCase):
         """Z(1, n) = C(N, n)."""
         N, n = 10, 4
         theta = torch.zeros(N, dtype=torch.float64)
-        log_Z = forward_log_Z(theta, n).item()
+        log_Z = ConditionalPoissonTorch(n, theta).log_normalizer
         self.assertAlmostEqual(log_Z, math.log(math.comb(N, n)), places=10)
 
     def test_n_equals_N(self):
         """Z(w, N) = prod(w)."""
         theta = torch.tensor(np.log(W_SMALL), dtype=torch.float64)
-        log_Z = forward_log_Z(theta, len(W_SMALL)).item()
+        log_Z = ConditionalPoissonTorch(len(W_SMALL), theta).log_normalizer
         self.assertAlmostEqual(log_Z, np.sum(np.log(W_SMALL)), places=10)
 
     def test_n_equals_1(self):
         """Z(w, 1) = sum(w)."""
         theta = torch.tensor(np.log(W_SMALL), dtype=torch.float64)
-        log_Z = forward_log_Z(theta, 1).item()
+        log_Z = ConditionalPoissonTorch(1, theta).log_normalizer
         self.assertAlmostEqual(log_Z, math.log(np.sum(W_SMALL)), places=10)
 
     def test_n_equals_0(self):
         """Z(w, 0) = 1."""
         theta = torch.tensor(np.log(W_SMALL), dtype=torch.float64)
-        log_Z = forward_log_Z(theta, 0).item()
+        log_Z = ConditionalPoissonTorch(0, theta).log_normalizer
         self.assertAlmostEqual(log_Z, 0.0, places=10)
 
     def test_extreme_weights(self):
@@ -137,40 +133,40 @@ class TestLogZ(unittest.TestCase):
         w = np.exp(rng.uniform(-10, 10, 15))
         n = 5
         theta = torch.tensor(np.log(w), dtype=torch.float64)
-        log_Z = forward_log_Z(theta, n).item()
+        log_Z = ConditionalPoissonTorch(n, theta).log_normalizer
         expected = math.log(Z_bf(w, n))
         self.assertAlmostEqual(log_Z, expected, places=8)
 
 
 class TestInclusionProbabilities(unittest.TestCase):
-    """Test compute_pi against brute-force."""
+    """Test incl_prob against brute-force."""
 
     def test_small(self):
         theta = torch.tensor(np.log(W_SMALL), dtype=torch.float64)
-        pi = compute_pi(theta, N_SMALL).detach().numpy()
+        pi = ConditionalPoissonTorch(N_SMALL, theta).incl_prob.numpy()
         np.testing.assert_allclose(pi, pi_bf(W_SMALL, N_SMALL), atol=1e-10)
 
     def test_medium(self):
         theta = torch.tensor(np.log(W_MED), dtype=torch.float64)
-        pi = compute_pi(theta, N_MED).detach().numpy()
+        pi = ConditionalPoissonTorch(N_MED, theta).incl_prob.numpy()
         np.testing.assert_allclose(pi, pi_bf(W_MED, N_MED), atol=1e-10)
 
     def test_sums_to_n(self):
         for w, n in [(W_SMALL, N_SMALL), (W_MED, N_MED)]:
             theta = torch.tensor(np.log(w), dtype=torch.float64)
-            pi = compute_pi(theta, n).detach()
+            pi = ConditionalPoissonTorch(n, theta).incl_prob
             self.assertAlmostEqual(pi.sum().item(), n, places=10)
 
     def test_in_zero_one(self):
         theta = torch.tensor(np.log(W_SMALL), dtype=torch.float64)
-        pi = compute_pi(theta, N_SMALL).detach()
+        pi = ConditionalPoissonTorch(N_SMALL, theta).incl_prob
         self.assertTrue((pi > 0).all() and (pi < 1).all())
 
     def test_uniform_weights(self):
         """pi_i = n/N when all weights are equal."""
         N, n = 10, 4
         theta = torch.zeros(N, dtype=torch.float64)
-        pi = compute_pi(theta, n).detach().numpy()
+        pi = ConditionalPoissonTorch(n, theta).incl_prob.numpy()
         np.testing.assert_allclose(pi, n / N, atol=1e-10)
 
     def test_is_marginal_of_P(self):
@@ -184,7 +180,7 @@ class TestInclusionProbabilities(unittest.TestCase):
                 pi_from_probs[i] += p
 
         theta = torch.tensor(np.log(w), dtype=torch.float64)
-        pi = compute_pi(theta, n).detach().numpy()
+        pi = ConditionalPoissonTorch(n, theta).incl_prob.numpy()
         np.testing.assert_allclose(pi, pi_from_probs, atol=1e-10)
 
 

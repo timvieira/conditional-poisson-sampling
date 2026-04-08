@@ -124,7 +124,7 @@ def r_accuracy():
         return
 
     import torch
-    from conditional_poisson.torch import compute_pi
+    from conditional_poisson.torch import ConditionalPoissonTorch
 
     r_script = """\
 library(sampling)
@@ -205,7 +205,7 @@ cat(sprintf('{"weights":[%s]}\\n', paste(sprintf("%.15e", w), collapse=",")))
             tree_sum_err = abs(pi_tree.sum() - n)
 
             theta = torch.tensor(np.log(w), dtype=torch.float64)
-            pi_fft = compute_pi(theta, n).detach().numpy()
+            pi_fft = ConditionalPoissonTorch(n, theta).incl_prob.numpy()
             fft_sum_err = abs(pi_fft.sum() - n)
 
             if r_result["status"] == "ok":
