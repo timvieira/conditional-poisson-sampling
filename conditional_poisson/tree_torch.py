@@ -73,7 +73,7 @@ class ConditionalPoissonTorch(ConditionalPoissonTorchBase):
             products = self._batch_poly_mul(left, right)
             if products.shape[1] > n + 1: products = products[:, :n + 1]
             new_scales = scales[0::2] + scales[1::2]
-            m = products.max(dim=1).values.clamp(min=1e-300)
+            m = products.max(dim=1).values
             products = products / m.unsqueeze(1)
             new_scales = new_scales + torch.log(m)
             level_size //= 2
