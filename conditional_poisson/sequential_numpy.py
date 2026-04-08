@@ -52,11 +52,11 @@ class ConditionalPoissonSequentialNumPy(ConditionalPoissonNumPyBase):
         selected = []
         k = K
         for i in reversed(range(N)):
-            if k == 0:
-                break
             if np.random.random() * E[k, i + 1] <= w[i] * E[k - 1, i]:
                 selected.append(i)
                 k -= 1
+            if k == 0:
+                break
         selected.reverse()
         return np.array(selected, dtype=np.int32)
 
