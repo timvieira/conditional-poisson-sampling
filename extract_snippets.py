@@ -21,7 +21,7 @@ GITHUB_BASE = f"https://github.com/{REPO}/blob/{BRANCH}"
 
 PYTHON_FILES = [
     "tests/test_identities.py",
-    "bench/bench_timing.py",
+    "bench/bench_one.py",
     "bench/bench_samplers.py",
     "conditional_poisson/tree_torch.py",
     "conditional_poisson/tree_numpy.py",

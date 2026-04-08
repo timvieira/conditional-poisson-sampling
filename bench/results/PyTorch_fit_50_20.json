@@ -1,0 +1,1 @@
+{"method": "PyTorch FFT (L-BFGS)", "experiment": "fit", "N": 50, "n": 20, "error": "timeout (60s)", "wall_s": 60.7}

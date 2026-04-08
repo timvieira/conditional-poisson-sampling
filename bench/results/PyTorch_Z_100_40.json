@@ -1,0 +1,1 @@
+{"method": "PyTorch FFT", "experiment": "Z", "N": 100, "n": 40, "error": "timeout (60s)", "wall_s": 60.3}

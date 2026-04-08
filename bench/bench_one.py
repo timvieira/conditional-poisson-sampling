@@ -53,7 +53,23 @@ def main():
 
     N, n = args.N, args.n
     reps = args.reps or max(3, 200 // max(1, N // 50))
-    result = {"method": args.method, "experiment": args.experiment, "N": N, "n": n}
+    # Output names for plots
+    METHOD_NAMES = {
+        ("Sequential", "Z"):      "Sequential DP",
+        ("Sequential", "pi"):     "Sequential DP",
+        ("Sequential", "fit"):    "Sequential DP (L-BFGS)",
+        ("Sequential", "sample"): "Sequential (1 sample)",
+        ("NumPy", "Z"):           "NumPy tree",
+        ("NumPy", "pi"):          "NumPy tree",
+        ("NumPy", "fit"):         "NumPy tree (L-BFGS)",
+        ("NumPy", "sample"):      "NumPy tree (1 sample)",
+        ("PyTorch", "Z"):         "PyTorch FFT",
+        ("PyTorch", "pi"):        "PyTorch FFT + autograd",
+        ("PyTorch", "fit"):       "PyTorch FFT (L-BFGS)",
+        ("PyTorch", "sample"):    "PyTorch tree (1 sample)",
+    }
+    method_name = METHOD_NAMES.get((args.method, args.experiment), args.method)
+    result = {"method": method_name, "experiment": args.experiment, "N": N, "n": n}
 
     rng = np.random.RandomState(42)
     w = rng.exponential(1.0, N)

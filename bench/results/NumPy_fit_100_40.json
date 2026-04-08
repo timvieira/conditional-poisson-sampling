@@ -1,0 +1,1 @@
+{"method": "NumPy tree (L-BFGS)", "experiment": "fit", "N": 100, "n": 40, "error": "timeout (60s)", "wall_s": 60.1}

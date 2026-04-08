@@ -1,0 +1,1 @@
+{"method": "Sequential DP", "experiment": "pi", "N": 2000, "n": 800, "error": "timeout (60s)", "wall_s": 60.0}

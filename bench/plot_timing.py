@@ -45,7 +45,9 @@ STYLE = {
     "R:sampling (1 sample, incl. DP)":      {"color": "#FF9800", "marker": "p", "ls": "-.", "lw": 1.5, "ms": 7},
     "R:sampling (1 sample, excl. DP)":      {"color": "#FF9800", "marker": "h", "ls": ":",  "lw": 1.5, "ms": 7},
     "NumPy tree (1 sample, incl. build)":   {"color": "#5b9bd5", "marker": "D", "ls": "--", "lw": 1.5, "ms": 5},
-    "NumPy tree (1 sample)":     {"color": "#5b9bd5", "marker": "o", "ls": "--", "lw": 1.5, "ms": 5},
+    "NumPy tree (1 sample)":     {"color": "#5b9bd5", "marker": "o", "ls": "-",  "lw": 2,   "ms": 6},
+    "PyTorch tree (1 sample)":   {"color": "#c0504d", "marker": "^", "ls": "-",  "lw": 2,   "ms": 6},
+    "Sequential (1 sample)":     {"color": "#E91E63", "marker": "s", "ls": "--", "lw": 1.5, "ms": 5},
 }
 
 # Map method names in pi experiment that reuse Z names

@@ -21,6 +21,7 @@ tags: notebook, sampling, algorithms, sampling-without-replacement
 \newcommand{\llbracket}{[\![}
 \newcommand{\rrbracket}{]\!]}
 \newcommand{\defeq}{\overset{\small\text{def}}{=}}
+\newcommand{\textsuperscript}[1]{^{\text{#1}}}
 </macros>
 
 <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 16px; margin-bottom: 1.5em; border-radius: 4px; font-size: 0.95em;">

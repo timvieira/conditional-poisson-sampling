@@ -1,0 +1,1 @@
+{"method": "PyTorch FFT + autograd", "experiment": "pi", "N": 2000, "n": 800, "time_ms": 3024.7116, "wall_s": 34.9}
