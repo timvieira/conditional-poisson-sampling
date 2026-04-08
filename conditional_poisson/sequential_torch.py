@@ -39,11 +39,11 @@ class ConditionalPoissonSequentialTorch(ConditionalPoissonTorchBase):
         selected = []
         k = K
         for i in reversed(range(N)):
-            if k == 0:
-                break
             if torch.rand(1).item() * E[i + 1, k].item() <= w[i].item() * E[i, k - 1].item():
                 selected.append(i)
                 k -= 1
+            if k == 0:
+                break
         selected.reverse()
         return torch.tensor(selected, dtype=torch.long)
 
