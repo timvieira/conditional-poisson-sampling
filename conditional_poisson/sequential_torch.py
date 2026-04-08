@@ -29,10 +29,8 @@ class ConditionalPoissonSequentialTorch(ConditionalPoissonTorchBase):
 
     @cached_property
     def _sample_data(self):
-        """ESP table and weights from _forward, detached."""
         _, _, (cols, w) = self._forward
-        E = torch.stack(cols).detach()
-        return E, w.detach()
+        return torch.stack(cols), w
 
     def sample(self) -> torch.Tensor:
         """Right-to-left scan on the forward ESP table.  O(N)."""

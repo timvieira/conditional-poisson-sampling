@@ -87,12 +87,8 @@ class ConditionalPoissonTorch(ConditionalPoissonTorchBase):
 
     @cached_property
     def _sample_data(self):
-        """Tree data from _forward, detached."""
         _, _, (tree, tree_n, node_scale) = self._forward
-        return (
-            [t.detach() if t is not None else torch.zeros(1) for t in tree],
-            node_scale, tree_n,
-        )
+        return tree, node_scale, tree_n
 
     def sample(self) -> torch.Tensor:
         """Top-down quota splitting on the product tree.  O(n log N)."""
