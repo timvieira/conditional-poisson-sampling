@@ -37,7 +37,7 @@
         inlineMath: [['$', '$']],
         displayMath: [['$$', '$$']],
         processEscapes: true,
-        macros: {"Ps": "p", "W": "W", "Z": "Z", "Zw": ["\\binom{#1}{#2}", 2], "ba": "\\boldsymbol{a}", "bb": "\\boldsymbol{b}", "bpip": "\\boldsymbol{\\pi}", "bpiptgt": "\\widehat{\\bpip}", "btheta": "{\\boldsymbol{\\theta}}", "bw": "\\boldsymbol{w}", "defeq": "\\overset{\\small\\text{def}}{=}", "llbracket": "[\\![", "pip": "\\pi", "piptgt": "\\widehat{\\pip}", "rrbracket": "]\\!]", "w": "w", "z": "z"},
+        macros: {"Ps": "p", "W": "W", "Z": "Z", "Zw": ["\\binom{#1}{#2}", 2], "ba": "\\boldsymbol{a}", "bb": "\\boldsymbol{b}", "bpip": "\\boldsymbol{\\pi}", "bpiptgt": "\\widehat{\\bpip}", "btheta": "{\\boldsymbol{\\theta}}", "bw": "\\boldsymbol{w}", "defeq": "\\overset{\\small\\text{def}}{=}", "llbracket": "[\\![", "pip": "\\pi", "piptgt": "\\widehat{\\pip}", "rrbracket": "]\\!]", "textsuperscript": ["^{\\text{#1}}", 1], "w": "w", "z": "z"},
       },
       chtml: {
         scale: 1,
@@ -3227,13 +3227,13 @@ $$
 <p>The leave-one-out methods (gray, dashed) are $\sim\!N\times$ slower than their backprop counterparts—this is the Baur-Strassen theorem in action.  The PyTorch FFT implementation is the fastest overall, combining FFT-based polynomial multiplication ($\mathcal{O}(d \log d)$ per multiply), batched execution ($\mathcal{O}(\log N)$ torch calls), and autograd.</p>
 <h3 id="fitting">Fitting</h3>
 <p>Given target inclusion probabilities $\bpiptgt$, find weights $\bw$ such that $\bpip(\bw) = \bpiptgt$:</p>
-<p><a href="conditional_poisson/tree_numpy.py#fit" title="ConditionalPoissonNumPy.fit" class="verified" target="_blank">✓</a> Product tree + Newton-CG ·
+<p><a href="conditional_poisson/tree_numpy.py#fit" title="ConditionalPoissonNumPy.fit" class="verified" target="_blank">✓</a> Product tree + L-BFGS ·
 <a href="bench/bench_timing_r.R" title="UPMEpiktildefrompik" class="verified" target="_blank">✓</a> R <code>sampling::UPMEpiktildefrompik</code> (fixed-point iteration)</p>
 <figure>
 <p><img src="../figures/timing_fit.svg" alt="Log-log plot: fitting target pi to weights" style="width:100%"></p>
 </figure>
 
-<p>Our Newton-CG optimizer uses true Hessian-vector products computed via the product tree, giving superlinear convergence.  R's <a href="https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R"><code>UPMEpiktildefrompik</code></a> uses $J = I$ rather than the true Jacobian, making it a fixed-point iteration ($\tilde{p} \mathrel{+}= \bpiptgt - \bpip(\tilde{p})$) despite the <a href="https://cran.r-project.org/web/packages/sampling/sampling.pdf">docs</a> calling it Newton's method.  Each R iteration requires a full $\mathcal{O}(Nn)$ DP pass to recompute $\bpip$.</p>
+<p>Our L-BFGS optimizer uses the gradient $\bpip(\btheta) - \bpiptgt$ (computed via reverse-mode AD on the product tree) to fit weights to target inclusion probabilities.  R's <a href="https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R"><code>UPMEpiktildefrompik</code></a> uses $J = I$ rather than the true Jacobian, making it a fixed-point iteration ($\tilde{p} \mathrel{+}= \bpiptgt - \bpip(\tilde{p})$) despite the <a href="https://cran.r-project.org/web/packages/sampling/sampling.pdf">docs</a> calling it Newton's method.  Each R iteration requires a full $\mathcal{O}(Nn)$ DP pass to recompute $\bpip$.</p>
 <h3 id="drawing-samples">Drawing Samples</h3>
 <p><a href="bench/bench_timing_r.R" title="UPMEqfromw + UPMEsfromq" class="verified" target="_blank">✓</a> R <code>sampling</code> (1 sample, with and without DP rebuild) ·
 <a href="conditional_poisson/tree_numpy.py" title="ConditionalPoissonNumPy.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (with and without tree build)</p>
@@ -3243,7 +3243,7 @@ $$
 
 <p>For fair comparison, the plot shows both "including setup" and "excluding setup" variants.  R's <a href="https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R"><code>UPMEqfromw</code></a> computes the $\mathcal{O}(Nn)$ DP table; <a href="https://github.com/cran/sampling/blob/master/R/UPMEsfromq.R"><code>UPMEsfromq</code></a> draws one $\mathcal{O}(N)$ sequential sample from it.  Our product tree costs $\mathcal{O}(N \log^2 n)$ to build plus $\mathcal{O}(Nn)$ to precompute the CDF tables, then $\mathcal{O}(n \log N)$ per sample via quota splitting with binary search on the cached CDFs.  The "incl. build/DP" lines give apples-to-apples single-sample cost; the "excl." lines show the marginal cost of additional samples from a precomputed structure.</p>
 <p>The R <code>sampling</code> package does not expose the normalizing constant $\Z$, and has numerical stability limitations: its <a href="https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R#L11">DP recurrence</a> operates in linear space without log-scaling, producing NaN at moderate sizes or when weights span several orders of magnitude.  Our FFT implementation maintains machine-epsilon accuracy at all tested sizes and weight ranges.<a href="bench_accuracy.py#r_accuracy" title="R vs tree vs FFT accuracy comparison" class="verified" target="_blank">✓</a></p>
-<h3 id="scaling-in-math373-and-math374">Scaling in $N$ and $n$</h3>
+<h3 id="scaling-in-math374-and-math375">Scaling in $N$ and $n$</h3>
 <p>The static plots above fix $n = 0.4N$.  The interactive 3D plots below sweep $N$ and $n$ independently, confirming the claimed complexities.  Drag to rotate, scroll to zoom, hover for values.  Use the dropdown to switch between operations.</p>
 <div id="timing-3d">
 
@@ -3257,7 +3257,7 @@ var COLORS = {
   'DP forward': '#E91E63', 'NumPy tree': '#5b9bd5', 'PyTorch FFT': '#c0504d',
   'Fwd-bwd DP': '#E91E63', 'PyTorch FFT + autograd': '#c0504d',
   'N\u00d7DP loo': '#999', 'N\u00d7Tree loo': '#bbb', 'R:sampling (pi)': '#FF9800',
-  'NumPy tree (Newton-CG)': '#5b9bd5', 'R:sampling (fit)': '#FF9800',
+  'NumPy tree (L-BFGS)': '#5b9bd5', 'R:sampling (fit)': '#FF9800',
   'R:sampling (1 sample, incl. DP)': '#FF9800', 'R:sampling (1 sample, excl. DP)': '#FF9800',
   'NumPy tree (1 sample, incl. build)': '#5b9bd5',
   'NumPy tree (1 sample)': '#5b9bd5'
@@ -3267,7 +3267,7 @@ var COMPLEXITY = {
   'Fwd-bwd DP': 'O(Nn)', 'PyTorch FFT + autograd': 'O(N log\u00b2 n)',
   'N\u00d7DP loo': 'O(N\u00b2n)', 'N\u00d7Tree loo': 'O(N\u00b2 log\u00b2 n)',
   'R:sampling (pi)': 'O(Nn)',
-  'NumPy tree (Newton-CG)': 'Newton-CG', 'R:sampling (fit)': 'fixed-point',
+  'NumPy tree (L-BFGS)': 'L-BFGS', 'R:sampling (fit)': 'fixed-point',
   'R:sampling (1 sample, incl. DP)': 'incl. DP', 'R:sampling (1 sample, excl. DP)': 'excl. DP',
   'NumPy tree (1 sample, incl. build)': 'incl. build',
   'NumPy tree (1 sample)': 'O(n log N)'
@@ -3743,7 +3743,7 @@ $$</p>
 <p>This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="tests/test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.</p>
 <p><strong>Example.</strong> With $N = 100$ items and $n = 5$, set weights proportional to $p(i)$ so that high-probability items are more likely to be selected.  Each sample gives 5 distinct evaluations of $f$; the HT formula reweights them to produce an unbiased estimate of the full sum.</p>
 <p>For more on SWOR-based estimation (including the near-optimal priority sampling scheme), see my earlier post on <a href="../post/2017/07/03/estimating-means-in-a-finite-universe/">estimating means in a finite universe</a>.</p>
-<h2 id="identities-for-math494-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
+<h2 id="identities-for-math495-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
 <p>The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> <a href="https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial">elementary symmetric polynomial</a> $e_n(\bw)$.  Here are some useful identities.</p>
 <h3 id="differential-identities">Differential Identities</h3>
 <p>The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:</p>
