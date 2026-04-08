@@ -85,14 +85,9 @@ class ConditionalPoissonTorch(ConditionalPoissonTorchBase):
         log_Z = torch.log(polys[0][n]) + scales[0] - n * math.log(r)
         return log_Z, (tree, tree_n, node_scale)
 
-    @cached_property
-    def _sample_data(self):
-        _, _, (tree, tree_n, node_scale) = self._forward
-        return tree, node_scale, tree_n
-
     def sample(self) -> torch.Tensor:
         """Top-down quota splitting on the product tree.  O(n log N)."""
-        Pc, ratio, tree_n = self._sample_data
+        _, _, (Pc, tree_n, ratio) = self._forward
         N, n = self.N, self.n
         selected = []
         stack = [(1, n)]

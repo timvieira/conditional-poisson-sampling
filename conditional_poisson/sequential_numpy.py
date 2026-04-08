@@ -45,13 +45,9 @@ class ConditionalPoissonSequentialNumPy(ConditionalPoissonNumPyBase):
                 dE[k - 1, n] += dE[k, n + 1] * w[n]
         return w * dw / Z
 
-    @cached_property
-    def _sample_data(self):
-        return self._forward
-
     def sample(self) -> np.ndarray:
         """Right-to-left scan on the forward ESP table.  O(N)."""
-        E, w = self._sample_data
+        E, w = self._forward
         N, K = self.N, self.n
         selected = []
         k = K
