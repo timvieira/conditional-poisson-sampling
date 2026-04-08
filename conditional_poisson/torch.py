@@ -206,35 +206,18 @@ class ConditionalPoissonTorch:
     # ── Sampling ──────────────────────────────────────────────────────────────
 
     def _get_sample_cdfs(self):
-        """Build product tree and precompute CDFs for sampling (cached)."""
+        """Precompute CDFs for sampling from the product tree (cached)."""
         if self._sample_tree is not None:
             return self._sample_tree
 
-        N = self.N
+        tree, tree_n, _, _ = self._build_tree(store=True)
         n = self.n
-        w = torch.exp(self._theta).detach()
 
-        r = self._find_r(w, n)
-        w_scaled = w * r
-
-        tree_n = 1 << (N - 1).bit_length()
+        # Convert tree tensors to lists for fast Python CDF computation.
         Pc = [None] * (2 * tree_n)
-
-        for i in range(N):
-            Pc[tree_n + i] = [1.0, w_scaled[i].item()]
-        for i in range(N, tree_n):
-            Pc[tree_n + i] = [1.0]
-
-        for i in range(tree_n - 1, 0, -1):
-            L = torch.tensor(Pc[2 * i], dtype=self._theta.dtype)
-            R = torch.tensor(Pc[2 * i + 1], dtype=self._theta.dtype)
-            p = self._batch_poly_mul(L.unsqueeze(0), R.unsqueeze(0)).squeeze(0)
-            if len(p) > n + 1:
-                p = p[:n + 1]
-            mx = p.abs().max()
-            if mx > 0:
-                p = p / mx
-            Pc[i] = p.tolist()
+        for i in range(1, 2 * tree_n):
+            if tree[i] is not None:
+                Pc[i] = tree[i].detach().tolist()
 
         # Precompute normalized CDFs for each (node, quota) pair.
         # PMF of split distribution: pmf[j] = L[j] * R[k-j]
@@ -416,15 +399,22 @@ class ConditionalPoissonTorch:
         return cls._batch_poly_mul_fft(a_batch, b_batch)
 
     def _log_Z(self):
-        """Compute log Z via FFT-based product tree with contour scaling.
+        """Log normalizing constant as a differentiable scalar tensor."""
+        root, root_log_scale, log_r = self._build_tree()
+        return torch.log(root[self.n]) + root_log_scale - self.n * log_r
 
-        Returns a scalar tensor (differentiable w.r.t. self._theta).
+    def _build_tree(self, store=False):
+        """Build the product tree via batched FFT with contour scaling.
 
-        Steps:
-        1. Compute r = optimal contour radius (non-differentiable root-find)
-        2. Rescale weights: w_i' = w_i * r  (differentiable)
-        3. Build product tree: prod_i (1 + w_i' z) via batched FFT
-        4. Extract: log Z = log(root[n]) - n * log(r)
+        If store=False (default), returns only the root polynomial — fast
+        path for log_Z and incl_prob.
+
+        If store=True, also populates and returns the full segment tree
+        (needed for sampling CDFs).
+
+        Returns (root_or_tree, root_log_scale_or_tree_n, log_r[, ...]):
+        - store=False: (root_poly, root_log_scale, log_r)
+        - store=True:  (tree, tree_n, log_r, root_log_scale)
         """
         n = self.n
         N = self.N
@@ -434,87 +424,63 @@ class ConditionalPoissonTorch:
 
         w = torch.exp(theta)
 
-        # Step 1: find optimal contour radius (not on autograd graph).
-        #
-        # Why this works: the product polynomial P(z) = prod_i (1 + w_i z) has
-        # its peak coefficient near degree N/2 (for uniform weights).  The
-        # coefficient at degree n can be ~10^{-300} smaller.  FFT introduces
-        # errors ~eps * max|c|, which drowns the small coefficient.
-        #
-        # Rescaling z -> r*z gives P(r*z) = prod_i (1 + w_i*r*z).  The k-th
-        # coefficient of P(r*z) is c_k * r^k, so choosing r shifts the peak.
-        # The optimal r makes the expected sample size under Poisson sampling
-        # equal n, placing the peak at degree n — exactly where we need it.
-        #
-        # r is NOT on the autograd graph: it's a numerical conditioning choice,
-        # not part of the mathematical function.  The gradient of log_Z w.r.t.
-        # theta flows through w_scaled = w * r (where r is a constant).
+        # Find optimal contour radius (not on autograd graph).
+        # Rescaling z -> r*z shifts the product polynomial's peak to degree n,
+        # making FFT numerically stable for the coefficient we need.
+        # r is NOT differentiable — it's a conditioning choice, not part of
+        # the mathematical function.  Gradients flow through w * r.
         r = self._find_r(w.detach(), n)
         log_r = math.log(r)
+        w_scaled = w * r   # on autograd graph
 
-        # Step 2: rescale weights (this IS on the autograd graph).
-        # After rescaling, the product polynomial's peak is near degree n,
-        # so FFT rounding errors are relative to the coefficient we need.
-        w_scaled = w * r
+        # Pad to power of 2 for clean binary tree layout.
+        tree_n = 1 << max(1, (N - 1).bit_length())
 
-        # Step 3: build leaf polynomials (1 + w_i' * z)
-        ones = torch.ones(N, dtype=dtype, device=device)
-        polys = torch.stack([ones, w_scaled], dim=1)  # (N, 2)
+        # Leaf polynomials: (1 + w_i'*z) for real items, (1) for padding.
+        polys = torch.ones(tree_n, 2, dtype=dtype, device=device)
+        polys[:N, 1] = w_scaled
+        polys[N:, 1] = 0.0
+
+        if store:
+            tree = [None] * (2 * tree_n)
+            for i in range(tree_n):
+                tree[tree_n + i] = polys[i]
 
         # Per-polynomial log-scale for renormalization.
-        # True polynomial = polys[i] * exp(log_scales[i]).
-        # Keeps convolution inputs O(1) for numerical stability.
-        log_scales = torch.zeros(N, dtype=dtype, device=device)
+        # True polynomial = polys[i] * exp(scales[i]).
+        scales = torch.zeros(tree_n, dtype=dtype, device=device)
 
-        # Bottom-up tree with batched multiplication
-        while polys.shape[0] > 1:
-            B = polys.shape[0]
-            if B % 2 == 1:
-                leftover_poly = polys[-1:]
-                leftover_scale = log_scales[-1:]
-                polys = polys[:-1]
-                log_scales = log_scales[:-1]
-                B -= 1
-            else:
-                leftover_poly = None
-                leftover_scale = None
-
+        # Bottom-up: batched multiplication, one level at a time.
+        level_size = tree_n
+        while level_size > 1:
             left = polys[0::2]
             right = polys[1::2]
 
-            # Truncate inputs to degree n (we only need coeff[0..n] of root)
             if left.shape[1] > n + 1:
                 left = left[:, :n + 1]
             if right.shape[1] > n + 1:
                 right = right[:, :n + 1]
 
             products = self._batch_poly_mul(left, right)
-
-            # Truncate output to degree n
             if products.shape[1] > n + 1:
                 products = products[:, :n + 1]
 
-            # Renormalize: scale to max|c| = 1
-            new_scales = log_scales[0::2] + log_scales[1::2]
+            new_scales = scales[0::2] + scales[1::2]
             max_abs = products.abs().max(dim=1).values.clamp(min=1e-300)
             products = products / max_abs.unsqueeze(1)
             new_scales = new_scales + torch.log(max_abs)
 
-            if leftover_poly is not None:
-                pad_size = products.shape[1] - leftover_poly.shape[1]
-                if pad_size > 0:
-                    leftover_poly = F.pad(leftover_poly, (0, pad_size))
-                products = torch.cat([products, leftover_poly], dim=0)
-                new_scales = torch.cat([new_scales, leftover_scale], dim=0)
+            level_size //= 2
+            if store:
+                for i in range(level_size):
+                    tree[level_size + i] = products[i]
 
             polys = products
-            log_scales = new_scales
+            scales = new_scales
 
-        root = polys[0]
-        # root[n] * exp(log_scales[0]) = [z^n] prod(1 + w_i*r*z) = Z(w,n) * r^n
-        # => log Z = log(root[n]) + log_scales[0] - n * log(r)
-        log_Z = torch.log(root[n]) + log_scales[0] - n * log_r
-        return log_Z
+        if store:
+            return tree, tree_n, log_r, scales[0]
+        return polys[0], scales[0], log_r
 
     # ── Repr ──────────────────────────────────────────────────────────────────
 
