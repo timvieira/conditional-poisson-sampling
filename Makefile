@@ -34,16 +34,8 @@ help:
 
 # ── Testing ──────────────────────────────────────────────────────────────────
 
-test: test-identity test-unit test-all
-
-test-identity:
-	python tests/test_identities.py
-
-test-unit:
-	python -m pytest tests/test_conditional_poisson.py tests/test_torch.py -v
-
-test-all:
-	python -m pytest tests/test_all_implementations.py -v
+test:
+	python -m pytest tests/ -v
 
 test-r:
 	python -m pytest tests/test_r_agreement.py -v
