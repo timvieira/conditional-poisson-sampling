@@ -62,6 +62,7 @@ class ConditionalPoissonSequentialNumPy:
 
     # ── Properties ───────────────────────────────────────────────────────────
 
+    # TODO: get rid of this method -- do the same for other classes!
     @property
     def theta(self) -> np.ndarray: return self._theta
 
@@ -73,6 +74,7 @@ class ConditionalPoissonSequentialNumPy:
             self._cache["dp"] = self._compute_table()
         return self._cache["dp"]
 
+    # TODO: seperate into forward and backward methods.
     def _compute_table(self):
         w = np.exp(self._theta)
         N, n = self.N, self.n
@@ -185,39 +187,34 @@ class ConditionalPoissonSequentialNumPy:
 
     def sample(
         self,
-        size: int = 1,
         rng: Optional[Union[int, np.random.Generator]] = None,
     ) -> np.ndarray:
         """
-        Draw independent samples via sequential scan.
+        Draw one sample via sequential scan.
 
         Parameters
         ----------
-        size : number of subsets to draw
         rng  : seed or np.random.Generator
 
         Returns
         -------
-        (size, n) int array; each row is a sorted list of n item indices.
+        (n,) int array of sorted item indices.
 
-        Complexity: O(Nn) to build q table [cached] + O(size * N).
+        Complexity: O(Nn) to build q table [cached] + O(N).
         """
         if not isinstance(rng, np.random.Generator):
             rng = np.random.default_rng(rng)
         q = self._get_seq_q()
         N, n = self.N, self.n
-        samples = np.empty((size, n), dtype=np.int32)
-        for m in range(size):
-            k = n
-            cursor = 0
-            for i in range(N):
-                if k == 0:
-                    break
-                if rng.random() < q[i, k - 1]:
-                    samples[m, cursor] = i
-                    cursor += 1
-                    k -= 1
-        return samples
+        selected = []
+        k = n
+        for i in range(N):
+            if k == 0:
+                break
+            if rng.random() < q[i, k - 1]:
+                selected.append(i)
+                k -= 1
+        return np.array(selected, dtype=np.int32)
 
     def __repr__(self):
         return f"ConditionalPoissonSequentialNumPy(N={self.N}, n={self.n})"
@@ -225,6 +222,7 @@ class ConditionalPoissonSequentialNumPy:
 
 # ── Helper: weighted Pascal DP table ─────────────────────────────────────────
 
+# TODO: inline this method, or integrate it into the class.
 def _build_dp_table(q, n):
     """
     Weighted Pascal DP table with row-wise scaling.

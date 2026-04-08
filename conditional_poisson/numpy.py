@@ -483,42 +483,32 @@ class ConditionalPoissonNumPy:
 
     def sample(
         self,
-        size: int = 1,
         rng: Optional[Union[int, np.random.Generator]] = None,
     ) -> np.ndarray:
         """
-        Draw independent samples using the cached P-tree.
+        Draw one sample using the cached P-tree.
 
         Parameters
         ----------
-        size : number of subsets to draw
         rng  : seed or np.random.Generator
 
         Returns
         -------
-        (size, n) int array; each row is a sorted list of n item indices.
+        (n,) int array of sorted item indices.
 
-        Complexity: O(N (log N)^2) to build tree [cached] + O(size * n * log N).
+        Complexity: O(N (log N)^2) to build tree [cached] + O(n log N).
         """
         if not isinstance(rng, np.random.Generator):
             rng = np.random.default_rng(rng)
         if self._reduced is not None:
-            # Sample from reduced problem, map indices back, merge with forced-in
-            int_samples = self._reduced.sample(size, rng)
-            int_samples = self._interior[int_samples]  # remap to full indices
-            forced_tile = np.tile(self._forced_in, (size, 1))
-            merged = np.concatenate([forced_tile, int_samples], axis=1)
-            merged.sort(axis=1)
-            return merged
+            int_sample = self._reduced.sample(rng)
+            int_sample = self._interior[int_sample]
+            return np.sort(np.concatenate([self._forced_in, int_sample]))
         if len(self._forced_in) > 0:
-            return np.tile(np.sort(self._forced_in), (size, 1))
+            return np.sort(self._forced_in)
         _, _, S, _, _ = self._get_p_tree()
         cdfs = self._get_sample_cdfs()
-        if size == 1:
-            return _tree_sample(cdfs, S, self.N, self.n, rng).reshape(1, -1)
-        return np.stack(
-            [_tree_sample(cdfs, S, self.N, self.n, rng) for _ in range(size)]
-        )
+        return _tree_sample(cdfs, S, self.N, self.n, rng)
 
     # ── Fitting ───────────────────────────────────────────────────────────────
 

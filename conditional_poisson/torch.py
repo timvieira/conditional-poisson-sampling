@@ -266,20 +266,19 @@ class ConditionalPoissonTorch:
         selected.sort()
         return selected
 
-    def sample(self, size: int = 1, rng=None) -> torch.Tensor:
+    def sample(self, rng=None) -> torch.Tensor:
         """
-        Draw independent samples using the cached product tree.
+        Draw one sample using the cached product tree.
 
         Parameters
         ----------
-        size : number of subsets to draw
         rng  : int seed, random.Random, or np.random.Generator
 
         Returns
         -------
-        (size, n) long tensor of sorted indices.
+        (n,) long tensor of sorted indices.
 
-        Complexity: O(N log^2 n) to build tree [cached] + O(size * n * log N).
+        Complexity: O(N log^2 n) to build tree [cached] + O(n log N).
         """
         import random as _random
         import numpy as np
@@ -287,26 +286,13 @@ class ConditionalPoissonTorch:
         cdfs, tree_n = self._get_sample_cdfs()
         N, n = self.N, self.n
 
-        # XXX: are these special cases necessary?
-        if n == 0:
-            return torch.empty(size, 0, dtype=torch.long)
-        if n == N:
-            return torch.arange(N).unsqueeze(0).expand(size, -1)
-
-        # Accept any object with .random() method (random.Random, np.random.Generator)
         if isinstance(rng, np.random.Generator) or isinstance(rng, _random.Random):
             pass  # use as-is
         else:
             rng = _random.Random(rng)
 
-        # XXX: remove the option to sampled more than one element; eliminate the size argument
-        if size == 1:
-            s = self._draw_one(cdfs, tree_n, N, n, rng)
-            return torch.tensor(s, dtype=torch.long).unsqueeze(0)
-        return torch.stack([
-            torch.tensor(self._draw_one(cdfs, tree_n, N, n, rng), dtype=torch.long)
-            for _ in range(size)
-        ])
+        s = self._draw_one(cdfs, tree_n, N, n, rng)
+        return torch.tensor(s, dtype=torch.long)
 
     # ── Internal: product tree with contour scaling ───────────────────────────
 

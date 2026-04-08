@@ -42,7 +42,7 @@ def test_sampling():
     q_true = rng.exponential(1.0, N)
     cp = ConditionalPoissonNumPy.from_weights(n, q_true)
     M = 100_000
-    S = cp.sample(M, rng=rng)
+    S = np.stack([cp.sample(rng=rng) for _ in range(M)])
     assert S.shape == (M, n)
     assert np.all(np.diff(S, axis=1) > 0), "samples not sorted"
     pi_emp = np.bincount(S.ravel(), minlength=N) / M
@@ -77,7 +77,7 @@ def test_n_equals_1():
     pi = cp.incl_prob
     assert abs(pi.sum() - 1.0) < 1e-10
     assert np.all((pi > 0) & (pi < 1))
-    S = cp.sample(1000, rng=rng)
+    S = np.stack([cp.sample(rng=rng) for _ in range(1000)])
     assert S.shape == (1000, 1)
     assert np.all((S >= 0) & (S < N))
 
@@ -162,7 +162,8 @@ def test_boundary_w_zero():
     assert cp.incl_prob[0] == 0.0
     assert abs(cp.incl_prob.sum() - 2) < 1e-10
     # Samples never contain item 0
-    samples = cp.sample(1000, rng=42)
+    rng = np.random.default_rng(42)
+    samples = np.stack([cp.sample(rng=rng) for _ in range(1000)])
     assert not np.any(samples == 0)
     # log_prob: subset containing item 0 is impossible
     assert cp.log_prob(np.array([0, 1])) == -np.inf
@@ -177,7 +178,8 @@ def test_boundary_w_inf():
     assert cp.incl_prob[0] == 1.0
     assert abs(cp.incl_prob.sum() - 3) < 1e-10
     # Samples always contain item 0
-    samples = cp.sample(1000, rng=42)
+    rng = np.random.default_rng(42)
+    samples = np.stack([cp.sample(rng=rng) for _ in range(1000)])
     assert np.all(samples[:, 0] == 0) or np.all(np.any(samples == 0, axis=1))
     # log_prob: subset missing item 0 is impossible
     assert cp.log_prob(np.array([1, 2, 3])) == -np.inf
@@ -205,7 +207,8 @@ def test_boundary_all_forced():
     w = np.array([np.inf, np.inf, 0.0, 0.0, 0.0])
     cp = ConditionalPoissonNumPy.from_weights(2, w)
     assert np.allclose(cp.incl_prob, [1, 1, 0, 0, 0])
-    samples = cp.sample(100, rng=42)
+    rng = np.random.default_rng(42)
+    samples = np.stack([cp.sample(rng=rng) for _ in range(100)])
     assert np.all(samples == np.array([[0, 1]]))
 
 
@@ -248,8 +251,10 @@ def test_log_prob_bool_formats():
 
 def test_sampling_deterministic_with_seed():
     cp = ConditionalPoissonNumPy.from_weights(3, np.array([1.0, 2.0, 3.0, 4.0, 5.0]))
-    s1 = cp.sample(50, rng=42)
-    s2 = cp.sample(50, rng=42)
+    rng1 = np.random.default_rng(42)
+    rng2 = np.random.default_rng(42)
+    s1 = np.stack([cp.sample(rng=rng1) for _ in range(50)])
+    s2 = np.stack([cp.sample(rng=rng2) for _ in range(50)])
     assert np.array_equal(s1, s2)
 
 
@@ -339,7 +344,7 @@ def test_brute_force_sampling_distribution():
     _, _, _, all_S, probs_bf = _brute_force(theta, n)
 
     M = 200_000
-    samples = cp.sample(M, rng=rng)
+    samples = np.stack([cp.sample(rng=rng) for _ in range(M)])
 
     # map each sample to its subset index
     S_to_idx = {s: i for i, s in enumerate(all_S)}

@@ -169,25 +169,25 @@ def run_benchmarks(quick=False):
         # ── Sampling benchmarks (excl. precomputation) ────────────
         # NumPy tree
         cp = ConditionalPoissonNumPy.from_weights(n, w)
-        cp.sample(1, rng=sample_rng)  # warmup
+        cp.sample(rng=sample_rng)  # warmup
         print("  samples: NumPy tree...", file=sys.stderr, end="", flush=True)
-        ms = time_fn(lambda: cp.sample(1, rng=sample_rng), reps=reps)
+        ms = time_fn(lambda: cp.sample(rng=sample_rng), reps=reps)
         add("NumPy tree (1 sample)", "samples", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 
         # PyTorch tree
         cpt = ConditionalPoissonTorch.from_weights(n, w)
-        cpt.sample(1, rng=sample_rng)  # warmup
+        cpt.sample(rng=sample_rng)  # warmup
         print("  samples: PyTorch tree...", file=sys.stderr, end="", flush=True)
-        ms = time_fn(lambda: cpt.sample(1, rng=sample_rng), reps=reps)
+        ms = time_fn(lambda: cpt.sample(rng=sample_rng), reps=reps)
         add("PyTorch tree (1 sample)", "samples", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 
         # Sequential (NumPy)
         cp_seq = ConditionalPoissonSequentialNumPy.from_weights(n, w)
-        cp_seq.sample(1, rng=sample_rng)  # warmup
+        cp_seq.sample(rng=sample_rng)  # warmup
         print("  samples: Sequential...", file=sys.stderr, end="", flush=True)
-        ms = time_fn(lambda: cp_seq.sample(1, rng=sample_rng), reps=reps)
+        ms = time_fn(lambda: cp_seq.sample(rng=sample_rng), reps=reps)
         add("Sequential (1 sample)", "samples", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 

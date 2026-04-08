@@ -85,18 +85,18 @@ def run_grid(quick=False):
 
             # Sampling (excl. precomputation)
             cp = ConditionalPoissonNumPy.from_weights(n, w)
-            cp.sample(1, rng=sample_rng)  # warmup
-            ms = time_fn(lambda: cp.sample(1, rng=sample_rng), reps=reps)
+            cp.sample(rng=sample_rng)  # warmup
+            ms = time_fn(lambda: cp.sample(rng=sample_rng), reps=reps)
             add("NumPy tree (1 sample)", "samples", N, n, ms)
 
             cpt = ConditionalPoissonTorch.from_weights(n, w)
-            cpt.sample(1, rng=sample_rng)  # warmup
-            ms = time_fn(lambda: cpt.sample(1, rng=sample_rng), reps=reps)
+            cpt.sample(rng=sample_rng)  # warmup
+            ms = time_fn(lambda: cpt.sample(rng=sample_rng), reps=reps)
             add("PyTorch tree (1 sample)", "samples", N, n, ms)
 
             cp_seq = ConditionalPoissonSequentialNumPy.from_weights(n, w)
-            cp_seq.sample(1, rng=sample_rng)  # warmup
-            ms = time_fn(lambda: cp_seq.sample(1, rng=sample_rng), reps=reps)
+            cp_seq.sample(rng=sample_rng)  # warmup
+            ms = time_fn(lambda: cp_seq.sample(rng=sample_rng), reps=reps)
             add("Sequential (1 sample)", "samples", N, n, ms)
 
             print(f" done", file=sys.stderr)

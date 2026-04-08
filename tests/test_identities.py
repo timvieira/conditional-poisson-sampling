@@ -474,7 +474,7 @@ def test_horvitz_thompson_unbiased():
 
     # Monte Carlo estimate of E[HT]
     M = 200_000
-    samples = cp.sample(M, rng=rng)
+    samples = np.stack([cp.sample(rng=rng) for _ in range(M)])
     ht_estimates = np.array([
         np.sum(p_dist[s] / cp.incl_prob[s] * f[s]) for s in samples
     ])
@@ -746,7 +746,7 @@ def test_sampling_distribution():
 
     M = 300_000
     rng = np.random.default_rng(42)
-    samples = cp.sample(M, rng=rng)
+    samples = np.stack([cp.sample(rng=rng) for _ in range(M)])
     counts = {}
     for s in samples:
         key = frozenset(s)
@@ -811,7 +811,7 @@ def test_boundary_sampling_respects_zero_inf():
     w = np.array([np.inf, 0.0, 1.0, 2.0, 3.0])
     cp = ConditionalPoissonNumPy.from_weights(n=3, w=w)
     rng = np.random.default_rng(123)
-    samples = cp.sample(500, rng=rng)
+    samples = np.stack([cp.sample(rng=rng) for _ in range(500)])
     # Item 0 (inf) must appear in every sample
     assert np.all(np.isin(0, samples.T)), "w=inf item missing from some samples"
     # Item 1 (zero) must never appear

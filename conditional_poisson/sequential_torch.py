@@ -79,6 +79,9 @@ class ConditionalPoissonSequentialTorch:
             # Forward: F[i, k] = e_k(q[0:i]) (scaled)
             F, Fls = _build_dp_table(q, n)
 
+
+            # TODO: there shouldn't be backward method -- it is just backprop on log Z!!!!
+
             # Backward: B[i, k] = e_k(q[i:N]) (scaled)
             B = [[0.0] * (n + 1) for _ in range(N + 1)]
             Bls = [0.0] * (N + 1)
@@ -185,20 +188,19 @@ class ConditionalPoissonSequentialTorch:
             self._cache["seq_q"] = q
         return self._cache["seq_q"]
 
-    def sample(self, size: int = 1, rng=None) -> torch.Tensor:
+    def sample(self, rng=None) -> torch.Tensor:
         """
-        Draw independent samples via sequential scan.
+        Draw one sample via sequential scan.
 
         Parameters
         ----------
-        size : number of subsets to draw
         rng  : int seed, random.Random, or np.random.Generator
 
         Returns
         -------
-        (size, n) long tensor of sorted indices.
+        (n,) long tensor of sorted indices.
 
-        Complexity: O(Nn) to build q table [cached] + O(size * N).
+        Complexity: O(Nn) to build q table [cached] + O(N).
         """
         import random as _random
         import numpy as np
@@ -206,24 +208,20 @@ class ConditionalPoissonSequentialTorch:
         q = self._get_seq_q()
         N, n = self.N, self.n
 
-        # Accept any object with .random() method
         if isinstance(rng, np.random.Generator) or isinstance(rng, _random.Random):
             pass
         else:
             rng = _random.Random(rng)
 
-        samples = torch.empty(size, n, dtype=torch.long)
-        for m in range(size):
-            k = n
-            cursor = 0
-            for i in range(N):
-                if k == 0:
-                    break
-                if rng.random() < q[i][k - 1]:
-                    samples[m, cursor] = i
-                    cursor += 1
-                    k -= 1
-        return samples
+        selected = []
+        k = n
+        for i in range(N):
+            if k == 0:
+                break
+            if rng.random() < q[i][k - 1]:
+                selected.append(i)
+                k -= 1
+        return torch.tensor(selected, dtype=torch.long)
 
     def __repr__(self):
         return f"ConditionalPoissonSequentialTorch(N={self.N}, n={self.n})"

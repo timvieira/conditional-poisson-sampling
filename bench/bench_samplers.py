@@ -122,13 +122,15 @@ def bench_sampling():
         w = np.random.default_rng(0).exponential(1.0, N)
 
         cp_seq = ConditionalPoissonSequentialNumPy.from_weights(n, w)
+        rng_seq = np.random.default_rng(42)
         t0 = time.perf_counter()
-        cp_seq.sample(M, rng=np.random.default_rng(42))
+        np.stack([cp_seq.sample(rng=rng_seq) for _ in range(M)])
         seq_ms = (time.perf_counter() - t0) * 1000
 
         cp = ConditionalPoissonNumPy.from_weights(n, w)
+        rng_tree = np.random.default_rng(42)
         t0 = time.perf_counter()
-        cp.sample(M, rng=np.random.default_rng(42))
+        np.stack([cp.sample(rng=rng_tree) for _ in range(M)])
         tree_ms = (time.perf_counter() - t0) * 1000
 
         print(f"{N:>6d}  {n:>6d}  {seq_ms:>10.1f}  {tree_ms:>10.1f}  {seq_ms/tree_ms:>9.2f}")
@@ -146,13 +148,15 @@ def bench_varying_M():
 
     for M in [1, 10, 100, 1000, 10_000, 100_000]:
         cp_seq = ConditionalPoissonSequentialNumPy.from_weights(n, w)
+        rng_seq = np.random.default_rng(42)
         t0 = time.perf_counter()
-        cp_seq.sample(M, rng=np.random.default_rng(42))
+        np.stack([cp_seq.sample(rng=rng_seq) for _ in range(M)])
         seq_ms = (time.perf_counter() - t0) * 1000
 
         cp = ConditionalPoissonNumPy.from_weights(n, w)
+        rng_tree = np.random.default_rng(42)
         t0 = time.perf_counter()
-        cp.sample(M, rng=np.random.default_rng(42))
+        np.stack([cp.sample(rng=rng_tree) for _ in range(M)])
         tree_ms = (time.perf_counter() - t0) * 1000
 
         print(f"{M:>8d}  {seq_ms:>10.1f}  {tree_ms:>10.1f}  {seq_ms/tree_ms:>9.2f}")
@@ -175,12 +179,14 @@ def bench_verify_sampling():
 
         # Sequential
         cp_seq = ConditionalPoissonSequentialNumPy.from_weights(n, w)
-        S_seq = cp_seq.sample(M, rng=np.random.default_rng(0))
+        rng_seq = np.random.default_rng(0)
+        S_seq = np.stack([cp_seq.sample(rng=rng_seq) for _ in range(M)])
         pi_seq_emp = np.bincount(S_seq.ravel(), minlength=N) / M
 
         # Tree
         cp = ConditionalPoissonNumPy.from_weights(n, w)
-        S_tree = cp.sample(M, rng=np.random.default_rng(0))
+        rng_tree = np.random.default_rng(0)
+        S_tree = np.stack([cp.sample(rng=rng_tree) for _ in range(M)])
         pi_tree_emp = np.bincount(S_tree.ravel(), minlength=N) / M
 
         err_seq = np.max(np.abs(pi_seq_emp - pi_tree))

@@ -99,30 +99,30 @@ def main():
 
         # NumPy tree
         cp = ConditionalPoissonNumPy.from_weights(n, w)
-        cp.sample(1, rng=rng)  # warmup
+        cp.sample(rng=rng)  # warmup
         timings["NumPy tree"] = time_fn(
-            lambda: cp.sample(1, rng=rng), reps
+            lambda: cp.sample(rng=rng), reps
         )
 
         # NumPy sequential
         cp_seq = ConditionalPoissonSequentialNumPy.from_weights(n, w)
-        cp_seq.sample(1, rng=rng)  # warmup
+        cp_seq.sample(rng=rng)  # warmup
         timings["NumPy sequential"] = time_fn(
-            lambda: cp_seq.sample(1, rng=rng), reps
+            lambda: cp_seq.sample(rng=rng), reps
         )
 
         # PyTorch tree
         cpt = ConditionalPoissonTorch.from_weights(n, w)
-        cpt.sample(1, rng=rng)  # warmup
+        cpt.sample(rng=rng)  # warmup
         timings["PyTorch tree"] = time_fn(
-            lambda: cpt.sample(1, rng=rng), reps
+            lambda: cpt.sample(rng=rng), reps
         )
 
         # PyTorch sequential
         cpt_seq = ConditionalPoissonSequentialTorch.from_weights(n, w)
-        cpt_seq.sample(1, rng=rng)  # warmup
+        cpt_seq.sample(rng=rng)  # warmup
         timings["PyTorch sequential"] = time_fn(
-            lambda: cpt_seq.sample(1, rng=rng), reps
+            lambda: cpt_seq.sample(rng=rng), reps
         )
 
         # R sequential
