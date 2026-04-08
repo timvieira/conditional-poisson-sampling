@@ -39,7 +39,7 @@
 - [ ] Fix numerical overflow in sequential `_get_seq_q` — the ESP recurrence operates in linear space without log-scaling, producing NaN at N ≥ 500. Affects both NumPy and Torch sequential classes.
 - [x] ~~`ConditionalPoissonSequentialTorch` should use `torch.autograd` for `incl_prob` (backprop on `log_normalizer`) instead of manual forward-backward DP~~ — done
 - [ ] Sequential sampling should work directly from the forward DP table instead of recomputing a separate backward ESP table (`_get_seq_q`)
-- [ ] All four implementations should have the same public interface: `from_weights`, `fit`, `sample`, `log_prob`, `incl_prob`, `log_normalizer`, `n`, `N`, `theta`, `w`
+- [x] ~~All four implementations should have the same public interface~~ — done (`from_weights`, `fit`, `sample`, `log_prob`, `incl_prob`, `log_normalizer`, `n`, `N`, `theta`; `w` removed)
 - [x] ~~Extend `tests/test_all_implementations.py` to cover `fit` and `log_prob`~~ — done
 
 ### Benchmarks

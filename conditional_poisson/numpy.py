@@ -56,11 +56,11 @@ The tree build follows the divide-and-conquer recurrence:
 
 where the O(N log N) term is FFT-based polynomial multiplication.
 
-  _build_p_tree          O(N (log N)^2)
-  _downward_pass         O(N (log N)^2)
+  _build_tree            O(N (log N)^2)
+  _forward (+ backward)  O(N (log N)^2)
   incl_prob / log_normalizer    O(N (log N)^2)  [cached]
-  sample(M)              O(N (log N)^2 + M n log N)
-  fit(target_incl)           O(N (log N)^2 * L-BFGS_iters)
+  sample                 O(N (log N)^2 + n log N)
+  fit(target_incl)       O(N (log N)^2 * L-BFGS_iters)
 
 TODO: truncate polynomials to degree n throughout the tree to achieve
 O(N log^2 n) instead of O(N log^2 N).  This requires per-coefficient
@@ -82,168 +82,6 @@ __all__ = ["ConditionalPoissonNumPy"]
 # and max|c| = 1.  Unlike the previous implementation, polynomials are NOT
 # truncated — they keep their full natural degree.
 
-def _scale(c):
-    """Normalize so max|c| = 1, return (normalized_coeffs, log_scale)."""
-    m = np.max(np.abs(c))
-    if m == 0:
-        return c, -np.inf
-    return c / m, np.log(m)
-
-def _pmul(a, als, b, bls):
-    """Multiply two scaled polynomials. Returns (c, cls)."""
-    c = convolve(a, b)
-    cn, inc = _scale(c)
-    return cn, als + bls + inc
-
-
-# ── Upward pass: P-tree ──────────────────────────────────────────────────────
-
-def _build_p_tree(q_s):
-    """
-    Build product tree for P_T(z) = prod_{i in T}(1 + q_i z).
-
-    Each node stores a scaled polynomial (c, ls) for its subtree.
-    No degree truncation.  Uses scipy.signal.convolve (auto FFT/direct).
-
-    Returns (Pc, Pls, S) where Pc[i], Pls[i] is the scaled poly at node i,
-    S is the leaf offset (power of 2 >= N).
-
-    Complexity: O(N (log N)^2).
-    """
-    N = len(q_s)
-    S = 1
-    while S < N:
-        S <<= 1
-    Pc  = [None] * (2 * S)
-    Pls = np.full(2 * S, -np.inf)
-
-    for i in range(S):
-        if i < N:
-            c = np.array([1.0, q_s[i]])
-            Pc[S + i], Pls[S + i] = _scale(c)
-        else:
-            Pc[S + i] = np.array([1.0])
-            Pls[S + i] = 0.0   # identity
-
-    for i in range(S - 1, 0, -1):
-        l, r = 2 * i, 2 * i + 1
-        Pc[i], Pls[i] = _pmul(Pc[l], Pls[l], Pc[r], Pls[r])
-
-    return Pc, Pls, S
-
-
-# ── Downward pass ─────────────────────────────────────────────────────────────
-
-def _downward_pass(Pc, Pls, S):
-    """
-    Top-down pass propagating outside polynomials to every leaf.
-
-    At leaf i on return:
-      oPc[S+i], oPls[S+i]  encodes  P^{(-i)}(z)
-
-    Update rule (child c with sibling s):
-      oP[c] = oP[parent] * P[s]
-
-    Complexity: O(N (log N)^2).
-    """
-    N2 = 2 * S
-    oPc  = [None] * N2
-    oPls = np.full(N2, -np.inf)
-    oPc[1] = np.array([1.0])
-    oPls[1] = 0.0
-
-    for i in range(1, S):
-        if oPc[i] is None:
-            continue
-        l, r = 2 * i, 2 * i + 1
-        for c, s in ((l, r), (r, l)):
-            oPc[c], oPls[c] = _pmul(oPc[i], oPls[i], Pc[s], Pls[s])
-
-    return oPc, oPls
-
-
-# ── Extraction: pi, log_Z ────────────────────────────────────────────────────
-
-def _extract(q_s, log_gm, Pc, Pls, oPc, oPls, S, N, n):
-    """
-    Extract pi and log_Z from tree + downward-pass results.
-
-    pi_i   = q_s[i] * oPc[S+i][n-1] / Pc[1][n]  * exp(oPls[S+i] - Pls[1])
-    log Z  = log|Pc[1][n]| + Pls[1] + n * log_gm
-    """
-    en_n    = float(Pc[1][n]) if len(Pc[1]) > n else 0.0
-    root_ls = float(Pls[1])
-    log_Z   = (np.log(abs(en_n)) + root_ls + n * log_gm) if en_n != 0.0 else -np.inf
-
-    pi = np.zeros(N)
-    for i in range(N):
-        op = oPc[S + i]
-        op_ls = float(oPls[S + i])
-        if en_n != 0.0 and op is not None and len(op) > n - 1:
-            pi[i] = q_s[i] * float(op[n - 1]) / en_n * np.exp(op_ls - root_ls)
-
-    return pi, log_Z
-
-
-# ── Sampler: divide-and-conquer on the P-tree ─────────────────────────────────
-
-def _build_sample_cdfs(Pc, S, n):
-    """Precompute normalized CDFs for every (node, quota) pair.
-
-    For each internal node with children L, R and quota k, the split
-    distribution has PMF  pmf[j] = L[j] * R[k-j].  The normalizer is
-    the parent's k-th coefficient (the convolution sum), which is already
-    stored in the tree (up to a scale factor that cancels).
-
-    Returns cdfs: list where cdfs[node][k] is a list of cumulative
-    probabilities for splitting quota k at that node, or None if
-    that quota is impossible.
-    """
-    cdfs = [None] * (2 * S)
-    for node in range(1, S):
-        La = np.maximum(np.asarray(Pc[2 * node]), 0.0)
-        Ra = np.maximum(np.asarray(Pc[2 * node + 1]), 0.0)
-        max_k = min(n, len(La) - 1 + len(Ra) - 1)
-        # Pad to length max_k+1 so indexing is unconditional
-        Lp = np.pad(La, (0, max(0, max_k + 1 - len(La))))
-        Rp = np.pad(Ra, (0, max(0, max_k + 1 - len(Ra))))
-        node_cdfs = [None] * (max_k + 1)
-        for k in range(1, max_k + 1):
-            # PMF of split distribution: pmf[j] = L[j] * R[k-j]
-            pmf = Lp[:k+1] * Rp[k::-1]
-            total = pmf.sum()
-            if total > 0:
-                np.cumsum(pmf, out=pmf)
-                pmf /= total
-                node_cdfs[k] = pmf
-        cdfs[node] = node_cdfs
-    return cdfs
-
-
-def _tree_sample(cdfs, S, N, n, rng):
-    """Draw one sample via top-down quota splitting with precomputed CDFs.
-
-    At each internal node with quota k, split k items between left and
-    right children proportional to Pc_L[j] * Pc_R[k-j].
-
-    Complexity: O(n log N).
-    """
-    selected = []
-    stack = [(1, n)]
-    while stack:
-        node, k = stack.pop()
-        if k == 0:
-            continue
-        if node >= S:
-            if node - S < N:
-                selected.append(node - S)
-            continue
-        cdf = cdfs[node][k]
-        j = int(np.searchsorted(cdf, rng.random()))
-        stack.append((2 * node + 1, k - j))
-        stack.append((2 * node, j))
-    selected.sort()
-    return np.array(selected, dtype=np.int32)
 
 
 
@@ -343,39 +181,106 @@ class ConditionalPoissonNumPy:
             raise ValueError(f"len(theta)={len(value)} != N={self.N}")
         self.__init__(self.n, value)
 
+    # ── Internal: scaled polynomial arithmetic ─────────────────────────────────
+
+    def _scale(self, c):
+        """Normalize so max(c) = 1, return (normalized_coeffs, log_scale)."""
+        m = np.max(c)
+        if m == 0:
+            return c, -np.inf
+        return c / m, np.log(m)
+
+    def _pmul(self, a, als, b, bls):
+        """Multiply two scaled polynomials. Returns (c, cls)."""
+        c = convolve(a, b)
+        cn, inc = self._scale(c)
+        return cn, als + bls + inc
+
     # ── Internal: P-tree (shared by pi, log_Z, sampling) ──────────────────────
 
-    def _get_p_tree(self):
-        """Build and cache the P-tree and normalized weights."""
-        if "p_tree" not in self._cache:
+    def _build_tree(self):
+        """Build and cache the product tree and geometric-mean-scaled weights.
+
+        The tree is a segment tree: Pc[i] is the polynomial at node i,
+        Pls[i] is its log scale. tree_n is the leaf offset (power of 2 >= N).
+        """
+        if "tree" not in self._cache:
+            N, n = self.N, self.n
             log_gm = float(np.mean(self._theta))
-            q_s    = np.exp(self._theta - log_gm)
-            Pc, Pls, S = _build_p_tree(q_s)
-            self._cache["p_tree"] = (Pc, Pls, S, q_s, log_gm)
-        return self._cache["p_tree"]
+            q_s = np.exp(self._theta - log_gm)
 
-    # ── Internal: forward pass (pi, log_Z) ────────────────────────────────────
+            tree_n = 1
+            while tree_n < N:
+                tree_n <<= 1
+            Pc  = [None] * (2 * tree_n)
+            Pls = np.full(2 * tree_n, -np.inf)
 
-    def _forward(self):
+            for i in range(tree_n):
+                if i < N:
+                    Pc[tree_n + i], Pls[tree_n + i] = self._scale(np.array([1.0, q_s[i]]))
+                else:
+                    Pc[tree_n + i] = np.array([1.0])
+                    Pls[tree_n + i] = 0.0
+
+            for i in range(tree_n - 1, 0, -1):
+                l, r = 2 * i, 2 * i + 1
+                Pc[i], Pls[i] = self._pmul(Pc[l], Pls[l], Pc[r], Pls[r])
+
+            self._cache["tree"] = (Pc, Pls, tree_n, q_s, log_gm)
+        return self._cache["tree"]
+
+    # ── Internal: backward (downward) pass for inclusion probabilities ────────
+
+    def _compute_pi(self):
+        """Downward pass: propagate outside polynomials to every leaf.
+
+        oP[leaf i] = prod_{j != i} (1 + q_j z)
+        pi_i = q_i * oP[i][n-1] / root[n] * exp(scale correction)
+        """
         if "pi" not in self._cache:
-            Pc, Pls, S, q_s, log_gm = self._get_p_tree()
-            oPc, oPls = _downward_pass(Pc, Pls, S)
-            pi, log_Z = _extract(q_s, log_gm, Pc, Pls, oPc, oPls,
-                                 S, self.N, self.n)
-            self._cache["pi"]    = pi
-            self._cache["log_Z"] = log_Z
+            Pc, Pls, tree_n, q_s, _ = self._build_tree()
+            N, n = self.N, self.n
+
+            N2 = 2 * tree_n
+            oPc  = [None] * N2
+            oPls = np.full(N2, -np.inf)
+            oPc[1] = np.array([1.0])
+            oPls[1] = 0.0
+            for i in range(1, tree_n):
+                if oPc[i] is None:
+                    continue
+                l, r = 2 * i, 2 * i + 1
+                for c, s in ((l, r), (r, l)):
+                    oPc[c], oPls[c] = self._pmul(oPc[i], oPls[i], Pc[s], Pls[s])
+
+            en_n = float(Pc[1][n]) if len(Pc[1]) > n else 0.0
+            root_ls = float(Pls[1])
+
+            pi = np.zeros(N)
+            for i in range(N):
+                op = oPc[tree_n + i]
+                op_ls = float(oPls[tree_n + i])
+                if en_n != 0.0 and op is not None and len(op) > n - 1:
+                    pi[i] = q_s[i] * float(op[n - 1]) / en_n * np.exp(op_ls - root_ls)
+
+            self._cache["pi"] = pi
 
     # ── Public properties ─────────────────────────────────────────────────────
 
     @property
     def incl_prob(self) -> np.ndarray:
         """Inclusion probabilities pi_i = P(i in S).  O(N (log N)^2), cached."""
-        self._forward(); return self._cache["pi"].copy()
+        self._compute_pi()
+        return self._cache["pi"].copy()
 
     @property
     def log_normalizer(self) -> float:
-        """Log normalizing constant.  Never overflows.  O(N (log N)^2), cached."""
-        self._forward(); return self._cache["log_Z"]
+        """Log normalizing constant.  O(N (log N)^2), cached."""
+        Pc, Pls, _, _, log_gm = self._build_tree()
+        n = self.n
+        en_n = float(Pc[1][n]) if len(Pc[1]) > n else 0.0
+        root_ls = float(Pls[1])
+        return (np.log(en_n) + root_ls + n * log_gm) if en_n != 0.0 else -np.inf
 
     # ── Log probability ───────────────────────────────────────────────────────
 
@@ -404,8 +309,26 @@ class ConditionalPoissonNumPy:
     def _get_sample_cdfs(self):
         """Build and cache the CDFs for sampling."""
         if "sample_cdfs" not in self._cache:
-            Pc, _, S, _, _ = self._get_p_tree()
-            self._cache["sample_cdfs"] = _build_sample_cdfs(Pc, S, self.n)
+            Pc, _, tree_n, _, _ = self._build_tree()
+            n = self.n
+            cdfs = [None] * (2 * tree_n)
+            for node in range(1, tree_n):
+                La = np.maximum(np.asarray(Pc[2 * node]), 0.0)
+                Ra = np.maximum(np.asarray(Pc[2 * node + 1]), 0.0)
+                max_k = min(n, len(La) - 1 + len(Ra) - 1)
+                Lp = np.pad(La, (0, max(0, max_k + 1 - len(La))))
+                Rp = np.pad(Ra, (0, max(0, max_k + 1 - len(Ra))))
+                node_cdfs = [None] * (max_k + 1)
+                for k in range(1, max_k + 1):
+                    pmf = Lp[:k+1] * Rp[k::-1]
+                    total = pmf.sum()
+                    # total == 0 only for padding-only subtrees (never sampled)
+                    if total > 0:
+                        np.cumsum(pmf, out=pmf)
+                        pmf /= total
+                        node_cdfs[k] = pmf
+                cdfs[node] = node_cdfs
+            self._cache["sample_cdfs"] = (cdfs, tree_n)
         return self._cache["sample_cdfs"]
 
     def sample(
@@ -427,9 +350,24 @@ class ConditionalPoissonNumPy:
         """
         if not isinstance(rng, np.random.Generator):
             rng = np.random.default_rng(rng)
-        _, _, S, _, _ = self._get_p_tree()
-        cdfs = self._get_sample_cdfs()
-        return _tree_sample(cdfs, S, self.N, self.n, rng)
+        cdfs, tree_n = self._get_sample_cdfs()
+        N, n = self.N, self.n
+        selected = []
+        stack = [(1, n)]
+        while stack:
+            node, k = stack.pop()
+            if k == 0:
+                continue
+            if node >= tree_n:
+                if node - tree_n < N:
+                    selected.append(node - tree_n)
+                continue
+            cdf = cdfs[node][k]
+            j = int(np.searchsorted(cdf, rng.random()))
+            stack.append((2 * node + 1, k - j))
+            stack.append((2 * node, j))
+        selected.sort()
+        return np.array(selected, dtype=np.int32)
 
     # ── Fitting ───────────────────────────────────────────────────────────────
 
@@ -469,8 +407,7 @@ class ConditionalPoissonNumPy:
         def neg_ll_and_grad(theta):
             self.theta = theta  # clears cache
             pi = self.incl_prob
-            log_Z = self._cache["log_Z"]
-            loss = log_Z - float(np.dot(target_incl, theta))
+            loss = self.log_normalizer - float(np.dot(target_incl, theta))
             grad = pi - target_incl
             if verbose:
                 err = float(np.max(np.abs(target_incl - pi)))
