@@ -60,7 +60,7 @@ where the O(N log N) term is FFT-based polynomial multiplication.
   _downward_pass         O(N (log N)^2)
   incl_prob / log_normalizer    O(N (log N)^2)  [cached]
   sample(M)              O(N (log N)^2 + M n log N)
-  fit(pi_star)           O(N (log N)^2 * L-BFGS_iters)
+  fit(target_incl)           O(N (log N)^2 * L-BFGS_iters)
 
 TODO: truncate polynomials to degree n throughout the tree to achieve
 O(N log^2 n) instead of O(N log^2 N).  This requires per-coefficient
@@ -259,7 +259,7 @@ class ConditionalPoissonNumPy:
     ------------
     ConditionalPoissonNumPy(n, theta)           direct from log-weights theta = log(w)
     ConditionalPoissonNumPy.from_weights(n, w)  from non-negative weights w_i
-    ConditionalPoissonNumPy.fit(pi_star, n)     moment-match to target probs
+    ConditionalPoissonNumPy.fit(target_incl, n)     moment-match to target probs
 
     Properties  (all cached; cache invalidated when theta changes)
     ----------
@@ -271,7 +271,7 @@ class ConditionalPoissonNumPy:
     -------
     log_prob(S)         scalar or (M,) log-probabilities
     sample(M, rng)      (M, n) int array of sorted subsets
-    fit_inplace(pi_star)  update theta in-place via L-BFGS; returns self
+    fit_inplace(target_incl)  update theta in-place via L-BFGS; returns self
 
     Notes
     -----
@@ -286,6 +286,7 @@ class ConditionalPoissonNumPy:
         if len(theta) < n:    raise ValueError(f"N={len(theta)} must be >= n={n}")
         if n < 1:             raise ValueError("n must be >= 1")
 
+        # TODO; remove the force-in/out stuff.  Simplify!
         forced_in  = np.where(theta == np.inf)[0]
         forced_out = np.where(theta == -np.inf)[0]
         interior   = np.where(np.isfinite(theta))[0]
@@ -300,7 +301,8 @@ class ConditionalPoissonNumPy:
                 f"(after {n_in} forced-in), impossible"
             )
 
-        self._n     = int(n)
+        self.n      = int(n)
+        self.N      = len(theta)
         self._theta = theta.copy()
         self._cache: dict = {}
 
@@ -329,7 +331,7 @@ class ConditionalPoissonNumPy:
     @classmethod
     def fit(
         cls,
-        pi_star: np.ndarray,
+        target_incl: np.ndarray,
         n: int,
         *,
         tol: float = 1e-10,
@@ -341,7 +343,7 @@ class ConditionalPoissonNumPy:
 
         Parameters
         ----------
-        pi_star : (N,) array with entries in (0, 1) summing to n
+        target_incl : (N,) array with entries in (0, 1) summing to n
         n       : subset size
         tol     : convergence threshold on max|pi* - pi|
         max_iter: maximum L-BFGS iterations
@@ -349,24 +351,16 @@ class ConditionalPoissonNumPy:
 
         Returns
         -------
-        ConditionalPoissonNumPy with weights fit to match pi_star.
+        ConditionalPoissonNumPy with weights fit to match target_incl.
         """
-        obj = cls(n, np.zeros(len(pi_star)))
-        obj.fit_inplace(pi_star, tol=tol, max_iter=max_iter, verbose=verbose)
+        obj = cls(n, np.zeros(len(target_incl)))
+        obj.fit_inplace(target_incl, tol=tol, max_iter=max_iter, verbose=verbose)
         return obj
 
     # ── Parameters ───────────────────────────────────────────────────────────
 
     @property
-    def n(self) -> int:   return self._n
-    @property
-    def N(self) -> int:   return len(self._theta)
-    @property
-    def theta(self) -> np.ndarray: return self._theta.copy()
-    @property
-    def w(self) -> np.ndarray:
-        """Weights w_i = exp(theta_i)."""
-        return np.exp(self._theta)
+    def theta(self) -> np.ndarray: return self._theta
 
     @theta.setter
     def theta(self, value):
@@ -374,7 +368,7 @@ class ConditionalPoissonNumPy:
         if len(value) != self.N:
             raise ValueError(f"len(theta)={len(value)} != N={self.N}")
         # Re-initialize to re-partition boundary items
-        self.__init__(self._n, value)
+        self.__init__(self.n, value)
 
     # ── Internal: P-tree (shared by pi, log_Z, sampling) ──────────────────────
 
@@ -394,7 +388,7 @@ class ConditionalPoissonNumPy:
             Pc, Pls, S, q_s, log_gm = self._get_p_tree()
             oPc, oPls = _downward_pass(Pc, Pls, S)
             pi, log_Z = _extract(q_s, log_gm, Pc, Pls, oPc, oPls,
-                                 S, self.N, self._n)
+                                 S, self.N, self.n)
             self._cache["pi"]    = pi
             self._cache["log_Z"] = log_Z
 
@@ -483,8 +477,8 @@ class ConditionalPoissonNumPy:
     def _get_sample_cdfs(self):
         """Build and cache the CDFs for sampling."""
         if "sample_cdfs" not in self._cache:
-            Pc, Pls, S, q_s, _ = self._get_p_tree()
-            self._cache["sample_cdfs"] = _build_sample_cdfs(Pc, S, self._n)
+            Pc, _, S, _, _ = self._get_p_tree()
+            self._cache["sample_cdfs"] = _build_sample_cdfs(Pc, S, self.n)
         return self._cache["sample_cdfs"]
 
     def sample(
@@ -521,16 +515,16 @@ class ConditionalPoissonNumPy:
         _, _, S, _, _ = self._get_p_tree()
         cdfs = self._get_sample_cdfs()
         if size == 1:
-            return _tree_sample(cdfs, S, self.N, self._n, rng).reshape(1, -1)
+            return _tree_sample(cdfs, S, self.N, self.n, rng).reshape(1, -1)
         return np.stack(
-            [_tree_sample(cdfs, S, self.N, self._n, rng) for _ in range(size)]
+            [_tree_sample(cdfs, S, self.N, self.n, rng) for _ in range(size)]
         )
 
     # ── Fitting ───────────────────────────────────────────────────────────────
 
     def fit_inplace(
         self,
-        pi_star: np.ndarray,
+        target_incl: np.ndarray,
         *,
         tol: float = 1e-10,
         max_iter: int = 200,
@@ -547,17 +541,17 @@ class ConditionalPoissonNumPy:
         """
         from scipy.optimize import minimize
 
-        pi_star = np.asarray(pi_star, float)
-        if len(pi_star) != self.N:
-            raise ValueError(f"len(pi_star)={len(pi_star)} != N={self.N}")
-        if abs(pi_star.sum() / self._n - 1.0) > 1e-6:
-            raise ValueError(f"sum(pi_star)/n = {pi_star.sum()/self._n:.8f}, expected 1.0")
-        if not np.all((pi_star > 0) & (pi_star < 1)):
-            raise ValueError("all pi_star must lie strictly in (0, 1)")
+        target_incl = np.asarray(target_incl, float)
+        if len(target_incl) != self.N:
+            raise ValueError(f"len(target_incl)={len(target_incl)} != N={self.N}")
+        if abs(target_incl.sum() / self.n - 1.0) > 1e-6:
+            raise ValueError(f"sum(target_incl)/n = {target_incl.sum()/self.n:.8f}, expected 1.0")
+        if not np.all((target_incl > 0) & (target_incl < 1)):
+            raise ValueError("all target_incl must lie strictly in (0, 1)")
 
         # Warm start: logit(pi*)
         from scipy.special import logit
-        theta0 = logit(pi_star)
+        theta0 = logit(target_incl)
 
         iter_count = [0]
 
@@ -565,10 +559,10 @@ class ConditionalPoissonNumPy:
             self.theta = theta  # clears cache
             pi = self.incl_prob
             log_Z = self._cache["log_Z"]
-            loss = -(float(np.dot(pi_star, theta)) - log_Z)
-            grad = -(pi_star - pi)  # gradient of neg log-likelihood
+            loss = log_Z - float(np.dot(target_incl, theta))
+            grad = pi - target_incl
             if verbose:
-                err = float(np.max(np.abs(pi_star - pi)))
+                err = float(np.max(np.abs(target_incl - pi)))
                 print(f"  iter {iter_count[0]:3d}:  max|pi*-pi| = {err:.3e}")
             iter_count[0] += 1
             return loss, grad
@@ -580,22 +574,12 @@ class ConditionalPoissonNumPy:
         )
 
         theta = result.x
+        theta -= theta.mean()   # zero-center (shift-invariant)
         self.theta = theta
-        fit_err = float(np.max(np.abs(self.incl_prob - pi_star)))
-        if fit_err > tol:
-            import warnings
-            warnings.warn(
-                f"fit did not reach tol={tol:.0e}: max|pi - pi*| = {fit_err:.2e}. "
-                f"L-BFGS exhausted max_iter={max_iter} without converging.",
-                stacklevel=3,
-            )
-
-        theta      -= theta.mean()   # zero-center (shift-invariant)
-        self.theta  = theta
         return self
 
     def __repr__(self) -> str:
         if "log_Z" in self._cache:
-            return (f"ConditionalPoissonNumPy(N={self.N}, n={self._n}, "
+            return (f"ConditionalPoissonNumPy(N={self.N}, n={self.n}, "
                     f"log_normalizer={self._cache['log_Z']:.3f})")
-        return f"ConditionalPoissonNumPy(N={self.N}, n={self._n})"
+        return f"ConditionalPoissonNumPy(N={self.N}, n={self.n})"

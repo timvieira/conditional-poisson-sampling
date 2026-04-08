@@ -47,8 +47,8 @@ class ConditionalPoissonSequentialTorch:
         N = len(theta)
         if n < 0 or n > N:
             raise ValueError(f"n={n} out of range [0, {N}]")
-        self._n = n
-        self._N = N
+        self.n = n
+        self.N = N
         self._theta = theta.detach().clone()
         self._cache: dict = {}
 
@@ -64,21 +64,15 @@ class ConditionalPoissonSequentialTorch:
     # ── Properties ───────────────────────────────────────────────────────────
 
     @property
-    def n(self) -> int:   return self._n
-    @property
-    def N(self) -> int:   return self._N
-    @property
-    def theta(self) -> torch.Tensor: return self._theta.clone()
-    @property
-    def w(self) -> torch.Tensor: return torch.exp(self._theta)
+    def theta(self) -> torch.Tensor: return self._theta
 
     # ── DP tables ────────────────────────────────────────────────────────────
 
     def _get_dp(self):
         """Build and cache forward/backward DP tables."""
         if "dp" not in self._cache:
-            w = self.w
-            N, n = self._N, self._n
+            w = torch.exp(self._theta)
+            N, n = self.N, self.n
             log_gm = self._theta.mean().item()
             q = (w / math.exp(log_gm)).tolist()
 
@@ -116,8 +110,8 @@ class ConditionalPoissonSequentialTorch:
         if "log_Z" not in self._cache:
             q, F, Fls, B, Bls, log_gm = self._get_dp()
             self._cache["log_Z"] = (
-                math.log(abs(F[self._N][self._n])) + Fls[self._N]
-                + self._n * log_gm
+                math.log(abs(F[self.N][self.n])) + Fls[self.N]
+                + self.n * log_gm
             )
         return self._cache["log_Z"]
 
@@ -128,7 +122,7 @@ class ConditionalPoissonSequentialTorch:
         """Inclusion probability vector pi.  O(Nn)."""
         if "pi" not in self._cache:
             q, F, Fls, B, Bls, log_gm = self._get_dp()
-            N, n = self._N, self._n
+            N, n = self.N, self.n
             log_Z = math.log(abs(F[N][n])) + Fls[N]
 
             pi = [0.0] * N
@@ -165,8 +159,8 @@ class ConditionalPoissonSequentialTorch:
         Uses the backward ESP recurrence.  O(Nn).
         """
         if "seq_q" not in self._cache:
-            w = self.w.tolist()
-            N, n = self._N, self._n
+            w = torch.exp(self._theta).tolist()
+            N, n = self.N, self.n
             # Backward ESP recurrence: expa[i, k] = e_k(w[i:N])
             expa = [[0.0] * n for _ in range(N)]
             for i in range(N):
@@ -210,7 +204,7 @@ class ConditionalPoissonSequentialTorch:
         import numpy as np
 
         q = self._get_seq_q()
-        N, n = self._N, self._n
+        N, n = self.N, self.n
 
         # Accept any object with .random() method
         if isinstance(rng, np.random.Generator) or isinstance(rng, _random.Random):
@@ -232,7 +226,7 @@ class ConditionalPoissonSequentialTorch:
         return samples
 
     def __repr__(self):
-        return f"ConditionalPoissonSequentialTorch(N={self._N}, n={self._n})"
+        return f"ConditionalPoissonSequentialTorch(N={self.N}, n={self.n})"
 
 
 # ── Helper: weighted Pascal DP table ─────────────────────────────────────────

@@ -210,7 +210,7 @@ def test_boundary_all_forced():
 
 
 def test_fit_bad_pi_sum_raises():
-    with pytest.raises(ValueError, match="sum\\(pi_star\\)/n"):
+    with pytest.raises(ValueError, match="sum\\(target_incl\\)/n"):
         ConditionalPoissonNumPy.fit(np.array([0.5, 0.5, 0.5]), n=2)
 
 

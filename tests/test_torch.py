@@ -355,9 +355,9 @@ class TestEdgeCases(unittest.TestCase):
             ConditionalPoissonTorch.from_weights(1, [1.0, float('inf')])
 
     def test_invalid_n(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(AssertionError):
             ConditionalPoissonTorch(10, torch.zeros(5))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(AssertionError):
             ConditionalPoissonTorch(-1, torch.zeros(5))
 
     def test_N_equals_1(self):

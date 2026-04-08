@@ -31,6 +31,7 @@
 - [ ] Rename `conditional_poisson/numpy.py` → `tree_numpy.py` and `conditional_poisson/torch.py` → `tree_torch.py` (or `fft_numpy.py`/`fft_torch.py`)? The current names don't distinguish the algorithm from the sequential variants.
 - [x] ~~Remove stupid wrapper methods~~ — done (moved `compute_pi`, `forward_log_Z`, `_find_r`, poly mul into class as instance/static methods)
 - [ ]  _get_sample_cdfs look way too complicated (and potentially slow) - I suspect it can be simplified considerably.
+- [ ] apply a similar refactor to numpy implementation (and I'm guess the sequential implementations too)
 
 ### Sequential implementations
 - [ ] Add `fit` and `log_prob` to `ConditionalPoissonSequentialNumPy`

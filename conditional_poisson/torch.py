@@ -86,9 +86,7 @@ class ConditionalPoissonTorch:
         self.n = int(n)
         self.N = len(self._theta)
         self._sample_tree = None
-
-        if self.n < 0 or self.n > self.N:
-            raise ValueError(f"n={self.n} must be in [0, {self.N}]")
+        assert 0 <= self.n <= self.N, f"n={self.n} must be in [0, {self.N}]"
 
     # ── Constructors ──────────────────────────────────────────────────────────
 
@@ -159,10 +157,6 @@ class ConditionalPoissonTorch:
         return self._theta.clone()
 
     @property
-    def w(self) -> torch.Tensor:
-        return torch.exp(self._theta)
-
-    @property
     def incl_prob(self) -> torch.Tensor:
         """Inclusion probabilities pi_i = P(i in S).
 
@@ -227,14 +221,17 @@ class ConditionalPoissonTorch:
             max_k = min(n, len(L) - 1 + len(R) - 1)
             node_cdfs = [None] * (max_k + 1)
             for k in range(1, max_k + 1):
+
+                # XXX: vectorize this block
                 pmf = []
                 for j in range(k + 1):
                     rem = k - j
                     lv = L[j] if j < len(L) else 0.0
                     rv = R[rem] if rem < len(R) else 0.0
                     pmf.append(max(lv, 0.0) * max(rv, 0.0))
+
                 total = sum(pmf)
-                if total > 0:
+                if total > 0:    # XXX: this should never be zero. if it were zero, we would not be sampling it.
                     acc = 0.0
                     cdf = []
                     for p in pmf:
@@ -346,7 +343,7 @@ class ConditionalPoissonTorch:
             # Numerically stable sigmoid and its derivative
             # Clamp to avoid exp overflow in the tails
             s_clamped = s.clamp(-500, 500)
-            p = torch.sigmoid(s_clamped)
+            p = torch.sigmoid(s_clamped)    # TODO: sigmoid should never overflow if it is implemented correctly (see https://timvieira.github.io/blog/exp-normalize-trick/)
             g = p.sum().item() - n
             gp = (p * (1 - p)).sum().item()
 
