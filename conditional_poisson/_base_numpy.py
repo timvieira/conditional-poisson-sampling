@@ -39,13 +39,13 @@ class ConditionalPoissonNumPyBase:
         from scipy.special import logit
 
         target_incl = np.asarray(target_incl, float)
-        obj = cls(n, logit(target_incl))
+        cp = cls(n, logit(target_incl))
 
         def neg_ll_and_grad(theta):
-            obj.theta = theta
-            obj.clear()
-            pi = obj.incl_prob
-            loss = obj.log_normalizer - float(target_incl @ theta)
+            cp.theta = theta
+            cp.clear()
+            pi = cp.incl_prob
+            loss = cp.log_normalizer - float(target_incl @ theta)
             grad = pi - target_incl
             if verbose:
                 print(f"  max|pi-pi*| = {np.max(np.abs(grad)):.3e}")
