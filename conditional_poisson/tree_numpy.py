@@ -48,9 +48,30 @@ class ConditionalPoissonNumPy:
 
     @classmethod
     def fit(cls, target_incl, n, *, tol=1e-10, max_iter=200, verbose=False):
-        obj = cls(n, np.zeros(len(target_incl)))
-        obj.fit_inplace(target_incl, tol=tol, max_iter=max_iter, verbose=verbose)
-        return obj
+        from scipy.optimize import minimize
+        from scipy.special import logit
+
+        target_incl = np.asarray(target_incl, float)
+        obj = cls(n, logit(target_incl))
+
+        def neg_ll_and_grad(theta):
+            obj.theta = theta
+            obj.clear()
+            pi = obj.incl_prob
+            loss = obj.log_normalizer - float(target_incl @ theta)
+            grad = pi - target_incl
+            if verbose:
+                print(f"  max|pi-pi*| = {np.max(np.abs(grad)):.3e}")
+            return loss, grad
+
+        result = minimize(
+            neg_ll_and_grad, logit(target_incl),
+            method='L-BFGS-B', jac=True,
+            options={'maxiter': max_iter, 'gtol': tol, 'ftol': 0},
+        )
+        theta = result.x
+        theta -= theta.mean()
+        return cls(n, theta)
 
     def clear(self):
         """Flush all cached computations."""
@@ -187,35 +208,6 @@ class ConditionalPoissonNumPy:
         else:
             return (th[S].sum(axis=1) - lz) if S.ndim == 2 else float(th[S].sum() - lz)
 
-    def fit_inplace(self, target_incl, *, tol=1e-10, max_iter=200, verbose=False):
-        """Update weights to match target inclusion probabilities.  Returns self."""
-        from scipy.optimize import minimize
-        from scipy.special import logit
-
-        target_incl = np.asarray(target_incl, float)
-        assert len(target_incl) == self.N
-        assert np.all((target_incl > 0) & (target_incl < 1))
-
-        def neg_ll_and_grad(theta):
-            self.theta = theta
-            self.clear()
-            pi = self.incl_prob
-            loss = self.log_normalizer - float(target_incl @ theta)
-            grad = pi - target_incl
-            if verbose:
-                print(f"  max|pi-pi*| = {np.max(np.abs(grad)):.3e}")
-            return loss, grad
-
-        result = minimize(
-            neg_ll_and_grad, logit(target_incl),
-            method='L-BFGS-B', jac=True,
-            options={'maxiter': max_iter, 'gtol': tol, 'ftol': 0},
-        )
-        theta = result.x
-        theta -= theta.mean()
-        self.theta = theta
-        self.clear()
-        return self
 
     def __repr__(self):
         return f"ConditionalPoissonNumPy(N={self.N}, n={self.n})"
