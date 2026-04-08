@@ -16,7 +16,7 @@ Basic usage:
     cp = ConditionalPoissonNumPy.from_weights(n=3, w=[1.0, 2.0, 3.0, 4.0, 5.0])
     print(cp.incl_prob)       # inclusion probabilities
     print(cp.log_normalizer)  # log Z
-    print(cp.sample(10))      # draw 10 samples
+    print(cp.sample())        # draw one sample
 """
 
 from conditional_poisson.tree_numpy import ConditionalPoissonNumPy

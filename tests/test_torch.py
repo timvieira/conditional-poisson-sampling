@@ -238,31 +238,20 @@ class TestSampling(unittest.TestCase):
 
     def test_sample_shape(self):
         cp = ConditionalPoissonTorch.from_weights(N_SMALL, W_SMALL)
-        rng = np.random.default_rng(0)
-        samples = torch.stack([cp.sample(rng=rng) for _ in range(100)])
+        samples = torch.stack([cp.sample() for _ in range(100)])
         self.assertEqual(samples.shape, (100, N_SMALL))
 
     def test_sample_no_duplicates(self):
         cp = ConditionalPoissonTorch.from_weights(N_SMALL, W_SMALL)
-        rng = np.random.default_rng(0)
-        samples = torch.stack([cp.sample(rng=rng) for _ in range(1000)])
+        samples = torch.stack([cp.sample() for _ in range(1000)])
         for row in samples:
             self.assertEqual(len(row.unique()), N_SMALL)
 
     def test_sample_sorted(self):
         cp = ConditionalPoissonTorch.from_weights(N_SMALL, W_SMALL)
-        rng = np.random.default_rng(0)
-        samples = torch.stack([cp.sample(rng=rng) for _ in range(100)])
+        samples = torch.stack([cp.sample() for _ in range(100)])
         for row in samples:
             self.assertTrue(torch.all(row[1:] > row[:-1]))
-
-    def test_sample_deterministic(self):
-        cp = ConditionalPoissonTorch.from_weights(N_SMALL, W_SMALL)
-        rng1 = np.random.default_rng(123)
-        rng2 = np.random.default_rng(123)
-        s1 = torch.stack([cp.sample(rng=rng1) for _ in range(50)])
-        s2 = torch.stack([cp.sample(rng=rng2) for _ in range(50)])
-        self.assertTrue(torch.equal(s1, s2))
 
     def test_sample_distribution_small(self):
         """Empirical subset frequencies match exact P(S) (TV distance)."""
@@ -272,8 +261,7 @@ class TestSampling(unittest.TestCase):
         exact = all_probs_bf(w, n)
 
         M = 50_000
-        rng = np.random.default_rng(0)
-        samples = torch.stack([cp.sample(rng=rng) for _ in range(M)])
+        samples = torch.stack([cp.sample() for _ in range(M)])
         counts = Counter(tuple(row.tolist()) for row in samples)
 
         tv = tv_distance(counts, exact, M)
@@ -282,15 +270,13 @@ class TestSampling(unittest.TestCase):
 
     def test_sample_distribution_extreme_weights(self):
         """Full distribution test with extreme weight ratios."""
-        rng = np.random.default_rng(99)
-        w = np.exp(rng.uniform(-5, 5, 10))
+        w = np.exp(np.random.default_rng(99).uniform(-5, 5, 10))
         n = 3
         cp = ConditionalPoissonTorch.from_weights(n, w)
         exact = all_probs_bf(w, n)
 
         M = 50_000
-        rng2 = np.random.default_rng(0)
-        samples = torch.stack([cp.sample(rng=rng2) for _ in range(M)])
+        samples = torch.stack([cp.sample() for _ in range(M)])
         counts = Counter(tuple(row.tolist()) for row in samples)
 
         tv = tv_distance(counts, exact, M)
@@ -305,22 +291,19 @@ class TestSampling(unittest.TestCase):
         num_subsets = math.comb(6, 2)  # 15
 
         M = 10_000
-        rng = np.random.default_rng(0)
-        samples = torch.stack([cp.sample(rng=rng) for _ in range(M)])
+        samples = torch.stack([cp.sample() for _ in range(M)])
         seen = set(tuple(row.tolist()) for row in samples)
         self.assertEqual(len(seen), num_subsets,
                          f"saw {len(seen)}/{num_subsets} subsets")
 
     def test_sample_n_zero(self):
         cp = ConditionalPoissonTorch.from_weights(0, W_SMALL)
-        rng = np.random.default_rng(0)
-        samples = torch.stack([cp.sample(rng=rng) for _ in range(10)])
+        samples = torch.stack([cp.sample() for _ in range(10)])
         self.assertEqual(samples.shape, (10, 0))
 
     def test_sample_n_equals_N(self):
         cp = ConditionalPoissonTorch.from_weights(len(W_SMALL), W_SMALL)
-        rng = np.random.default_rng(0)
-        samples = torch.stack([cp.sample(rng=rng) for _ in range(5)])
+        samples = torch.stack([cp.sample() for _ in range(5)])
         expected = torch.arange(len(W_SMALL))
         for row in samples:
             self.assertTrue(torch.equal(row, expected))

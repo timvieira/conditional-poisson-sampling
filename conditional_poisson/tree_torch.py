@@ -180,7 +180,7 @@ class ConditionalPoissonTorch:
 
     # ── Sampling ──────────────────────────────────────────────────────────────
 
-    def sample(self, rng=None) -> torch.Tensor:
+    def sample(self) -> torch.Tensor:
         """
         Draw one sample via top-down quota splitting on the product tree.
 

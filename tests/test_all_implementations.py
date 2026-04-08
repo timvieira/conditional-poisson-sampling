@@ -121,23 +121,20 @@ class TestSampling:
     def test_correct_shape(self, cls):
         w = np.random.default_rng(0).exponential(1.0, 20)
         cp = cls.from_weights(7, w)
-        rng = np.random.default_rng(42)
-        S = np.stack([to_numpy(cp.sample(rng=rng)) for _ in range(10)])
+        S = np.stack([to_numpy(cp.sample()) for _ in range(10)])
         assert S.shape == (10, 7)
 
     def test_sorted_indices(self, cls):
         w = np.random.default_rng(0).exponential(1.0, 20)
         cp = cls.from_weights(7, w)
-        rng = np.random.default_rng(42)
-        S = np.stack([to_numpy(cp.sample(rng=rng)) for _ in range(100)])
+        S = np.stack([to_numpy(cp.sample()) for _ in range(100)])
         assert np.all(np.diff(S, axis=1) > 0), "samples not sorted"
 
     def test_valid_indices(self, cls):
         N = 20
         w = np.random.default_rng(0).exponential(1.0, N)
         cp = cls.from_weights(7, w)
-        rng = np.random.default_rng(42)
-        S = np.stack([to_numpy(cp.sample(rng=rng)) for _ in range(100)])
+        S = np.stack([to_numpy(cp.sample()) for _ in range(100)])
         assert np.all(S >= 0) and np.all(S < N)
 
     def test_empirical_pi_matches(self, cls):
@@ -146,8 +143,7 @@ class TestSampling:
         cp = cls.from_weights(n, w)
         pi = to_numpy(cp.incl_prob)
         M = 50_000
-        rng = np.random.default_rng(0)
-        S = np.stack([to_numpy(cp.sample(rng=rng)) for _ in range(M)])
+        S = np.stack([to_numpy(cp.sample()) for _ in range(M)])
         pi_emp = np.bincount(S.ravel(), minlength=N) / M
         assert np.max(np.abs(pi_emp - pi)) < 0.02
 
@@ -164,12 +160,11 @@ class TestSampling:
         log_Z = np.log(np.exp(log_probs - log_probs.max()).sum()) + log_probs.max()
         true_probs = dict(zip(all_S, np.exp(log_probs - log_Z)))
 
-        # Empirical P(S) — use persistent RNG for all backends
+        # Empirical P(S)
         M = 200_000
-        rng = np.random.default_rng(0)
         counts = {}
         for _ in range(M):
-            s = tuple(sorted(to_numpy(cp.sample(rng=rng))))
+            s = tuple(sorted(to_numpy(cp.sample())))
             counts[s] = counts.get(s, 0) + 1
 
         max_err = max(abs(counts.get(s, 0) / M - true_probs[s]) for s in all_S)
@@ -185,8 +180,7 @@ class TestEdgeCases:
         cp = cls.from_weights(1, w)
         pi = to_numpy(cp.incl_prob)
         assert abs(pi.sum() - 1.0) < 1e-10
-        rng = np.random.default_rng(42)
-        S = np.stack([to_numpy(cp.sample(rng=rng)) for _ in range(100)])
+        S = np.stack([to_numpy(cp.sample()) for _ in range(100)])
         assert S.shape == (100, 1)
 
     def test_n_equals_N_minus_1(self, cls):

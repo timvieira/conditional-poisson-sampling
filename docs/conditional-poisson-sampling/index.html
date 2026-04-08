@@ -2856,7 +2856,7 @@ $S \leftarrow \text{sample}(\text{root}, n)$</p>
 <span class="o">&gt;&gt;&gt;</span> <span class="n">cp</span><span class="o">.</span><span class="n">incl_prob</span>
 <span class="n">tensor</span><span class="p">([</span><span class="mf">0.3813</span><span class="p">,</span> <span class="mf">0.5038</span><span class="p">,</span> <span class="mf">0.3236</span><span class="p">,</span> <span class="mf">0.6424</span><span class="p">,</span> <span class="mf">0.3771</span><span class="p">,</span> <span class="mf">0.7718</span><span class="p">])</span>
 
-<span class="o">&gt;&gt;&gt;</span> <span class="n">cp</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">cp</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">)])</span>
 <span class="n">tensor</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span>
         <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span>
         <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span>

@@ -18,7 +18,6 @@ draws one sample by scanning items and flipping biased coins.
 
 from __future__ import annotations
 import numpy as np
-from typing import Optional, Union
 
 
 class ConditionalPoissonSequentialNumPy:
@@ -140,10 +139,7 @@ class ConditionalPoissonSequentialNumPy:
 
     # ── Sampling ─────────────────────────────────────────────────────────────
 
-    def sample(
-        self,
-        rng: Optional[Union[int, np.random.Generator]] = None,
-    ) -> np.ndarray:
+    def sample(self) -> np.ndarray:
         """
         Draw one sample via sequential scan using the backward DP table.
 
@@ -157,8 +153,7 @@ class ConditionalPoissonSequentialNumPy:
 
         Complexity: O(Nn) to build tables [cached] + O(N).
         """
-        if not isinstance(rng, np.random.Generator):
-            rng = np.random.default_rng(rng)
+        rng = np.random.default_rng()
         q, _, _, B, Bls, _ = self._get_dp()
         N, n = self.N, self.n
         selected = []

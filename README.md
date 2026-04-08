@@ -35,7 +35,7 @@ print(cp.incl_prob)          # shape (5,), sums to n=2
 print(cp.log_normalizer)
 
 # Sample 1000 subsets of size 2
-samples = cp.sample(1000, rng=42)   # shape (1000, 2)
+samples = np.stack([cp.sample() for _ in range(1000)])  # shape (1000, 2)
 
 # Log-probability of a specific subset
 print(cp.log_prob([0, 3]))

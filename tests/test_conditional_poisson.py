@@ -42,7 +42,7 @@ def test_sampling():
     q_true = rng.exponential(1.0, N)
     cp = ConditionalPoissonNumPy.from_weights(n, q_true)
     M = 100_000
-    S = np.stack([cp.sample(rng=rng) for _ in range(M)])
+    S = np.stack([cp.sample() for _ in range(M)])
     assert S.shape == (M, n)
     assert np.all(np.diff(S, axis=1) > 0), "samples not sorted"
     pi_emp = np.bincount(S.ravel(), minlength=N) / M
@@ -77,7 +77,7 @@ def test_n_equals_1():
     pi = cp.incl_prob
     assert abs(pi.sum() - 1.0) < 1e-10
     assert np.all((pi > 0) & (pi < 1))
-    S = np.stack([cp.sample(rng=rng) for _ in range(1000)])
+    S = np.stack([cp.sample() for _ in range(1000)])
     assert S.shape == (1000, 1)
     assert np.all((S >= 0) & (S < N))
 
@@ -204,17 +204,6 @@ def test_log_prob_bool_formats():
     assert np.max(np.abs(lps_idx - lps_bool)) < 1e-12
 
 
-# ── Sampling reproducibility ─────────────────────────────────────────────────
-
-def test_sampling_deterministic_with_seed():
-    cp = ConditionalPoissonNumPy.from_weights(3, np.array([1.0, 2.0, 3.0, 4.0, 5.0]))
-    rng1 = np.random.default_rng(42)
-    rng2 = np.random.default_rng(42)
-    s1 = np.stack([cp.sample(rng=rng1) for _ in range(50)])
-    s2 = np.stack([cp.sample(rng=rng2) for _ in range(50)])
-    assert np.array_equal(s1, s2)
-
-
 # ── Brute-force equivalence ───────────────────────────────────────────────────
 
 def _brute_force(theta, n):
@@ -301,7 +290,7 @@ def test_brute_force_sampling_distribution():
     _, _, _, all_S, probs_bf = _brute_force(theta, n)
 
     M = 200_000
-    samples = np.stack([cp.sample(rng=rng) for _ in range(M)])
+    samples = np.stack([cp.sample() for _ in range(M)])
 
     # map each sample to its subset index
     S_to_idx = {s: i for i, s in enumerate(all_S)}

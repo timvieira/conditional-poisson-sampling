@@ -109,8 +109,6 @@ def run_benchmarks(quick=False):
         print(f"\n=== N={N}, n={n} ===", file=sys.stderr)
         w = rng.exponential(1.0, N)
         theta = torch.tensor(np.log(w), dtype=torch.float64)
-        sample_rng = np.random.default_rng(seed)
-
         reps = max(3, 200 // max(1, N // 50))
 
         # ── Z benchmarks ────────────────────────────────────────────
@@ -169,25 +167,25 @@ def run_benchmarks(quick=False):
         # ── Sampling benchmarks (excl. precomputation) ────────────
         # NumPy tree
         cp = ConditionalPoissonNumPy.from_weights(n, w)
-        cp.sample(rng=sample_rng)  # warmup
+        cp.sample()  # warmup
         print("  samples: NumPy tree...", file=sys.stderr, end="", flush=True)
-        ms = time_fn(lambda: cp.sample(rng=sample_rng), reps=reps)
+        ms = time_fn(lambda: cp.sample(), reps=reps)
         add("NumPy tree (1 sample)", "samples", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 
         # PyTorch tree
         cpt = ConditionalPoissonTorch.from_weights(n, w)
-        cpt.sample(rng=sample_rng)  # warmup
+        cpt.sample()  # warmup
         print("  samples: PyTorch tree...", file=sys.stderr, end="", flush=True)
-        ms = time_fn(lambda: cpt.sample(rng=sample_rng), reps=reps)
+        ms = time_fn(lambda: cpt.sample(), reps=reps)
         add("PyTorch tree (1 sample)", "samples", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 
         # Sequential (NumPy)
         cp_seq = ConditionalPoissonSequentialNumPy.from_weights(n, w)
-        cp_seq.sample(rng=sample_rng)  # warmup
+        cp_seq.sample()  # warmup
         print("  samples: Sequential...", file=sys.stderr, end="", flush=True)
-        ms = time_fn(lambda: cp_seq.sample(rng=sample_rng), reps=reps)
+        ms = time_fn(lambda: cp_seq.sample(), reps=reps)
         add("Sequential (1 sample)", "samples", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 

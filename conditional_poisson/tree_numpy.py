@@ -70,7 +70,7 @@ than the peak coefficient at degree ~subtree_size/2.
 
 from __future__ import annotations
 import numpy as np
-from typing import Optional, Union
+from typing import Union
 from scipy.signal import convolve
 
 __all__ = ["ConditionalPoissonNumPy"]
@@ -274,10 +274,7 @@ class ConditionalPoissonNumPy:
 
     # ── Sampling ──────────────────────────────────────────────────────────────
 
-    def sample(
-        self,
-        rng: Optional[Union[int, np.random.Generator]] = None,
-    ) -> np.ndarray:
+    def sample(self) -> np.ndarray:
         """
         Draw one sample via top-down quota splitting on the product tree.
 
@@ -287,8 +284,7 @@ class ConditionalPoissonNumPy:
 
         Complexity: O(N (log N)^2) to build tree [cached] + O(n log N).
         """
-        if not isinstance(rng, np.random.Generator):
-            rng = np.random.default_rng(rng)
+        rng = np.random.default_rng()
         Pc, _, tree_n, _, _ = self._build_tree()
         N, n = self.N, self.n
         selected = []

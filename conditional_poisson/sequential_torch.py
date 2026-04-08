@@ -111,7 +111,7 @@ class ConditionalPoissonSequentialTorch:
 
     # ── Sampling ─────────────────────────────────────────────────────────────
 
-    def sample(self, rng=None) -> torch.Tensor:
+    def sample(self) -> torch.Tensor:
         """
         Draw one sample via sequential scan.
 
@@ -146,8 +146,7 @@ class ConditionalPoissonSequentialTorch:
                 Bls[i] = Bls[i+1]
             B[i] = row
 
-        if not isinstance(rng, _random.Random):
-            rng = _random.Random(rng)
+        rng = _random.Random()
 
         selected = []
         k = n

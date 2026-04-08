@@ -2844,7 +2844,7 @@ Now that we've seen how the product tree works under the hood, here's the librar
 >>> cp.incl_prob
 tensor([0.3813, 0.5038, 0.3236, 0.6424, 0.3771, 0.7718])
 
->>> cp.sample(5)
+>>> torch.stack([cp.sample() for _ in range(5)])
 tensor([[0, 3, 5],
         [1, 3, 5],
         [0, 1, 5],
