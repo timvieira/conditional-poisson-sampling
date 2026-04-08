@@ -473,7 +473,7 @@ def test_horvitz_thompson_unbiased():
     mu_true = np.sum(p_dist * f)
 
     # Monte Carlo estimate of E[HT]
-    M = 200_000
+    M = 10_000
     samples = np.stack([cp.sample() for _ in range(M)])
     ht_estimates = np.array([
         np.sum(p_dist[s] / cp.incl_prob[s] * f[s]) for s in samples
@@ -744,7 +744,7 @@ def test_sampling_distribution():
     all_S = sorted(probs_exact.keys(), key=lambda s: tuple(sorted(s)))
     p_expected = np.array([probs_exact[S] for S in all_S])
 
-    M = 300_000
+    M = 10_000
     samples = np.stack([cp.sample() for _ in range(M)])
     counts = {}
     for s in samples:

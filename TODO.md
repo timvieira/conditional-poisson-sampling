@@ -66,6 +66,9 @@
 - Citations verified against actual publications
 - No hardcoded stale numbers
 
+## I WILL DIE ON THIS HILL
+- there will be no such thing as a suffix table in torch sequential.
+
 ## Repo Housekeeping
 
 ### Cleanup

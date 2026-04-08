@@ -17,6 +17,9 @@ dev = ["pytest", "scipy", "torch", "matplotlib", "cvxpy"]
 [tool.setuptools.packages.find]
 include = ["conditional_poisson*"]
 
+[tool.pytest.ini_options]
+timeout = 20
+
 [tool.blog]
 static = ["figures"]
 preprocess = ["python extract_snippets.py"]
