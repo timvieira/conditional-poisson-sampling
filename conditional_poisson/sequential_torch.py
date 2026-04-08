@@ -23,19 +23,9 @@ import torch
 class ConditionalPoissonSequentialTorch:
     """Conditional Poisson distribution via O(Nn) sequential DP (PyTorch).
 
-    Construction
-    ------------
-    ConditionalPoissonSequentialTorch(n, theta)           from log-weights
-    ConditionalPoissonSequentialTorch.from_weights(n, w)  from weights
-
-    Properties
-    ----------
-    log_normalizer   log Z(w, n)
-    incl_prob        inclusion probability vector pi
-
-    Methods
-    -------
-    sample(size)     draw samples via sequential scan, O(N) per sample
+    Constructors: __init__(n, theta), from_weights(n, w), fit(target_incl, n)
+    Properties:   incl_prob, log_normalizer, theta, n, N
+    Methods:      log_prob(S), sample(rng)
     """
 
     def __init__(self, n: int, theta):

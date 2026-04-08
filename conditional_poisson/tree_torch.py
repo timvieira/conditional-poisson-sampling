@@ -62,22 +62,9 @@ class ConditionalPoissonTorch:
 
         P(S) ∝ prod_{i in S} w_i,   |S| = n
 
-    Construction
-    ------------
-    ConditionalPoissonTorch(n, theta)                direct from log-weights
-    ConditionalPoissonTorch.from_weights(n, w)       from positive weights
-    ConditionalPoissonTorch.fit(target_incl, n)           fit to target probs
-
-    Properties
-    ----------
-    incl_prob       (N,) inclusion probabilities
-    w               (N,) weights (= exp(theta))
-    log_normalizer  log normalizing constant
-
-    Methods
-    -------
-    log_prob(S)         log-probability of subset(s)
-    sample(M)           draw M independent subsets
+    Constructors: __init__(n, theta), from_weights(n, w), fit(target_incl, n)
+    Properties:   incl_prob, log_normalizer, theta, n, N
+    Methods:      log_prob(S), sample(rng)
     """
 
     def __init__(self, n: int, theta, *, dtype=torch.float64, device=None):

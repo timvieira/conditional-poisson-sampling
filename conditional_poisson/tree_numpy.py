@@ -93,29 +93,9 @@ class ConditionalPoissonNumPy:
 
         P(S) ∝ prod_{i in S} w_i,   |S| = n
 
-    Construction
-    ------------
-    ConditionalPoissonNumPy(n, theta)           direct from log-weights theta = log(w)
-    ConditionalPoissonNumPy.from_weights(n, w)  from non-negative weights w_i
-    ConditionalPoissonNumPy.fit(target_incl, n)     moment-match to target probs
-
-    Properties  (all cached; cache invalidated when theta changes)
-    ----------
-    incl_prob       (N,) inclusion probabilities
-    w               (N,) weights (= exp(theta))
-    log_normalizer  log normalizing constant  — never overflows
-
-    Methods
-    -------
-    log_prob(S)         scalar or (M,) log-probabilities
-    sample(M, rng)      (M, n) int array of sorted subsets
-    fit_inplace(target_incl)  update theta in-place via L-BFGS; returns self
-
-    Notes
-    -----
-    - The P-tree is built once on first access and shared by pi, log_normalizer,
-      and sample.
-    - theta is zero-centered after fitting (shift-invariant distribution).
+    Constructors: __init__(n, theta), from_weights(n, w), fit(target_incl, n)
+    Properties:   incl_prob, log_normalizer, theta, n, N
+    Methods:      log_prob(S), sample(rng), fit_inplace(target_incl)
     """
 
     def __init__(self, n: int, theta: np.ndarray):
