@@ -135,13 +135,15 @@ def test_theta_setter_invalidates_cache():
 
 # ── Input validation ─────────────────────────────────────────────────────────
 
-def test_n_less_than_1_raises():
-    with pytest.raises(ValueError, match="n must be >= 1"):
-        ConditionalPoissonNumPy(0, np.zeros(5))
+def test_n_out_of_range_raises():
+    with pytest.raises(AssertionError):
+        ConditionalPoissonNumPy(-1, np.zeros(5))
+    with pytest.raises(AssertionError):
+        ConditionalPoissonNumPy(6, np.zeros(5))
 
 
 def test_N_less_than_n_raises():
-    with pytest.raises(ValueError, match="N=.*must be >= n"):
+    with pytest.raises(AssertionError):
         ConditionalPoissonNumPy(5, np.zeros(3))
 
 
@@ -151,65 +153,20 @@ def test_theta_not_1d_raises():
 
 
 def test_from_weights_negative_raises():
-    with pytest.raises(ValueError, match="all weights must be non-negative"):
+    with pytest.raises(ValueError, match="finite and positive"):
         ConditionalPoissonNumPy.from_weights(2, np.array([1.0, -1.0, 2.0]))
 
 
-def test_boundary_w_zero():
-    """w_i = 0 means item i is never selected."""
-    w = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
-    cp = ConditionalPoissonNumPy.from_weights(2, w)
-    assert cp.incl_prob[0] == 0.0
-    assert abs(cp.incl_prob.sum() - 2) < 1e-10
-    # Samples never contain item 0
-    rng = np.random.default_rng(42)
-    samples = np.stack([cp.sample(rng=rng) for _ in range(1000)])
-    assert not np.any(samples == 0)
-    # log_prob: subset containing item 0 is impossible
-    assert cp.log_prob(np.array([0, 1])) == -np.inf
-    # log_prob: valid subset
-    assert np.isfinite(cp.log_prob(np.array([1, 2])))
+def test_boundary_w_zero_rejected():
+    """w=0 is no longer supported — must raise."""
+    with pytest.raises(ValueError):
+        ConditionalPoissonNumPy.from_weights(2, np.array([0.0, 1.0, 2.0]))
 
 
-def test_boundary_w_inf():
-    """w_i = inf means item i is always selected."""
-    w = np.array([np.inf, 1.0, 2.0, 3.0, 4.0])
-    cp = ConditionalPoissonNumPy.from_weights(3, w)
-    assert cp.incl_prob[0] == 1.0
-    assert abs(cp.incl_prob.sum() - 3) < 1e-10
-    # Samples always contain item 0
-    rng = np.random.default_rng(42)
-    samples = np.stack([cp.sample(rng=rng) for _ in range(1000)])
-    assert np.all(samples[:, 0] == 0) or np.all(np.any(samples == 0, axis=1))
-    # log_prob: subset missing item 0 is impossible
-    assert cp.log_prob(np.array([1, 2, 3])) == -np.inf
-    # log_prob: valid subset
-    assert np.isfinite(cp.log_prob(np.array([0, 1, 2])))
-
-
-def test_boundary_mixed():
-    """Mix of w=0, w=inf, and finite weights."""
-    w = np.array([np.inf, 0.0, 1.0, 2.0, 3.0, np.inf, 0.0])
-    cp = ConditionalPoissonNumPy.from_weights(3, w)
-    assert cp.incl_prob[0] == 1.0
-    assert cp.incl_prob[5] == 1.0
-    assert cp.incl_prob[1] == 0.0
-    assert cp.incl_prob[6] == 0.0
-    assert abs(cp.incl_prob.sum() - 3) < 1e-10
-    # The remaining 1 item is chosen from {2, 3, 4} with weights {1, 2, 3}
-    # pi should be proportional to weights for interior items
-    interior_pi = cp.incl_prob[[2, 3, 4]]
-    assert abs(interior_pi.sum() - 1) < 1e-10
-
-
-def test_boundary_all_forced():
-    """All items determined: n items have w=inf, rest have w=0."""
-    w = np.array([np.inf, np.inf, 0.0, 0.0, 0.0])
-    cp = ConditionalPoissonNumPy.from_weights(2, w)
-    assert np.allclose(cp.incl_prob, [1, 1, 0, 0, 0])
-    rng = np.random.default_rng(42)
-    samples = np.stack([cp.sample(rng=rng) for _ in range(100)])
-    assert np.all(samples == np.array([[0, 1]]))
+def test_boundary_w_inf_rejected():
+    """w=inf is no longer supported — must raise."""
+    with pytest.raises(ValueError):
+        ConditionalPoissonNumPy.from_weights(2, np.array([np.inf, 1.0, 2.0]))
 
 
 def test_fit_bad_pi_sum_raises():

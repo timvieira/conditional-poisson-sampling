@@ -27,7 +27,7 @@
 - [x] ~~Move tests to `tests/`~~ — done
 - [ ] Add fixed-point iteration `fit` method (matching R's `UPMEpiktildefrompik`: `theta += pi_star - pi(theta)`) as an alternative to L-BFGS. Compare running time of L-BFGS vs fixed-point iteration.
 - [ ] L-BFGS fitting convergence is much slower than the old Newton-CG (24 iterations vs 5 for N=10, non-monotone). Consider restoring Newton-CG as the default optimizer (requires HVP internally, not as public API) or tuning L-BFGS parameters.
-- [ ] Remove boundary handling (w=0/inf) from `conditional_poisson/numpy.py` — forced_in/forced_out/interior/reduced instance delegation. Already removed from torch impl for simplicity; numpy should match.
+- [x] ~~Remove boundary handling (w=0/inf) from `conditional_poisson/numpy.py`~~ — done (all implementations now require finite positive weights)
 - [ ] Rename `conditional_poisson/numpy.py` → `tree_numpy.py` and `conditional_poisson/torch.py` → `tree_torch.py` (or `fft_numpy.py`/`fft_torch.py`)? The current names don't distinguish the algorithm from the sequential variants.
 - [x] ~~Remove stupid wrapper methods~~ — done (moved `compute_pi`, `forward_log_Z`, `_find_r`, poly mul into class as instance/static methods)
 - [ ]  _get_sample_cdfs look way too complicated (and potentially slow) - I suspect it can be simplified considerably.
