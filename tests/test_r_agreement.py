@@ -19,7 +19,7 @@ import sys
 import tempfile
 import unittest
 
-from conditional_poisson.numpy import ConditionalPoissonNumPy
+from conditional_poisson.tree_numpy import ConditionalPoissonNumPy
 
 
 def find_rscript():

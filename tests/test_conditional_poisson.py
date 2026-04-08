@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 from itertools import combinations
-from conditional_poisson.numpy import ConditionalPoissonNumPy
+from conditional_poisson.tree_numpy import ConditionalPoissonNumPy
 
 
 def test_forward_pass():

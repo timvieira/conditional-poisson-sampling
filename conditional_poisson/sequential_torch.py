@@ -207,7 +207,7 @@ class ConditionalPoissonSequentialTorch:
     def fit(cls, target_incl, n, *, tol=1e-7,
             dtype=torch.float64, device=None):
         """Fit to target inclusion probabilities via L-BFGS."""
-        from conditional_poisson.torch import _to_tensor
+        from conditional_poisson.tree_torch import _to_tensor
         target_incl = _to_tensor(target_incl, dtype).to(device=device)
         cp = cls(n, torch.logit(target_incl))
         cp._theta.requires_grad_(True)

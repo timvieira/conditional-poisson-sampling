@@ -19,7 +19,7 @@ Basic usage:
     print(cp.sample(10))      # draw 10 samples
 """
 
-from conditional_poisson.numpy import ConditionalPoissonNumPy
+from conditional_poisson.tree_numpy import ConditionalPoissonNumPy
 from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNumPy
 
 __all__ = [
@@ -29,7 +29,7 @@ __all__ = [
 
 # PyTorch implementations are optional (torch may not be installed)
 try:
-    from conditional_poisson.torch import ConditionalPoissonTorch
+    from conditional_poisson.tree_torch import ConditionalPoissonTorch
     __all__.append("ConditionalPoissonTorch")
 except ImportError:
     pass

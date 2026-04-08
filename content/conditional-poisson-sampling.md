@@ -3180,8 +3180,8 @@ The plots below compare wall-clock time across methods for four operations: comp
 
 Three methods for computing the normalizing constant:
 <a href="bench/bench_timing.py#dp_forward_Z" title="dp_forward_Z" class="verified" target="_blank">✓</a> DP forward pass $\mathcal{O}(Nn)$ ·
-<a href="conditional_poisson/numpy.py" title="ConditionalPoissonNumPy.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
-<a href="conditional_poisson/torch.py#_log_Z" title="ConditionalPoissonTorch._log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$
+<a href="conditional_poisson/tree_numpy.py" title="ConditionalPoissonNumPy.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
+<a href="conditional_poisson/tree_torch.py#_log_Z" title="ConditionalPoissonTorch._log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$
 
 <figure>
 <img src="../figures/timing_Z.svg" alt="Log-log plot: computing Z" style="width:100%">
@@ -3197,8 +3197,8 @@ This is the main event.  The naive approach computes each $\pip_i$ independently
 <a href="bench/bench_timing.py#tree_loo_pi" title="tree_loo_pi" class="verified" target="_blank">✓</a> $N \times$ Tree leave-one-out $\mathcal{O}(N^2 \log^2 n)$ ·
 <a href="bench/bench_samplers.py#sequential_pi" title="sequential_pi" class="verified" target="_blank">✓</a> Forward-backward DP $\mathcal{O}(Nn)$ ·
 <a href="bench/bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R `sampling` package ·
-<a href="conditional_poisson/numpy.py" title="ConditionalPoissonNumPy.incl_prob" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
-<a href="conditional_poisson/torch.py#incl_prob" title="ConditionalPoissonTorch.incl_prob" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$
+<a href="conditional_poisson/tree_numpy.py" title="ConditionalPoissonNumPy.incl_prob" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
+<a href="conditional_poisson/tree_torch.py#incl_prob" title="ConditionalPoissonTorch.incl_prob" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$
 
 <figure>
 <img src="../figures/timing_pi.svg" alt="Log-log plot: computing inclusion probabilities" style="width:100%">
@@ -3210,7 +3210,7 @@ The leave-one-out methods (gray, dashed) are $\sim\!N\times$ slower than their b
 
 Given target inclusion probabilities $\bpiptgt$, find weights $\bw$ such that $\bpip(\bw) = \bpiptgt$:
 
-<a href="conditional_poisson/numpy.py#fit" title="ConditionalPoissonNumPy.fit" class="verified" target="_blank">✓</a> Product tree + Newton-CG ·
+<a href="conditional_poisson/tree_numpy.py#fit" title="ConditionalPoissonNumPy.fit" class="verified" target="_blank">✓</a> Product tree + Newton-CG ·
 <a href="bench/bench_timing_r.R" title="UPMEpiktildefrompik" class="verified" target="_blank">✓</a> R `sampling::UPMEpiktildefrompik` (fixed-point iteration)
 
 <figure>
@@ -3222,7 +3222,7 @@ Our Newton-CG optimizer uses true Hessian-vector products computed via the produ
 ### Drawing Samples
 
 <a href="bench/bench_timing_r.R" title="UPMEqfromw + UPMEsfromq" class="verified" target="_blank">✓</a> R `sampling` (1 sample, with and without DP rebuild) ·
-<a href="conditional_poisson/numpy.py" title="ConditionalPoissonNumPy.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (with and without tree build)
+<a href="conditional_poisson/tree_numpy.py" title="ConditionalPoissonNumPy.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (with and without tree build)
 
 <figure>
 <img src="../figures/timing_samples.svg" alt="Log-log plot: drawing samples" style="width:100%">
@@ -3742,7 +3742,7 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
 
 </div>
 
-Code: [`conditional_poisson/torch.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson/torch.py)
+Code: [`conditional_poisson/tree_torch.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson/tree_torch.py)
 
 ## Application: Horvitz-Thompson Estimation
 
@@ -3841,7 +3841,7 @@ For non-diagonal $L$, the K-DPP introduces correlations between items (repulsion
 
 There are no problem-specific derivations here—each row follows from a general theorem in automatic differentiation or computer algebra.
 
-The PyTorch implementation ([`conditional_poisson/torch.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson/torch.py)) uses FFT-based polynomial multiplication with **contour radius scaling**—rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stable—achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.
+The PyTorch implementation ([`conditional_poisson/tree_torch.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson/tree_torch.py)) uses FFT-based polynomial multiplication with **contour radius scaling**—rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stable—achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.
 
 **Acknowledgment.** This post was written with extensive help from [Claude Code](https://claude.ai/claude-code)—especially the interactive widgets, which would not have been possible without it.
 

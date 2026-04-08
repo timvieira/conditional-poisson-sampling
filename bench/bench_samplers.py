@@ -13,7 +13,7 @@ This script compares:
 import numpy as np
 import time
 from itertools import combinations
-from conditional_poisson.numpy import ConditionalPoissonNumPy
+from conditional_poisson.tree_numpy import ConditionalPoissonNumPy
 from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNumPy
 
 

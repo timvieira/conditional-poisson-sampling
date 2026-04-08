@@ -16,8 +16,8 @@ import time
 
 import numpy as np
 
-from conditional_poisson.numpy import ConditionalPoissonNumPy
-from conditional_poisson.torch import ConditionalPoissonTorch
+from conditional_poisson.tree_numpy import ConditionalPoissonNumPy
+from conditional_poisson.tree_torch import ConditionalPoissonTorch
 from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNumPy
 from conditional_poisson.sequential_torch import ConditionalPoissonSequentialTorch
 
