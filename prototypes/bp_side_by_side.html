@@ -363,7 +363,7 @@ Drag the weight sliders to explore.
         }
       }
 
-      // Pi output (only on adjoint panel)
+      // Pi output at the TOP of the adjoint panel (mirrors weight sliders)
       var piBars = [], piLabels = [];
       if (mode === 'adj') {
         var pi = [];
@@ -378,29 +378,29 @@ Drag the weight sliders to explore.
           var barIdx = Math.min(1, barXs.length - 1);
           var bx = barXs[barIdx];
           var piFrac = Math.min(pi[idx], 1);
+          var piTop = topPad;
 
           var pb = svg.append('rect')
             .attr('x', bx + 2).attr('width', bW - 4).attr('rx', 2)
-            .attr('y', outputY + piBarH - piFrac * piBarH).attr('height', piFrac * piBarH)
+            .attr('y', piTop + sliderH - piFrac * sliderH).attr('height', piFrac * sliderH)
             .attr('fill', CR).attr('opacity', 0.7);
           piBars.push(pb);
 
           svg.append('text')
-            .attr('x', bx + bW/2).attr('y', outputY + piBarH - piFrac * piBarH - 3)
+            .attr('x', bx + bW/2).attr('y', piTop + sliderH - piFrac * sliderH - 2)
             .attr('text-anchor', 'middle')
             .style('font-size', '9px').style('fill', CR)
             .style('font-family', "'EB Garamond', serif")
             .text(pi[idx].toFixed(3));
 
-          // Arrow from leaf to pi
+          // Arrow from leaf up to pi bar
           svg.append('line')
-            .attr('x1', bx + bW/2).attr('y1', nd.y + nodeH + 8)
-            .attr('x2', bx + bW/2).attr('y2', outputY)
-            .attr('stroke', '#d4a0a0').attr('stroke-width', 1)
-            .attr('marker-end', 'url(#adjArrow)');
+            .attr('x1', bx + bW/2).attr('y1', nd.y)
+            .attr('x2', bx + bW/2).attr('y2', inputZoneBot)
+            .attr('stroke', '#d4a0a0').attr('stroke-width', 1);
 
-          addMathLabel(panel, bx + bW/2, outputY + piBarH - 6,
-            '$\\pi_{' + (idx+1) + '}$', {anchor:'middle', color:CR, fontSize:'13px'});
+          addMathLabel(panel, bx + bW/2, piTop + sliderH - 6,
+            '$\\pip_{' + (idx+1) + '}$', {anchor:'middle', color:CR, fontSize:'13px'});
         });
       }
 
