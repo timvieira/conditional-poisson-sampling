@@ -24,9 +24,6 @@
 - [ ] Add fixed-point iteration `fit` method (matching R's `UPMEpiktildefrompik`: `theta += pi_star - pi(theta)`) as an alternative to L-BFGS. Compare running time of L-BFGS vs fixed-point iteration.
 - [ ] L-BFGS fitting convergence is much slower than the old Newton-CG (24 iterations vs 5 for N=10, non-monotone). Consider restoring Newton-CG as the default optimizer (requires HVP internally, not as public API) or tuning L-BFGS parameters.
 
-### Sequential implementations
-- [ ] Fix numerical overflow in sequential `_get_seq_q` — the ESP recurrence operates in linear space without log-scaling, producing NaN at N ≥ 500. Affects both NumPy and Torch sequential classes.
-
 ### Benchmarks
 - [ ] Rerun `bench_timing.py` and regenerate `timing_data.json` + SVG plots (sampling data is stale after sampler rewrite)
 - [ ] Rerun `bench_timing_grid.py` and update inline 3D widget data in the article (sampling rows are stale)
@@ -55,7 +52,6 @@
 - [ ] Make sure the sampling animation widget is faithful to the implementation.
 - [ ] Several widgets overflow their containers on mobile. Fix the layout to fill viewport width on small screens, then add horizontal scroll for wide SVGs.
 - [ ] Centralize widget/layout styles into the blog's CSS (`~/projects/blog/main/content/css/blog.css`) instead of inline styles in the .md file.
-- [x] Clicking "Gradient Descent" and "Archive" in the header should navigate to the blog's archive page.
 
 ## Fidelity Audit
 
