@@ -10,6 +10,7 @@ forward table).
 """
 
 from __future__ import annotations
+from functools import cached_property
 import torch
 
 
@@ -18,7 +19,7 @@ class ConditionalPoissonSequentialTorch:
 
     Constructors: __init__(n, theta), from_weights(n, w), fit(target_incl, n)
     Properties:   incl_prob, log_normalizer, n, N, theta
-    Methods:      log_prob(S), sample()
+    Methods:      log_prob(S), sample(), clear()
     """
 
     def __init__(self, n: int, theta):
@@ -28,7 +29,6 @@ class ConditionalPoissonSequentialTorch:
         self.n = n
         self.N = len(theta)
         self.theta = theta.detach().clone()
-        self._cache: dict = {}
 
     @classmethod
     def from_weights(cls, n: int, w) -> ConditionalPoissonSequentialTorch:
@@ -37,6 +37,11 @@ class ConditionalPoissonSequentialTorch:
             raise ValueError("all weights must be finite and positive")
         return cls(n, torch.log(w))
 
+    def clear(self):
+        """Flush all cached computations."""
+        for attr in ('_E_differentiable', 'log_normalizer', 'incl_prob', '_sample_data'):
+            self.__dict__.pop(attr, None)
+
     def _build_E(self, theta):
         """Build the full ESP table E[k, n] = e_k(w[0:n]).
 
@@ -44,32 +49,34 @@ class ConditionalPoissonSequentialTorch:
         """
         N, K = self.N, self.n
         w = torch.exp(theta)
-        # Build column by column; store all columns for sampling.
         cols = [torch.zeros(K + 1, dtype=theta.dtype, device=theta.device)]
         cols[0][0] = 1.0
-        for n in range(N):
-            new_col = cols[n].clone()
-            new_col[1:] = cols[n][1:] + w[n] * cols[n][:K]
+        for i in range(N):
+            new_col = cols[i].clone()
+            new_col[1:] = cols[i][1:] + w[i] * cols[i][:K]
             cols.append(new_col)
-        E = torch.stack(cols, dim=1)  # (K+1, N+1)
+        E = torch.stack(cols, dim=1)
         return E, w
 
-    @property
+    @cached_property
     def log_normalizer(self) -> float:
-        """log Z(w, n).  O(Nn)."""
-        E, _ = self._build_E(self.theta)
+        """log Z(w, n).  O(Nn).  Does not trigger backward pass."""
+        E, _ = self._build_E(self.theta.detach())
         return float(torch.log(E[self.n, self.N]).item())
 
-    @property
+    @cached_property
     def incl_prob(self) -> torch.Tensor:
-        """Inclusion probabilities pi_i = d(log Z)/d(theta_i) via autograd."""
-        saved = self.theta
-        self.theta = saved.detach().requires_grad_(True)
-        E, _ = self._build_E(self.theta)
+        """Inclusion probabilities pi_i = d(log Z)/d(theta_i) via autograd.  O(Nn)."""
+        theta = self.theta.detach().requires_grad_(True)
+        E, _ = self._build_E(theta)
         log_Z = torch.log(E[self.n, self.N])
-        pi = torch.autograd.grad(log_Z, self.theta)[0].detach()
-        self.theta = saved
-        return pi
+        return torch.autograd.grad(log_Z, theta)[0].detach()
+
+    @cached_property
+    def _sample_data(self):
+        """Build ESP table as plain lists for fast sampling loop."""
+        E, w = self._build_E(self.theta.detach())
+        return E.tolist(), w.tolist()
 
     def sample(self) -> torch.Tensor:
         """Draw one sample by scanning items right-to-left.
@@ -78,11 +85,8 @@ class ConditionalPoissonSequentialTorch:
 
         Complexity: O(Nn) to build table [cached] + O(N).
         """
-        if "sample_data" not in self._cache:
-            E, w = self._build_E(self.theta.detach())
-            self._cache["sample_data"] = (E.tolist(), w.tolist())
-        E, w = self._cache["sample_data"]
         import random
+        E, w = self._sample_data
         N, K = self.N, self.n
         selected = []
         k = K
@@ -119,7 +123,7 @@ class ConditionalPoissonSequentialTorch:
 
         def closure():
             optimizer.zero_grad()
-            cp._cache.clear()
+            cp.clear()
             E, _ = cp._build_E(cp.theta)
             loss = torch.log(E[cp.n, cp.N]) - target_incl @ cp.theta
             loss.backward()
@@ -130,7 +134,7 @@ class ConditionalPoissonSequentialTorch:
         with torch.no_grad():
             cp.theta -= cp.theta.mean()
         cp.theta = cp.theta.detach()
-        cp._cache.clear()
+        cp.clear()
 
         return cp
 

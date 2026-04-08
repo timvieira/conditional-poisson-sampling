@@ -10,6 +10,7 @@ forward table).
 """
 
 from __future__ import annotations
+from functools import cached_property
 import numpy as np
 
 
@@ -18,7 +19,7 @@ class ConditionalPoissonSequentialNumPy:
 
     Constructors: __init__(n, theta), from_weights(n, w), fit(target_incl, n)
     Properties:   incl_prob, log_normalizer, n, N, theta
-    Methods:      log_prob(S), sample()
+    Methods:      log_prob(S), sample(), clear()
     """
 
     def __init__(self, n: int, theta: np.ndarray):
@@ -28,7 +29,6 @@ class ConditionalPoissonSequentialNumPy:
         self.n = n
         self.N = len(theta)
         self.theta = theta.copy()
-        self._cache: dict = {}
 
     @classmethod
     def from_weights(cls, n: int, w) -> ConditionalPoissonSequentialNumPy:
@@ -37,60 +37,49 @@ class ConditionalPoissonSequentialNumPy:
             raise ValueError("all weights must be finite and positive")
         return cls(n, np.log(w))
 
-    def _get_E(self):
-        """Build and cache the ESP table E[k, n+1].
+    def clear(self):
+        """Flush all cached computations."""
+        for attr in ('_E', 'log_normalizer', 'incl_prob', '_sample_data'):
+            self.__dict__.pop(attr, None)
 
-        E[k, n] = e_k(w[0:n]), the k-th elementary symmetric polynomial
-        of the first n weights.  With row-wise rescaling for stability:
+    @cached_property
+    def _E(self):
+        """Forward ESP table E[k, n] = e_k(w[0:n]).  O(Nn)."""
+        w = np.exp(self.theta)
+        N, K = self.N, self.n
+        E = np.zeros((K + 1, N + 1))
+        E[0, :] = 1.0
+        for n in range(N):
+            E[1:, n+1] = E[1:, n] + w[n] * E[:K, n]
+        return E, w
 
-            E[k, n+1] = E[k, n] + w[n] * E[k-1, n]
-
-        Scale factors sf[n] are stored per column (per item added).
-        True value: e_k(w[0:n]) = E[k, n] * prod(sf[1:n+1]).
-        """
-        if "E" not in self._cache:
-            w = np.exp(self.theta)
-            N, K = self.N, self.n
-            E = np.zeros((K + 1, N + 1))
-            E[0, :] = 1.0
-            for n in range(N):
-                E[1:, n+1] = E[1:, n] + w[n] * E[:K, n]
-            self._cache["E"] = (E, w)
-        return self._cache["E"]
-
-    @property
+    @cached_property
     def log_normalizer(self) -> float:
-        """log Z(w, n).  O(Nn), cached."""
-        if "log_Z" not in self._cache:
-            E, _ = self._get_E()
-            self._cache["log_Z"] = float(np.log(E[self.n, self.N]))
-        return self._cache["log_Z"]
+        """log Z(w, n).  O(Nn).  Does not trigger backward pass."""
+        E, _ = self._E
+        return float(np.log(E[self.n, self.N]))
 
-    @property
+    @cached_property
     def incl_prob(self) -> np.ndarray:
-        """Inclusion probabilities via reverse-mode AD on the ESP DP.
+        """Inclusion probabilities via reverse-mode AD on the ESP DP.  O(Nn)."""
+        E, w = self._E
+        N, K = self.N, self.n
+        Z = E[K, N]
+        dE = np.zeros((K + 1, N + 1))
+        dw = np.zeros(N)
+        dE[K, N] = 1.0
+        for n in reversed(range(N)):
+            for k in range(K, 0, -1):
+                dE[k, n] += dE[k, n+1]
+                dw[n] += dE[k, n+1] * E[k-1, n]
+                dE[k-1, n] += dE[k, n+1] * w[n]
+        return w * dw / Z
 
-        Forward: E[k, n+1] = E[k, n] + w[n] * E[k-1, n]
-        Backward: dZ/dw[n] = sum_k dE[k, n+1] * E[k-1, n]
-        Inclusion: pi[n] = w[n] * dZ/dw[n] / Z
-        """
-        if "pi" not in self._cache:
-            E, w = self._get_E()
-            N, K = self.N, self.n
-            Z = E[K, N]
-
-            # Reverse-mode AD on the ESP recurrence
-            dE = np.zeros((K + 1, N + 1))
-            dw = np.zeros(N)
-            dE[K, N] = 1.0
-            for n in reversed(range(N)):
-                for k in range(K, 0, -1):
-                    dE[k, n] += dE[k, n+1]
-                    dw[n] += dE[k, n+1] * E[k-1, n]
-                    dE[k-1, n] += dE[k, n+1] * w[n]
-
-            self._cache["pi"] = w * dw / Z
-        return self._cache["pi"].copy()
+    @cached_property
+    def _sample_data(self):
+        """Convert ESP table to plain lists for fast sampling loop."""
+        E, w = self._E
+        return E.tolist(), w.tolist()
 
     def sample(self) -> np.ndarray:
         """Draw one sample by scanning items right-to-left.
@@ -99,17 +88,15 @@ class ConditionalPoissonSequentialNumPy:
 
         Complexity: O(Nn) to build table [cached] + O(N).
         """
-        if "sample_data" not in self._cache:
-            E, w = self._get_E()
-            self._cache["sample_data"] = (E.tolist(), w.tolist())
-        E, w = self._cache["sample_data"]
+        import random
+        E, w = self._sample_data
         N, K = self.N, self.n
         selected = []
         k = K
         for i in reversed(range(N)):
             if k == 0:
                 break
-            if np.random.random() * E[k][i+1] <= w[i] * E[k-1][i]:
+            if random.random() * E[k][i+1] <= w[i] * E[k-1][i]:
                 selected.append(i)
                 k -= 1
         selected.reverse()
@@ -131,7 +118,7 @@ class ConditionalPoissonSequentialNumPy:
 
         def neg_ll_and_grad(theta):
             obj.theta = theta
-            obj._cache.clear()
+            obj.clear()
             pi = obj.incl_prob
             loss = obj.log_normalizer - float(target_incl @ theta)
             grad = pi - target_incl
