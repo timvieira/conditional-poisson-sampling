@@ -1,19 +1,12 @@
 """
-conditional_poisson_sequential_torch.py
-=======================================
-
-Conditional Poisson distribution using O(Nn) sequential DP (PyTorch).
+Sequential O(Nn) implementation of the conditional Poisson distribution (PyTorch).
 
     P(S) ∝ prod_{i in S} w_i,   |S| = n
 
-This implementation uses the weighted Pascal recurrence for all computations:
-normalizing constant, inclusion probabilities, and sampling.  It is simpler
-and faster than the product-tree implementation for small n, but scales as
-O(Nn) rather than O(N log^2 n).
-
-The sampling algorithm builds a table of sequential conditional probabilities
-q[i, k] = P(include item i | k items still needed from items i..N-1), then
-draws one sample by scanning items and flipping biased coins.
+Uses the elementary symmetric polynomial (ESP) recurrence for all
+computations: normalizing constant, inclusion probabilities (via
+torch.autograd on the DP), and sampling (right-to-left scan on the
+forward table).
 """
 
 from __future__ import annotations
@@ -24,65 +17,55 @@ class ConditionalPoissonSequentialTorch:
     """Conditional Poisson distribution via O(Nn) sequential DP (PyTorch).
 
     Constructors: __init__(n, theta), from_weights(n, w), fit(target_incl, n)
-    Properties:   incl_prob, log_normalizer, theta, n, N
-    Methods:      log_prob(S), sample(rng)
+    Properties:   incl_prob, log_normalizer, n, N, theta
+    Methods:      log_prob(S), sample()
     """
 
     def __init__(self, n: int, theta):
         theta = torch.as_tensor(theta, dtype=torch.float64)
-        if theta.ndim != 1:
-            raise ValueError(f"theta must be 1-D, got shape {theta.shape}")
-        N = len(theta)
-        if n < 0 or n > N:
-            raise ValueError(f"n={n} out of range [0, {N}]")
+        assert theta.ndim == 1
+        assert 0 <= n <= len(theta)
         self.n = n
-        self.N = N
+        self.N = len(theta)
         self.theta = theta.detach().clone()
         self._cache: dict = {}
 
     @classmethod
     def from_weights(cls, n: int, w) -> ConditionalPoissonSequentialTorch:
         w = torch.as_tensor(w, dtype=torch.float64)
-        if torch.any(w < 0):
-            raise ValueError("weights must be non-negative")
-        if torch.any(w == 0) or torch.any(torch.isinf(w)):
-            raise ValueError("sequential DP requires finite positive weights")
+        if torch.any(w <= 0) or not torch.isfinite(w).all():
+            raise ValueError("all weights must be finite and positive")
         return cls(n, torch.log(w))
-
-    # ── Log normalizer ───────────────────────────────────────────────────────
 
     def _log_Z(self):
         """Compute log Z as a differentiable scalar tensor.
 
-        Uses the weighted Pascal recurrence F[k] += q[i] * F[k-1]
-        with uniform row-wise rescaling for numerical stability.
+        ESP recurrence: E[k, n+1] = E[k, n] + w[n] * E[k-1, n]
+        with per-column rescaling. Scale factors stored for log Z.
         """
         theta = self.theta
-        N, n = self.N, self.n
-        log_gm = theta.mean()
-        q = torch.exp(theta - log_gm)
+        N, K = self.N, self.n
+        w = torch.exp(theta)
 
-        F = torch.zeros(n + 1, dtype=theta.dtype, device=theta.device)
-        F[0] = 1.0
+        E = torch.zeros(K + 1, dtype=theta.dtype, device=theta.device)
+        E[0] = 1.0
         sf = torch.ones(N, dtype=theta.dtype, device=theta.device)
 
-        for i in range(N):
-            new_F = F.clone()
-            new_F[1:] = F[1:] + q[i] * F[:n]
-            mx = new_F.max()
+        for n in range(N):
+            new_E = E.clone()
+            new_E[1:] = E[1:] + w[n] * E[:K]
+            mx = new_E.max()
             if mx > 0:
-                new_F = new_F / mx
-                sf[i] = mx
-            F = new_F
+                new_E = new_E / mx
+                sf[n] = mx
+            E = new_E
 
-        return torch.log(F[n]) + sf.log().sum() + n * log_gm
+        return torch.log(E[K]) + sf.log().sum()
 
     @property
     def log_normalizer(self) -> float:
         """log Z(w, n).  O(Nn)."""
         return self._log_Z().item()
-
-    # ── Inclusion probabilities ──────────────────────────────────────────────
 
     @property
     def incl_prob(self) -> torch.Tensor:
@@ -92,72 +75,56 @@ class ConditionalPoissonSequentialTorch:
         log_Z = self._log_Z()
         pi = torch.autograd.grad(log_Z, self.theta)[0].detach()
         self.theta = saved
-        return pi.clone()
+        return pi
 
-    # ── Sampling ─────────────────────────────────────────────────────────────
-
-    def _get_suffix_table(self):
-        """Build and cache the suffix ESP table for sampling.
-
-        B[i] is the uniformly-scaled ESP vector for items i..N-1.
-        true value: e_k(q[i:N]) = B[i,k] * exp(Bls[i]).
-        """
-        if "suffix" not in self._cache:
-            N, n = self.N, self.n
-            theta = self.theta.detach()
-            log_gm = theta.mean()
-            q = torch.exp(theta - log_gm)
-
-            B = torch.zeros(N + 1, n + 1, dtype=theta.dtype)
-            scale_factor = torch.ones(N + 1, dtype=theta.dtype)
-            B[N, 0] = 1.0
-            for i in range(N - 1, -1, -1):
-                B[i] = B[i+1].clone()
-                B[i, 1:] += q[i] * B[i+1, :n]
-                mx = B[i].max().item()
+    def _get_E_for_sampling(self):
+        """Build and cache the ESP table for sampling (detached, as lists)."""
+        if "sample_E" not in self._cache:
+            w = torch.exp(self.theta).detach()
+            N, K = self.N, self.n
+            E = torch.zeros(K + 1, N + 1, dtype=self.theta.dtype)
+            sf = torch.ones(N + 1, dtype=self.theta.dtype)
+            E[0, :] = 1.0
+            for n in range(N):
+                E[1:, n+1] = E[1:, n] + w[n] * E[:K, n]
+                mx = E[:, n+1].max().item()
                 if mx > 0:
-                    B[i] /= mx
-                    scale_factor[i] = mx
-            self._cache["suffix"] = (q, B, scale_factor)
-        return self._cache["suffix"]
+                    E[:, n+1] /= mx
+                    sf[n+1] = mx
+            self._cache["sample_E"] = (
+                E.tolist(), sf.tolist(), w.tolist()
+            )
+        return self._cache["sample_E"]
 
     def sample(self) -> torch.Tensor:
-        """
-        Draw one sample via sequential scan.
+        """Draw one sample by scanning items right-to-left.
 
-        Complexity: O(Nn) to build suffix table [cached] + O(N).
+        P(include i) = w[i] * E[k-1, i] / (E[k, i+1] * sf[i+1])
+
+        Complexity: O(Nn) to build table [cached] + O(N).
         """
-        if "sample_data" not in self._cache:
-            q, B, sf = self._get_suffix_table()
-            self._cache["sample_data"] = (
-                q.tolist(), B.tolist(), sf.tolist()
-            )
-        q, B, sf = self._cache["sample_data"]
-        N, n = self.N, self.n
         import random
+        E, sf, w = self._get_E_for_sampling()
+        N, K = self.N, self.n
         selected = []
-        k = n
-        for i in range(N):
+        k = K
+        for i in reversed(range(N)):
             if k == 0:
                 break
-            prob = q[i] * B[i+1][k-1] / (B[i][k] * sf[i])
+            prob = w[i] * E[k-1][i] / (E[k][i+1] * sf[i+1])
             if random.random() < prob:
                 selected.append(i)
                 k -= 1
+        selected.reverse()
         return torch.tensor(selected, dtype=torch.long)
-
-    # ── Log probability ───────────────────────────────────────────────────────
 
     def log_prob(self, S) -> float:
         """log P(S) = sum_{i in S} theta_i - log Z."""
         S = torch.as_tensor(S, dtype=torch.long)
         return float(self.theta[S].sum() - self.log_normalizer)
 
-    # ── Fitting ──────────────────────────────────────────────────────────────
-
     @classmethod
-    def fit(cls, target_incl, n, *, tol=1e-7,
-            dtype=torch.float64, device=None):
+    def fit(cls, target_incl, n, *, tol=1e-7, dtype=torch.float64, device=None):
         """Fit to target inclusion probabilities via L-BFGS."""
         from conditional_poisson.tree_torch import _to_tensor
         target_incl = _to_tensor(target_incl, dtype).to(device=device)
