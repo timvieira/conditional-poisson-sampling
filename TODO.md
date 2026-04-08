@@ -44,7 +44,13 @@
 
 ## Widget UX
 
-- [ ] Inclusion probability widget: hard to distinguish forward values from adjoint (backward) values. Explore different layouts. Also, inclusion probabilities appear at the bottom rather than the top—keep the forward-value + backward-value visual metaphor consistent.
+- [ ] Inclusion probability widget redesign:
+  - [x] Problem: forward and adjoint values are interleaved in the same node boxes, making it hard to parse
+  - [ ] **Side-by-side trees**: forward pass (blue) on the left, backward pass (purple) on the right. Same layout, nodes correspond visually. Simplest win.
+  - [ ] **Animate the two passes**: show forward first, then backward flowing back, rather than everything at once
+  - [ ] **Highlight on hover**: when hovering over a pi_i, highlight the path from root adjoint down to that leaf
+  - [ ] **Simplify node labels**: show the key coefficient (e.g., c_n for the root) prominently, with the full histogram as supporting detail
+  - [ ] Move inclusion probabilities to the top (near the leaves they come from) rather than the bottom
 - [ ] Scrutinize the little histograms in the sampling animation. What are they supposed to be? Why do they appear to change after sampling?
 - [ ] Make sure the sampling animation widget is faithful to the implementation.
 - [ ] Several widgets overflow their containers on mobile. Fix the layout to fill viewport width on small screens, then add horizontal scroll for wide SVGs.

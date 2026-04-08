@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Backprop Visualization — Side-by-Side Prototype</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+body { font-family: system-ui, sans-serif; margin: 20px; background: #f8f9fa; }
+h2 { margin-top: 30px; }
+.container { display: flex; gap: 40px; align-items: flex-start; }
+.panel { background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; }
+.panel h3 { margin-top: 0; text-align: center; }
+.controls { margin-bottom: 20px; }
+.controls label { margin-right: 16px; }
+</style>
+</head>
+<body>
+
+<h2>Backprop on the Product Tree — Side-by-Side</h2>
+
+<div class="controls">
+  N = <input type="number" id="inputN" value="4" min="2" max="8" style="width:40px">
+  &ensp; n = <input type="number" id="inputn" value="2" min="0" max="8" style="width:40px">
+  &ensp;
+  <span id="sliders"></span>
+</div>
+
+<div class="container">
+  <div class="panel">
+    <h3 style="color:#5b9bd5">Forward Pass</h3>
+    <div id="forward-tree"></div>
+  </div>
+  <div class="panel">
+    <h3 style="color:#7b2d8e">Backward Pass (Adjoints)</h3>
+    <div id="backward-tree"></div>
+  </div>
+</div>
+
+<div id="pi-output" style="margin-top: 20px;"></div>
+
+<script>
+(function() {
+  var CW = '#5b9bd5', CA = '#7b2d8e', CWEIGHT = '#d4a24e', CPI = '#c0504d';
+  var WMAX = 3;
+
+  // --- Core math ---
+  function polyMul(a, b) {
+    var out = new Array(a.length + b.length - 1).fill(0);
+    for (var i = 0; i < a.length; i++)
+      for (var j = 0; j < b.length; j++)
+        out[i + j] += a[i] * b[j];
+    return out;
+  }
+
+  function buildTree(w, n) {
+    var N = w.length;
+    var leaves = w.map(function(wi, i) {
+      return { poly: [1, wi], leaf: true, idx: i };
+    });
+    // Pad to power of 2
+    var S = 1; while (S < N) S <<= 1;
+    for (var i = N; i < S; i++) leaves.push({ poly: [1], pad: true });
+
+    var allLevels = [leaves];
+    var level = leaves;
+    while (level.length > 1) {
+      var next = [];
+      for (var i = 0; i < level.length; i += 2) {
+        var L = level[i], R = level[i + 1];
+        var p = polyMul(L.poly, R.poly);
+        if (p.length > n + 1) p = p.slice(0, n + 1);
+        next.push({ poly: p, left: L, right: R });
+      }
+      allLevels.push(next);
+      level = next;
+    }
+    return { root: level[0], levels: allLevels };
+  }
+
+  function crossCorr(parentAdj, siblingPoly, maxLen) {
+    var out = new Array(maxLen).fill(0);
+    for (var j = 0; j < maxLen; j++)
+      for (var k = 0; k < siblingPoly.length; k++)
+        if (j + k < parentAdj.length)
+          out[j] += parentAdj[j + k] * siblingPoly[k];
+    return out;
+  }
+
+  function backprop(tree, n) {
+    var rt = tree.root;
+    var Z = rt.poly[Math.min(n, rt.poly.length - 1)] || 0;
+    var adjLen = Math.min(rt.poly.length, n + 1);
+    rt.adj = new Array(adjLen).fill(0);
+    if (n < adjLen && Z > 0) rt.adj[n] = 1 / Z;
+    (function walk(nd) {
+      if (nd.leaf || !nd.left) return;
+      var left = nd.left, right = nd.right;
+      left.adj = crossCorr(nd.adj, right.poly, Math.min(left.poly.length, n + 1));
+      right.adj = crossCorr(nd.adj, left.poly, Math.min(right.poly.length, n + 1));
+      walk(left); walk(right);
+    })(rt);
+    return Z;
+  }
+
+  // --- Rendering ---
+  var bW = 28, bH = 60, bGap = 4, nodePad = 12, vGap = 30, hGap = 20;
+
+  function renderTree(container, levels, mode, n, w) {
+    // mode = 'forward' or 'backward'
+    d3.select(container).selectAll('*').remove();
+    var depth = levels.length;
+    var leafCount = levels[0].length;
+
+    function getCoeffs(nd) {
+      if (mode === 'forward') return nd.poly.slice(0, n + 1);
+      return (nd.adj || []).slice(0, n + 1);
+    }
+    var color = mode === 'forward' ? CW : CA;
+
+    function nodeW(nd) {
+      if (nd.pad) return 0;
+      var nc = getCoeffs(nd).length;
+      return nc * (bW + bGap) - bGap + nodePad;
+    }
+
+    var leafSpacing = 0;
+    levels[0].forEach(function(nd) {
+      var ww = nodeW(nd) + hGap;
+      if (ww > leafSpacing) leafSpacing = ww;
+    });
+    leafSpacing = Math.max(leafSpacing, bW + hGap + 10);
+
+    var nodeH = bH + nodePad;
+    var svgW = Math.max(250, leafCount * leafSpacing + 40);
+    var svgH = depth * (nodeH + vGap) + 40;
+
+    var svg = d3.select(container).append('svg')
+      .attr('width', svgW).attr('height', svgH)
+      .style('display', 'block');
+
+    // Position nodes
+    for (var i = 0; i < leafCount; i++) {
+      levels[0][i].x = 20 + i * leafSpacing + leafSpacing / 2;
+      levels[0][i].y = 20;
+    }
+    for (var li = 1; li < depth; li++) {
+      levels[li].forEach(function(nd) {
+        nd.x = (nd.left.x + (nd.right ? nd.right.x : nd.left.x)) / 2;
+        nd.y = 20 + li * (nodeH + vGap);
+      });
+    }
+
+    // Edges
+    for (var li = 1; li < depth; li++) {
+      levels[li].forEach(function(nd) {
+        [nd.left, nd.right].forEach(function(child) {
+          if (!child || child.pad) return;
+          svg.append('line')
+            .attr('x1', child.x).attr('y1', child.y + nodeH)
+            .attr('x2', nd.x).attr('y2', nd.y)
+            .attr('stroke', '#ddd').attr('stroke-width', 1.5);
+        });
+      });
+    }
+
+    // Find max value for bar scaling
+    var maxVal = 0;
+    levels.forEach(function(lev) {
+      lev.forEach(function(nd) {
+        if (nd.pad) return;
+        getCoeffs(nd).forEach(function(v) { if (v > maxVal) maxVal = v; });
+      });
+    });
+    if (maxVal === 0) maxVal = 1;
+
+    // Nodes
+    levels.forEach(function(lev) {
+      lev.forEach(function(nd) {
+        if (nd.pad) return;
+        var coeffs = getCoeffs(nd);
+        var nw = nodeW(nd);
+        var g = svg.append('g').attr('transform',
+          'translate(' + (nd.x - nw/2) + ',' + nd.y + ')');
+
+        g.append('rect').attr('width', nw).attr('height', nodeH)
+          .attr('rx', 4).attr('fill', '#f8f9fa').attr('stroke', '#e0e0e0');
+
+        var x0 = nodePad / 2;
+        coeffs.forEach(function(v, k) {
+          var h = Math.max(1, (v / maxVal) * (bH - 12));
+          g.append('rect')
+            .attr('x', x0 + k * (bW + bGap))
+            .attr('y', nodePad/2 + (bH - 12) - h)
+            .attr('width', bW).attr('height', h)
+            .attr('fill', color).attr('rx', 2).attr('opacity', 0.8);
+          g.append('text')
+            .attr('x', x0 + k * (bW + bGap) + bW/2)
+            .attr('y', nodePad/2 - 2)
+            .attr('text-anchor', 'middle').attr('font-size', '9px')
+            .attr('fill', '#666')
+            .text(v.toFixed(2));
+        });
+
+        // Label for root in backward mode
+        if (mode === 'backward' && !nd.left && !nd.right) {
+          // leaf
+        }
+      });
+    });
+
+    // In backward mode, label the seed at root
+    if (mode === 'backward') {
+      var root = levels[depth - 1][0];
+      svg.append('text')
+        .attr('x', root.x).attr('y', root.y - 8)
+        .attr('text-anchor', 'middle').attr('font-size', '11px')
+        .attr('fill', CA).attr('font-style', 'italic')
+        .text('seed: c\u0304_n = 1/Z');
+    }
+
+    return svg;
+  }
+
+  function renderPi(w, levels, n) {
+    var container = d3.select('#pi-output');
+    container.selectAll('*').remove();
+    var N = w.length;
+    var pi = [];
+    for (var i = 0; i < N; i++) {
+      var leaf = levels[0][i];
+      pi.push(leaf.adj && leaf.adj.length > 1 ? w[i] * leaf.adj[1] : 0);
+    }
+
+    var div = container.append('div').style('display', 'flex').style('gap', '30px')
+      .style('margin-top', '10px');
+    pi.forEach(function(p, i) {
+      var cell = div.append('div').style('text-align', 'center');
+      var barH = Math.max(2, p * 80);
+      cell.append('div').style('font-size', '12px').style('color', '#666').text(p.toFixed(3));
+      cell.append('div')
+        .style('width', '30px').style('height', barH + 'px')
+        .style('background', CPI).style('border-radius', '3px')
+        .style('margin', '4px auto');
+      cell.append('div').style('font-size', '13px').style('font-weight', 'bold')
+        .html('&pi;<sub>' + (i+1) + '</sub>');
+    });
+  }
+
+  // --- Controls & rebuild ---
+  var N = 4, n = 2;
+  var w = [0.5, 1.2, 0.3, 1.0];
+
+  function rebuild() {
+    var tree = buildTree(w, n);
+    var Z = backprop(tree, n);
+    renderTree('#forward-tree', tree.levels, 'forward', n, w);
+    renderTree('#backward-tree', tree.levels, 'backward', n, w);
+    renderPi(w, tree.levels, n);
+  }
+
+  // Weight sliders
+  var sliderDiv = d3.select('#sliders');
+  w.forEach(function(wi, i) {
+    sliderDiv.append('label').text('w' + (i+1) + ': ');
+    sliderDiv.append('input')
+      .attr('type', 'range').attr('min', 0.1).attr('max', WMAX).attr('step', 0.1)
+      .attr('value', wi).style('width', '80px')
+      .on('input', function() { w[i] = +this.value; rebuild(); });
+    sliderDiv.append('span').text('  ');
+  });
+
+  d3.select('#inputN').on('change', function() {
+    N = Math.max(2, Math.min(8, +this.value));
+    w = []; for (var i = 0; i < N; i++) w.push(1.0);
+    d3.select('#sliders').selectAll('*').remove();
+    w.forEach(function(wi, i) {
+      d3.select('#sliders').append('label').text('w' + (i+1) + ': ');
+      d3.select('#sliders').append('input')
+        .attr('type', 'range').attr('min', 0.1).attr('max', WMAX).attr('step', 0.1)
+        .attr('value', wi).style('width', '80px')
+        .on('input', function() { w[i] = +this.value; rebuild(); });
+      d3.select('#sliders').append('span').text('  ');
+    });
+    rebuild();
+  });
+  d3.select('#inputn').on('change', function() {
+    n = Math.max(0, Math.min(N, +this.value)); rebuild();
+  });
+
+  rebuild();
+})();
+</script>
+
+</body>
+</html>
