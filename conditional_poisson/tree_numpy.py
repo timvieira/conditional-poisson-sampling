@@ -107,7 +107,7 @@ class ConditionalPoissonNumPy:
 
         self.n      = int(n)
         self.N      = len(theta)
-        self._theta = theta.copy()
+        self.theta = theta.copy()
         self._cache: dict = {}
 
     # ── Constructors ──────────────────────────────────────────────────────────
@@ -149,18 +149,6 @@ class ConditionalPoissonNumPy:
         obj.fit_inplace(target_incl, tol=tol, max_iter=max_iter, verbose=verbose)
         return obj
 
-    # ── Parameters ───────────────────────────────────────────────────────────
-
-    @property
-    def theta(self) -> np.ndarray: return self._theta
-
-    @theta.setter
-    def theta(self, value):
-        value = np.asarray(value, float)
-        if len(value) != self.N:
-            raise ValueError(f"len(theta)={len(value)} != N={self.N}")
-        self.__init__(self.n, value)
-
     # ── Internal: scaled polynomial arithmetic ─────────────────────────────────
 
     def _scale(self, c):
@@ -186,8 +174,8 @@ class ConditionalPoissonNumPy:
         """
         if "tree" not in self._cache:
             N, n = self.N, self.n
-            log_gm = float(np.mean(self._theta))
-            q_s = np.exp(self._theta - log_gm)
+            log_gm = float(np.mean(self.theta))
+            q_s = np.exp(self.theta - log_gm)
 
             tree_n = 1
             while tree_n < N:
@@ -278,7 +266,7 @@ class ConditionalPoissonNumPy:
         """
         S   = np.asarray(S)
         lz  = self.log_normalizer
-        th  = self._theta
+        th  = self.theta
         if S.dtype == bool:
             return (th @ S.T - lz) if S.ndim == 2 else float(th[S].sum() - lz)
         else:
@@ -362,7 +350,8 @@ class ConditionalPoissonNumPy:
         iter_count = [0]
 
         def neg_ll_and_grad(theta):
-            self.theta = theta  # clears cache
+            self.theta = theta
+            self._cache.clear()
             pi = self.incl_prob
             loss = self.log_normalizer - float(np.dot(target_incl, theta))
             grad = pi - target_incl
@@ -381,6 +370,7 @@ class ConditionalPoissonNumPy:
         theta = result.x
         theta -= theta.mean()   # zero-center (shift-invariant)
         self.theta = theta
+        self._cache.clear()
         return self
 
     def __repr__(self) -> str:

@@ -39,7 +39,6 @@ Pure PyTorch internally — no numpy or scipy dependency.
 
 import torch
 import torch.nn.functional as F
-import numpy as np
 import math
 from typing import Union
 
@@ -69,9 +68,9 @@ class ConditionalPoissonTorch:
 
     def __init__(self, n: int, theta, *, dtype=torch.float64, device=None):
         """Construct from log-weights theta_i = log(w_i)."""
-        self._theta = _to_tensor(theta, dtype).detach().clone().to(device=device)
+        self.theta = _to_tensor(theta, dtype).detach().clone().to(device=device)
         self.n = int(n)
-        self.N = len(self._theta)
+        self.N = len(self.theta)
         assert 0 <= self.n <= self.N, f"n={self.n} must be in [0, {self.N}]"
 
     # ── Constructors ──────────────────────────────────────────────────────────
@@ -108,13 +107,13 @@ class ConditionalPoissonTorch:
         """
         target_incl = _to_tensor(target_incl, dtype).to(device=device)
         cp = cls(n, torch.logit(target_incl), dtype=dtype, device=device, **kw)
-        cp._theta.requires_grad_(True)
+        cp.theta.requires_grad_(True)
 
         # L-BFGS (Nocedal & Wright, Ch. 7): memory m, Wolfe line search.
         # The gradient is π(θ) - π*, so tolerance_grad = tol stops
         # when max|π - π*| ≤ tol.
         optimizer = torch.optim.LBFGS(
-            [cp._theta],
+            [cp.theta],
             max_iter=200,
             history_size=5,
             line_search_fn='strong_wolfe',
@@ -124,23 +123,19 @@ class ConditionalPoissonTorch:
 
         def closure():
             optimizer.zero_grad()
-            loss = cp._log_Z() - target_incl @ cp._theta
+            loss = cp._log_Z() - target_incl @ cp.theta
             loss.backward()
             return loss
 
         optimizer.step(closure)
 
         with torch.no_grad():
-            cp._theta -= cp._theta.mean()   # zero-center (shift-invariant)
-        cp._theta = cp._theta.detach()
+            cp.theta -= cp.theta.mean()   # zero-center (shift-invariant)
+        cp.theta = cp.theta.detach()
 
         return cp
 
     # ── Properties ────────────────────────────────────────────────────────────
-
-    @property
-    def theta(self) -> torch.Tensor:
-        return self._theta.clone()
 
     @property
     def incl_prob(self) -> torch.Tensor:
@@ -151,11 +146,11 @@ class ConditionalPoissonTorch:
         cost is O(1)x the forward pass.  Griewank-Walther guarantees the numerical
         stability is inherited from the forward pass.
         """
-        saved = self._theta
-        self._theta = saved.detach().requires_grad_(True)
+        saved = self.theta
+        self.theta = saved.detach().requires_grad_(True)
         log_Z = self._log_Z()
-        pi = torch.autograd.grad(log_Z, self._theta)[0].detach()
-        self._theta = saved
+        pi = torch.autograd.grad(log_Z, self.theta)[0].detach()
+        self.theta = saved
         return pi
 
     @property
@@ -172,7 +167,7 @@ class ConditionalPoissonTorch:
         S: (n,) or (M, n) int tensor, or (N,) or (M, N) bool tensor.
         """
         S = _to_tensor(S, torch.long) if not isinstance(S, torch.Tensor) else S
-        th = self._theta.detach()
+        th = self.theta.detach()
         lz = self.log_normalizer
 
         if S.dtype == torch.bool:
@@ -198,9 +193,6 @@ class ConditionalPoissonTorch:
         tree, tree_n, _, _ = self._build_tree(store=True)
         N, n = self.N, self.n
 
-        if not isinstance(rng, np.random.Generator):
-            rng = np.random.default_rng(rng)
-
         selected = []
         stack = [(1, n)]
         while stack:
@@ -211,14 +203,12 @@ class ConditionalPoissonTorch:
                 if node - tree_n < N:
                     selected.append(node - tree_n)
                 continue
-            L = tree[2 * node].detach().numpy()
-            R = tree[2 * node + 1].detach().numpy()
-            Lp = np.pad(L, (0, max(0, k + 1 - len(L))))
-            Rp = np.pad(R, (0, max(0, k + 1 - len(R))))
-            pmf = Lp[:k+1] * Rp[k::-1]
-            cdf = np.cumsum(pmf)
-            cdf /= cdf[-1]
-            j = int(np.searchsorted(cdf, rng.random()))
+            L = tree[2 * node].detach()
+            R = tree[2 * node + 1].detach()
+            Lp = F.pad(L, (0, max(0, k + 1 - len(L))))
+            Rp = F.pad(R, (0, max(0, k + 1 - len(R))))
+            pmf = Lp[:k+1] * torch.flip(Rp[:k+1], [0])
+            j = int(torch.multinomial(pmf, 1))
             stack.append((2 * node + 1, k - j))
             stack.append((2 * node, j))
         selected.sort()
@@ -237,7 +227,7 @@ class ConditionalPoissonTorch:
         """
         # Work in log-space: let t = log(r), solve g(t) = sum p_i(t) - n = 0
         # where p_i(t) = w_i*exp(t) / (1 + w_i*exp(t)) = sigmoid(log(w_i) + t)
-        log_w = self._theta.detach().double()
+        log_w = self.theta.detach().double()
         n = self.n
 
         t = -torch.median(log_w).item()
@@ -312,7 +302,7 @@ class ConditionalPoissonTorch:
         """
         n = self.n
         N = self.N
-        theta = self._theta
+        theta = self.theta
         dtype = theta.dtype
         device = theta.device
 

@@ -37,7 +37,7 @@ class ConditionalPoissonSequentialTorch:
             raise ValueError(f"n={n} out of range [0, {N}]")
         self.n = n
         self.N = N
-        self._theta = theta.detach().clone()
+        self.theta = theta.detach().clone()
         self._cache: dict = {}
 
     @classmethod
@@ -49,11 +49,6 @@ class ConditionalPoissonSequentialTorch:
             raise ValueError("sequential DP requires finite positive weights")
         return cls(n, torch.log(w))
 
-    # ── Properties ───────────────────────────────────────────────────────────
-
-    @property
-    def theta(self) -> torch.Tensor: return self._theta
-
     # ── Log normalizer ───────────────────────────────────────────────────────
 
     def _log_Z(self):
@@ -64,7 +59,7 @@ class ConditionalPoissonSequentialTorch:
         with row-wise renormalization for numerical stability.
         log Z = log|F[N, n]| + cumulative_log_scale + n * log(geometric_mean).
         """
-        theta = self._theta
+        theta = self.theta
         N, n = self.N, self.n
         w = torch.exp(theta)
 
@@ -107,64 +102,52 @@ class ConditionalPoissonSequentialTorch:
     @property
     def incl_prob(self) -> torch.Tensor:
         """Inclusion probabilities pi_i = d(log Z)/d(theta_i) via autograd."""
-        saved = self._theta
-        self._theta = saved.detach().requires_grad_(True)
+        saved = self.theta
+        self.theta = saved.detach().requires_grad_(True)
         log_Z = self._log_Z()
-        pi = torch.autograd.grad(log_Z, self._theta)[0].detach()
-        self._theta = saved
+        pi = torch.autograd.grad(log_Z, self.theta)[0].detach()
+        self.theta = saved
         return pi.clone()
 
     # ── Sampling ─────────────────────────────────────────────────────────────
 
-    def _get_backward_table(self):
-        """Build and cache the backward DP table for sampling.
-
-        B[i, k] * exp(Bls[i]) = e_k(q[i:N]), the k-th ESP of scaled
-        weights from item i onward.  q = w / exp(mean(theta)).
-        """
-        if "backward" not in self._cache:
-            N, n = self.N, self.n
-            theta = self._theta.detach()
-            log_gm = theta.mean()
-            q = torch.exp(theta - log_gm)
-
-            B = torch.zeros(N + 1, n + 1, dtype=theta.dtype)
-            Bls = torch.zeros(N + 1, dtype=theta.dtype)
-            B[N, 0] = 1.0
-            for i in range(N - 1, -1, -1):
-                row = torch.zeros(n + 1, dtype=theta.dtype)
-                row[0] = 1.0
-                if n >= 1:
-                    row[1] = B[i+1, 1] + q[i] * torch.exp(-Bls[i+1])
-                if n >= 2:
-                    row[2:] = B[i+1, 2:] + q[i] * B[i+1, 1:n]
-                mx = row[1:].max().item() if n >= 1 else 1.0
-                if mx > 0:
-                    row[1:] /= mx
-                    Bls[i] = Bls[i+1] + torch.log(torch.tensor(mx))
-                else:
-                    Bls[i] = Bls[i+1]
-                B[i] = row
-            self._cache["backward"] = (q, B, Bls)
-        return self._cache["backward"]
-
     def sample(self, rng=None) -> torch.Tensor:
         """
-        Draw one sample via sequential scan using the backward DP table.
+        Draw one sample via sequential scan.
 
-        Complexity: O(Nn) to build table [cached] + O(N).
+        Computes suffix ESPs B[i,k] = e_k(q[i:N]) via a right-to-left
+        DP pass, then scans left-to-right flipping biased coins.
+
+        Complexity: O(Nn).
         """
-        import numpy as np
-
-        # Convert to numpy for fast sampling loop (no autograd needed)
-        q, B, Bls = self._get_backward_table()
-        q_np = q.numpy()
-        B_np = B.numpy()
-        Bls_np = Bls.numpy()
+        import random as _random
         N, n = self.N, self.n
+        theta = self.theta.detach()
+        log_gm = theta.mean()
+        q = torch.exp(theta - log_gm)
 
-        if not isinstance(rng, np.random.Generator):
-            rng = np.random.default_rng(rng)
+        # Suffix ESP table with row-wise scaling.
+        # True value: e_k(q[i:N]) = B[i,k] * exp(Bls[i]) for k>=1; e_0 = 1.
+        B = torch.zeros(N + 1, n + 1, dtype=theta.dtype)
+        Bls = torch.zeros(N + 1, dtype=theta.dtype)
+        B[N, 0] = 1.0
+        for i in range(N - 1, -1, -1):
+            row = torch.zeros(n + 1, dtype=theta.dtype)
+            row[0] = 1.0
+            if n >= 1:
+                row[1] = B[i+1, 1] + q[i] * torch.exp(-Bls[i+1])
+            if n >= 2:
+                row[2:] = B[i+1, 2:] + q[i] * B[i+1, 1:n]
+            mx = row[1:].max().item() if n >= 1 else 1.0
+            if mx > 0:
+                row[1:] /= mx
+                Bls[i] = Bls[i+1] + torch.log(torch.tensor(mx, dtype=theta.dtype))
+            else:
+                Bls[i] = Bls[i+1]
+            B[i] = row
+
+        if not isinstance(rng, _random.Random):
+            rng = _random.Random(rng)
 
         selected = []
         k = n
@@ -172,9 +155,9 @@ class ConditionalPoissonSequentialTorch:
             if k == 0:
                 break
             if k == 1:
-                prob = q_np[i] * np.exp(-Bls_np[i]) / B_np[i, k]
+                prob = (q[i] * torch.exp(-Bls[i]) / B[i, k]).item()
             else:
-                prob = q_np[i] * B_np[i+1, k-1] / B_np[i, k] * np.exp(Bls_np[i+1] - Bls_np[i])
+                prob = (q[i] * B[i+1, k-1] / B[i, k] * torch.exp(Bls[i+1] - Bls[i])).item()
             if rng.random() < prob:
                 selected.append(i)
                 k -= 1
@@ -185,7 +168,7 @@ class ConditionalPoissonSequentialTorch:
     def log_prob(self, S) -> float:
         """log P(S) = sum_{i in S} theta_i - log Z."""
         S = torch.as_tensor(S, dtype=torch.long)
-        return float(self._theta[S].sum() - self.log_normalizer)
+        return float(self.theta[S].sum() - self.log_normalizer)
 
     # ── Fitting ──────────────────────────────────────────────────────────────
 
@@ -196,10 +179,10 @@ class ConditionalPoissonSequentialTorch:
         from conditional_poisson.tree_torch import _to_tensor
         target_incl = _to_tensor(target_incl, dtype).to(device=device)
         cp = cls(n, torch.logit(target_incl))
-        cp._theta.requires_grad_(True)
+        cp.theta.requires_grad_(True)
 
         optimizer = torch.optim.LBFGS(
-            [cp._theta],
+            [cp.theta],
             max_iter=200,
             history_size=5,
             line_search_fn='strong_wolfe',
@@ -209,15 +192,15 @@ class ConditionalPoissonSequentialTorch:
 
         def closure():
             optimizer.zero_grad()
-            loss = cp._log_Z() - target_incl @ cp._theta
+            loss = cp._log_Z() - target_incl @ cp.theta
             loss.backward()
             return loss
 
         optimizer.step(closure)
 
         with torch.no_grad():
-            cp._theta -= cp._theta.mean()
-        cp._theta = cp._theta.detach()
+            cp.theta -= cp.theta.mean()
+        cp.theta = cp.theta.detach()
 
         return cp
 

@@ -38,7 +38,7 @@ class ConditionalPoissonSequentialNumPy:
             raise ValueError(f"n={n} out of range [0, {N}]")
         self.n = n
         self.N = N
-        self._theta = theta.copy()
+        self.theta = theta.copy()
         self._cache: dict = {}
 
     @classmethod
@@ -52,9 +52,6 @@ class ConditionalPoissonSequentialNumPy:
 
     # ── Properties ───────────────────────────────────────────────────────────
 
-    @property
-    def theta(self) -> np.ndarray: return self._theta
-
     # ── DP tables ────────────────────────────────────────────────────────────
 
     def _get_dp(self):
@@ -64,9 +61,9 @@ class ConditionalPoissonSequentialNumPy:
         return self._cache["dp"]
 
     def _compute_table(self):
-        w = np.exp(self._theta)
+        w = np.exp(self.theta)
         N, n = self.N, self.n
-        log_gm = np.mean(self._theta)
+        log_gm = np.mean(self.theta)
         q = w / np.exp(log_gm)
 
         # Forward: F[i, k] = e_k(q[0:i]) (scaled)
@@ -185,7 +182,7 @@ class ConditionalPoissonSequentialNumPy:
     def log_prob(self, S) -> float:
         """log P(S) = sum_{i in S} theta_i - log Z."""
         S = np.asarray(S)
-        return float(self._theta[S].sum() - self.log_normalizer)
+        return float(self.theta[S].sum() - self.log_normalizer)
 
     # ── Fitting ──────────────────────────────────────────────────────────────
 
@@ -199,7 +196,7 @@ class ConditionalPoissonSequentialNumPy:
         obj = cls(n, logit(target_incl))
 
         def neg_ll_and_grad(theta):
-            obj._theta = theta
+            obj.theta = theta
             obj._cache.clear()
             pi = obj.incl_prob
             loss = obj.log_normalizer - float(np.dot(target_incl, theta))
