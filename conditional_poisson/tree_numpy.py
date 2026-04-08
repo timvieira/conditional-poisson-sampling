@@ -1,82 +1,28 @@
-"""
-Product-tree implementation of the conditional Poisson distribution (NumPy).
+"""Product-tree conditional Poisson distribution (NumPy).
 
-    P(S) ∝ prod_{i in S} w_i,   |S| = n
+Uses a polynomial product tree for O(N (log N)^2) computation.
+The downward pass for inclusion probabilities is only triggered
+when incl_prob is accessed.
 
-Uses a polynomial product tree for O(N (log N)^2) computation of Z, pi,
-and sampling.  The downward pass for inclusion probabilities is only
-triggered when incl_prob is accessed.
-
-TODO: truncate polynomials to degree n throughout the tree to achieve
-O(N log^2 n) instead of O(N log^2 N).
+TODO: truncate polynomials to degree n to achieve O(N log^2 n).
 """
 
-from __future__ import annotations
 from functools import cached_property
 import numpy as np
 from typing import Union
 from scipy.signal import convolve
+from conditional_poisson._base_numpy import ConditionalPoissonNumPyBase
 
 __all__ = ["ConditionalPoissonNumPy"]
 
 
-class ConditionalPoissonNumPy:
-    """Conditional Poisson distribution over fixed-size subsets.
-
-        P(S) ∝ prod_{i in S} w_i,   |S| = n
+class ConditionalPoissonNumPy(ConditionalPoissonNumPyBase):
+    """Product-tree O(N (log N)^2) via scipy convolve (NumPy).
 
     Constructors: __init__(n, theta), from_weights(n, w), fit(target_incl, n)
     Properties:   incl_prob, log_normalizer, n, N, theta
     Methods:      log_prob(S), sample(), clear()
     """
-
-    def __init__(self, n: int, theta: np.ndarray):
-        theta = np.asarray(theta, float)
-        assert theta.ndim == 1
-        assert np.all(np.isfinite(theta))
-        assert 0 <= n <= len(theta)
-        self.n = int(n)
-        self.N = len(theta)
-        self.theta = theta.copy()
-
-    @classmethod
-    def from_weights(cls, n: int, w: np.ndarray) -> "ConditionalPoissonNumPy":
-        w = np.asarray(w, float)
-        if np.any(w <= 0) or not np.all(np.isfinite(w)):
-            raise ValueError("all weights must be finite and positive")
-        return cls(n, np.log(w))
-
-    @classmethod
-    def fit(cls, target_incl, n, *, tol=1e-10, max_iter=200, verbose=False):
-        from scipy.optimize import minimize
-        from scipy.special import logit
-
-        target_incl = np.asarray(target_incl, float)
-        obj = cls(n, logit(target_incl))
-
-        def neg_ll_and_grad(theta):
-            obj.theta = theta
-            obj.clear()
-            pi = obj.incl_prob
-            loss = obj.log_normalizer - float(target_incl @ theta)
-            grad = pi - target_incl
-            if verbose:
-                print(f"  max|pi-pi*| = {np.max(np.abs(grad)):.3e}")
-            return loss, grad
-
-        result = minimize(
-            neg_ll_and_grad, logit(target_incl),
-            method='L-BFGS-B', jac=True,
-            options={'maxiter': max_iter, 'gtol': tol, 'ftol': 0},
-        )
-        theta = result.x
-        theta -= theta.mean()
-        return cls(n, theta)
-
-    def clear(self):
-        """Flush all cached computations."""
-        for attr in ('_forward', 'log_normalizer', 'incl_prob', '_sample_data'):
-            self.__dict__.pop(attr, None)
 
     def _scale(self, c):
         m = np.max(c)
@@ -117,7 +63,7 @@ class ConditionalPoissonNumPy:
 
     @cached_property
     def log_normalizer(self) -> float:
-        """Log normalizing constant.  O(N (log N)^2).  Does not trigger downward pass."""
+        """Log normalizing constant.  Does not trigger downward pass."""
         Pc, Pls, _, _, log_gm = self._forward
         n = self.n
         en_n = float(Pc[1][n]) if len(Pc[1]) > n else 0.0
@@ -155,21 +101,17 @@ class ConditionalPoissonNumPy:
 
     @cached_property
     def _sample_data(self):
-        """Prepare tree data for fast sampling loop."""
         Pc, Pls, tree_n, _, _ = self._forward
         ratio = [1.0] * (2 * tree_n)
         for i in range(1, tree_n):
-            ratio[i] = np.exp(Pls[i] - Pls[2*i] - Pls[2*i+1])
+            ratio[i] = np.exp(Pls[i] - Pls[2 * i] - Pls[2 * i + 1])
         return (
             [p.tolist() if p is not None else [] for p in Pc],
             ratio, tree_n,
         )
 
     def sample(self) -> np.ndarray:
-        """Draw one sample via top-down quota splitting.
-
-        Complexity: O(N (log N)^2) to build tree [cached] + O(n log N).
-        """
+        """Top-down quota splitting on the product tree.  O(n log N)."""
         import random
         Pc, ratio, tree_n = self._sample_data
         N, n = self.N, self.n
@@ -199,7 +141,7 @@ class ConditionalPoissonNumPy:
         return np.array(selected, dtype=np.int32)
 
     def log_prob(self, S: Union[np.ndarray, list]) -> Union[float, np.ndarray]:
-        """log P(S) = sum_{i in S} theta_i - log Z."""
+        """log P(S) = sum_{i in S} theta_i - log Z.  Supports batch."""
         S = np.asarray(S)
         lz = self.log_normalizer
         th = self.theta
