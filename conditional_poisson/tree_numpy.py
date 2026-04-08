@@ -27,7 +27,7 @@ class ConditionalPoissonNumPy:
 
     Constructors: __init__(n, theta), from_weights(n, w), fit(target_incl, n)
     Properties:   incl_prob, log_normalizer, n, N, theta
-    Methods:      log_prob(S), sample(), fit_inplace(target_incl), clear()
+    Methods:      log_prob(S), sample(), clear()
     """
 
     def __init__(self, n: int, theta: np.ndarray):
