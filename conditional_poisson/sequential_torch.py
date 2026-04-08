@@ -18,8 +18,6 @@ draws one sample by scanning items and flipping biased coins.
 
 from __future__ import annotations
 import torch
-import math
-from typing import Optional
 
 
 class ConditionalPoissonSequentialTorch:
@@ -66,95 +64,69 @@ class ConditionalPoissonSequentialTorch:
     @property
     def theta(self) -> torch.Tensor: return self._theta
 
-    # ── DP tables ────────────────────────────────────────────────────────────
-
-    def _get_dp(self):
-        """Build and cache forward/backward DP tables."""
-        if "dp" not in self._cache:
-            w = torch.exp(self._theta)
-            N, n = self.N, self.n
-            log_gm = self._theta.mean().item()
-            q = (w / math.exp(log_gm)).tolist()
-
-            # Forward: F[i, k] = e_k(q[0:i]) (scaled)
-            F, Fls = _build_dp_table(q, n)
-
-
-            # TODO: there shouldn't be backward method -- it is just backprop on log Z!!!!
-
-            # Backward: B[i, k] = e_k(q[i:N]) (scaled)
-            B = [[0.0] * (n + 1) for _ in range(N + 1)]
-            Bls = [0.0] * (N + 1)
-            B[N][0] = 1.0
-            for i in range(N - 1, -1, -1):
-                row = [0.0] * (n + 1)
-                row[0] = 1.0
-                if n >= 1:
-                    row[1] = B[i+1][1] + q[i] * math.exp(-Bls[i+1])
-                for k in range(2, n + 1):
-                    row[k] = B[i+1][k] + q[i] * B[i+1][k-1]
-                mx = max(abs(row[k]) for k in range(1, n + 1)) if n >= 1 else 1.0
-                if mx > 0:
-                    for k in range(1, n + 1):
-                        row[k] /= mx
-                    Bls[i] = Bls[i+1] + math.log(mx)
-                else:
-                    Bls[i] = Bls[i+1]
-                B[i] = row
-
-            self._cache["dp"] = (q, F, Fls, B, Bls, log_gm)
-        return self._cache["dp"]
-
     # ── Log normalizer ───────────────────────────────────────────────────────
+
+    def _log_Z(self):
+        """Compute log Z as a differentiable scalar tensor.
+
+        Uses the weighted Pascal recurrence:
+            F[i, k] = F[i-1, k] + w[i-1] * F[i-1, k-1]
+        with row-wise renormalization for numerical stability.
+        log Z = log|F[N, n]| + cumulative_log_scale + n * log(geometric_mean).
+        """
+        theta = self._theta
+        N, n = self.N, self.n
+        w = torch.exp(theta)
+
+        # Geometric-mean normalization for stability
+        log_gm = theta.mean()
+        q = w / torch.exp(log_gm)
+
+        # Forward DP: F[k] = e_k(q[0:i]) after processing i items.
+        # Row-wise scaling: true value at k>=1 is F[k] * exp(log_scale).
+        # F[0] = 1 always (unscaled), so the k=1 update must compensate:
+        #   F_new[1] = F[1] + q[i] * exp(-log_scale)
+        #   F_new[k] = F[k] + q[i] * F[k-1]   for k >= 2
+        F = torch.zeros(n + 1, dtype=theta.dtype, device=theta.device)
+        F[0] = 1.0
+        log_scale = torch.zeros(1, dtype=theta.dtype, device=theta.device)
+
+        for i in range(N):
+            parts = [F[:1]]  # F[0] = 1 unchanged
+            # k=1: compensate for unscaled F[0]
+            parts.append(F[1:2] + q[i] * torch.exp(-log_scale))
+            if n >= 2:
+                # k=2..n: both F[k] and F[k-1] share the same scale
+                parts.append(F[2:] + q[i] * F[1:n])
+            new_tail = torch.cat(parts[1:])
+            mx = new_tail.abs().max()
+            if mx > 0:
+                new_tail = new_tail / mx
+                log_scale = log_scale + torch.log(mx)
+            F = torch.cat([F[:1], new_tail])
+
+        return torch.log(F[n]) + log_scale.squeeze() + n * log_gm
 
     @property
     def log_normalizer(self) -> float:
         """log Z(w, n).  O(Nn)."""
-        if "log_Z" not in self._cache:
-            q, F, Fls, B, Bls, log_gm = self._get_dp()
-            self._cache["log_Z"] = (
-                math.log(abs(F[self.N][self.n])) + Fls[self.N]
-                + self.n * log_gm
-            )
-        return self._cache["log_Z"]
+        return self._log_Z().item()
 
     # ── Inclusion probabilities ──────────────────────────────────────────────
 
     @property
     def incl_prob(self) -> torch.Tensor:
-        """Inclusion probability vector pi.  O(Nn)."""
-        if "pi" not in self._cache:
-            q, F, Fls, B, Bls, log_gm = self._get_dp()
-            N, n = self.N, self.n
-            log_Z = math.log(abs(F[N][n])) + Fls[N]
-
-            pi = [0.0] * N
-            for i in range(N):
-                max_j = min(n, i + 1)
-                total_log = -math.inf
-                for j in range(max_j):
-                    k = n - 1 - j
-                    if k < 0 or k > N - i - 1:
-                        continue
-                    f_val, b_val = F[i][j], B[i+1][k]
-                    if f_val == 0 or b_val == 0:
-                        continue
-                    log_f = math.log(abs(f_val)) + (Fls[i] if j >= 1 else 0.0)
-                    log_b = math.log(abs(b_val)) + (Bls[i+1] if k >= 1 else 0.0)
-                    log_term = log_f + log_b
-                    if total_log == -math.inf:
-                        total_log = log_term
-                    else:
-                        mx = max(total_log, log_term)
-                        total_log = mx + math.log(
-                            math.exp(total_log - mx) + math.exp(log_term - mx)
-                        )
-                pi[i] = q[i] * math.exp(total_log - log_Z)
-            self._cache["pi"] = torch.tensor(pi, dtype=torch.float64)
-        return self._cache["pi"].clone()
+        """Inclusion probabilities pi_i = d(log Z)/d(theta_i) via autograd."""
+        saved = self._theta
+        self._theta = saved.detach().requires_grad_(True)
+        log_Z = self._log_Z()
+        pi = torch.autograd.grad(log_Z, self._theta)[0].detach()
+        self._theta = saved
+        return pi.clone()
 
     # ── Sampling ─────────────────────────────────────────────────────────────
 
+    # TODO: I don't they we need to do this computation.  Instead, sampling should work directly from the forward DP table.
     def _get_seq_q(self):
         """Build and cache the sequential conditional probability table q.
 
@@ -225,36 +197,3 @@ class ConditionalPoissonSequentialTorch:
 
     def __repr__(self):
         return f"ConditionalPoissonSequentialTorch(N={self.N}, n={self.n})"
-
-
-# ── Helper: weighted Pascal DP table ─────────────────────────────────────────
-
-def _build_dp_table(q, n):
-    """
-    Weighted Pascal DP table with row-wise scaling (pure Python lists).
-
-    True value: Z(q[0:i] choose k) = W[i][k] * exp(ls[i])  for k >= 1
-    W[i][0] = 1 always (unscaled).
-
-    Recurrence:  Z[i, k] = Z[i-1, k] + q[i-1] * Z[i-1, k-1]
-    """
-    N = len(q)
-    W = [[0.0] * (n + 1) for _ in range(N + 1)]
-    ls = [0.0] * (N + 1)
-    W[0][0] = 1.0
-    for i in range(1, N + 1):
-        row = [0.0] * (n + 1)
-        row[0] = 1.0
-        if n >= 1:
-            row[1] = W[i-1][1] + q[i-1] * math.exp(-ls[i-1])
-        for k in range(2, n + 1):
-            row[k] = W[i-1][k] + q[i-1] * W[i-1][k-1]
-        mx = max(abs(row[k]) for k in range(1, n + 1)) if n >= 1 else 1.0
-        if mx > 0:
-            for k in range(1, n + 1):
-                row[k] /= mx
-            ls[i] = ls[i-1] + math.log(mx)
-        else:
-            ls[i] = ls[i-1]
-        W[i] = row
-    return W, ls
