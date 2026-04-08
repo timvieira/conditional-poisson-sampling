@@ -144,7 +144,7 @@ def run_benchmarks(quick=False):
         print(f" {ms:.1f}ms", file=sys.stderr)
 
         # ── Fitting benchmarks ───────────────────────────────────────
-        pi_target = ConditionalPoissonSequentialNumPy.from_weights(n, w).incl_prob
+        pi_target = ConditionalPoissonNumPy.from_weights(n, w).incl_prob
 
         print("  fit: NumPy tree (L-BFGS)...", file=sys.stderr, end="", flush=True)
         ms = time_fn(lambda: ConditionalPoissonNumPy.fit(pi_target, n), reps=reps)

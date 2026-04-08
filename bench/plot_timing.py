@@ -132,10 +132,9 @@ def main():
     data_path = sys.argv[1] if len(sys.argv) > 1 else "results/timing_data.json"
     data = load_data(data_path)
 
-    base = os.path.dirname(__file__)
-    # Write to content/figures/ (source); blog build copies to docs/figures/
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     out_dirs = [
-        os.path.join(base, "content", "figures"),
+        os.path.join(repo, "content", "figures"),
     ]
 
     plots = [
