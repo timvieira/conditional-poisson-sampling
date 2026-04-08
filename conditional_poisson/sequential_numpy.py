@@ -62,7 +62,6 @@ class ConditionalPoissonSequentialNumPy:
 
     # ── Properties ───────────────────────────────────────────────────────────
 
-    # TODO: get rid of this method -- do the same for other classes!
     @property
     def theta(self) -> np.ndarray: return self._theta
 
@@ -74,7 +73,6 @@ class ConditionalPoissonSequentialNumPy:
             self._cache["dp"] = self._compute_table()
         return self._cache["dp"]
 
-    # TODO: seperate into forward and backward methods.
     def _compute_table(self):
         w = np.exp(self._theta)
         N, n = self.N, self.n
@@ -82,7 +80,7 @@ class ConditionalPoissonSequentialNumPy:
         q = w / np.exp(log_gm)
 
         # Forward: F[i, k] = e_k(q[0:i]) (scaled)
-        F, Fls = _build_dp_table(q, n)
+        F, Fls = self._forward_dp(q)
 
         # Backward: B[i, k] = e_k(q[i:N]) (scaled)
         B = np.zeros((N + 1, n + 1))
@@ -95,7 +93,7 @@ class ConditionalPoissonSequentialNumPy:
                 row[1] = B[i+1, 1] + q[i] * np.exp(-Bls[i+1])
             if n >= 2:
                 row[2:] = B[i+1, 2:] + q[i] * B[i+1, 1:n]
-            mx = np.max(np.abs(row[1:])) if n >= 1 else 1.0    # TODO: absolute value shouldn't be necessary
+            mx = np.max(row[1:]) if n >= 1 else 1.0
             if mx > 0:
                 row[1:] /= mx
                 Bls[i] = Bls[i+1] + np.log(mx)
@@ -219,35 +217,30 @@ class ConditionalPoissonSequentialNumPy:
     def __repr__(self):
         return f"ConditionalPoissonSequentialNumPy(N={self.N}, n={self.n})"
 
+    def _forward_dp(self, q):
+        """Weighted Pascal DP table with row-wise scaling.
 
-# ── Helper: weighted Pascal DP table ─────────────────────────────────────────
+        True value: Z(q[0:i] choose k) = W[i, k] * exp(ls[i])  for k >= 1.
+        W[i, 0] = 1 always (unscaled).
 
-# TODO: inline this method, or integrate it into the class.
-def _build_dp_table(q, n):
-    """
-    Weighted Pascal DP table with row-wise scaling.
-
-    True value: Z(q[0:i] choose k) = W[i, k] * exp(ls[i])  for k >= 1
-    W[i, 0] = 1 always (unscaled).
-
-    Recurrence:  Z[i, k] = Z[i-1, k] + q[i-1] * Z[i-1, k-1]
-    """
-    N = len(q)
-    W = np.zeros((N + 1, n + 1))
-    ls = np.zeros(N + 1)
-    W[0, 0] = 1.0
-    for i in range(1, N + 1):
-        row = np.empty(n + 1)
-        row[0] = 1.0
-        if n >= 1:
-            row[1] = W[i-1, 1] + q[i-1] * np.exp(-ls[i-1])
-        if n >= 2:
-            row[2:] = W[i-1, 2:] + q[i-1] * W[i-1, 1:n]
-        mx = np.max(np.abs(row[1:])) if n >= 1 else 1.0
-        if mx > 0:
-            row[1:] /= mx
-            ls[i] = ls[i-1] + np.log(mx)
-        else:
-            ls[i] = ls[i-1]
-        W[i] = row
-    return W, ls
+        Recurrence:  Z[i, k] = Z[i-1, k] + q[i-1] * Z[i-1, k-1]
+        """
+        N, n = self.N, self.n
+        W = np.zeros((N + 1, n + 1))
+        ls = np.zeros(N + 1)
+        W[0, 0] = 1.0
+        for i in range(1, N + 1):
+            row = np.empty(n + 1)
+            row[0] = 1.0
+            if n >= 1:
+                row[1] = W[i-1, 1] + q[i-1] * np.exp(-ls[i-1])
+            if n >= 2:
+                row[2:] = W[i-1, 2:] + q[i-1] * W[i-1, 1:n]
+            mx = np.max(row[1:]) if n >= 1 else 1.0
+            if mx > 0:
+                row[1:] /= mx
+                ls[i] = ls[i-1] + np.log(mx)
+            else:
+                ls[i] = ls[i-1]
+            W[i] = row
+        return W, ls

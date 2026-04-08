@@ -126,7 +126,6 @@ class ConditionalPoissonSequentialTorch:
 
     # ── Sampling ─────────────────────────────────────────────────────────────
 
-    # TODO: I don't they we need to do this computation.  Instead, sampling should work directly from the forward DP table.
     def _get_seq_q(self):
         """Build and cache the sequential conditional probability table q.
 

@@ -39,6 +39,7 @@ Pure PyTorch internally — no numpy or scipy dependency.
 
 import torch
 import torch.nn.functional as F
+import numpy as np
 import math
 from bisect import bisect_left as _bisect_left
 from typing import Union
@@ -220,24 +221,16 @@ class ConditionalPoissonTorch:
             L, R = Pc[2 * node], Pc[2 * node + 1]
             max_k = min(n, len(L) - 1 + len(R) - 1)
             node_cdfs = [None] * (max_k + 1)
+            La = np.maximum(np.array(L), 0.0)
+            Ra = np.maximum(np.array(R), 0.0)
+            Lp = np.pad(La, (0, max(0, max_k + 1 - len(La))))
+            Rp = np.pad(Ra, (0, max(0, max_k + 1 - len(Ra))))
             for k in range(1, max_k + 1):
-
-                # XXX: vectorize this block
-                pmf = []
-                for j in range(k + 1):
-                    rem = k - j
-                    lv = L[j] if j < len(L) else 0.0
-                    rv = R[rem] if rem < len(R) else 0.0
-                    pmf.append(max(lv, 0.0) * max(rv, 0.0))
-
-                total = sum(pmf)
-                if total > 0:    # XXX: this should never be zero. if it were zero, we would not be sampling it.
-                    acc = 0.0
-                    cdf = []
-                    for p in pmf:
-                        acc += p / total
-                        cdf.append(acc)
-                    node_cdfs[k] = cdf
+                pmf = Lp[:k+1] * Rp[k::-1]
+                total = pmf.sum()
+                # total == 0 only for padding-only subtrees (never sampled)
+                if total > 0:
+                    node_cdfs[k] = np.cumsum(pmf) / total
             cdfs[node] = node_cdfs
 
         self._sample_tree = (cdfs, tree_n)
@@ -296,40 +289,24 @@ class ConditionalPoissonTorch:
 
     # ── Internal: product tree with contour scaling ───────────────────────────
 
-    @staticmethod
-    def _find_r(w, n, tol=1e-12, max_iter=100):
+    def _find_r(self, tol=1e-12, max_iter=100):
         """Find r such that sum_i w_i*r / (1 + w_i*r) = n.
 
         This is a monotone equation in log(r): the LHS is strictly increasing
         from 0 (as r->0) to N (as r->inf).  Newton's method converges quickly.
 
-        Parameters
-        ----------
-        w : (N,) tensor of positive weights (detached, no grad needed)
-        n : target sum (int)
-
-        Returns
-        -------
-        r : scalar (float, not a tensor — this is a numerical parameter,
-            not part of the differentiable computation)
+        Returns r as a plain float (not a tensor — this is a numerical
+        conditioning choice, not part of the differentiable computation).
         """
-
-        # XXX: make find_r a proper method that uses theta and n
-
         # Work in log-space: let t = log(r), solve g(t) = sum p_i(t) - n = 0
         # where p_i(t) = w_i*exp(t) / (1 + w_i*exp(t)) = sigmoid(log(w_i) + t)
-        log_w = torch.log(w).detach().double()
+        log_w = self._theta.detach().double()
+        n = self.n
 
-        # Initial guess: t such that n/N of the items have p_i ≈ 0.5
-        # i.e., median(log_w) + t ≈ 0 => t ≈ -median(log_w)
         t = -torch.median(log_w).item()
 
         for _ in range(max_iter):
-            s = log_w + t
-            # Numerically stable sigmoid and its derivative
-            # Clamp to avoid exp overflow in the tails
-            s_clamped = s.clamp(-500, 500)
-            p = torch.sigmoid(s_clamped)    # TODO: sigmoid should never overflow if it is implemented correctly (see https://timvieira.github.io/blog/exp-normalize-trick/)
+            p = torch.sigmoid(log_w + t)
             g = p.sum().item() - n
             gp = (p * (1 - p)).sum().item()
 
@@ -337,10 +314,7 @@ class ConditionalPoissonTorch:
                 break
             if gp < 1e-100:
                 # All probabilities saturated; do a bisection-style step
-                if g > 0:
-                    t -= 1.0
-                else:
-                    t += 1.0
+                t += -1.0 if g > 0 else 1.0
                 continue
 
             t -= g / gp
@@ -412,7 +386,7 @@ class ConditionalPoissonTorch:
         # making FFT numerically stable for the coefficient we need.
         # r is NOT differentiable — it's a conditioning choice, not part of
         # the mathematical function.  Gradients flow through w * r.
-        r = self._find_r(w.detach(), n)
+        r = self._find_r()
         log_r = math.log(r)
         w_scaled = w * r   # on autograd graph
 

@@ -286,7 +286,6 @@ class ConditionalPoissonNumPy:
         if len(theta) < n:    raise ValueError(f"N={len(theta)} must be >= n={n}")
         if n < 1:             raise ValueError("n must be >= 1")
 
-        # TODO; remove the force-in/out stuff.  Simplify!
         forced_in  = np.where(theta == np.inf)[0]
         forced_out = np.where(theta == -np.inf)[0]
         interior   = np.where(np.isfinite(theta))[0]
