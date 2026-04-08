@@ -306,51 +306,22 @@ class ConditionalPoissonNumPy:
 
     # ── Sampling ──────────────────────────────────────────────────────────────
 
-    def _get_sample_cdfs(self):
-        """Build and cache the CDFs for sampling."""
-        if "sample_cdfs" not in self._cache:
-            Pc, _, tree_n, _, _ = self._build_tree()
-            n = self.n
-            cdfs = [None] * (2 * tree_n)
-            for node in range(1, tree_n):
-                La = np.maximum(np.asarray(Pc[2 * node]), 0.0)
-                Ra = np.maximum(np.asarray(Pc[2 * node + 1]), 0.0)
-                max_k = min(n, len(La) - 1 + len(Ra) - 1)
-                Lp = np.pad(La, (0, max(0, max_k + 1 - len(La))))
-                Rp = np.pad(Ra, (0, max(0, max_k + 1 - len(Ra))))
-                node_cdfs = [None] * (max_k + 1)
-                for k in range(1, max_k + 1):
-                    pmf = Lp[:k+1] * Rp[k::-1]
-                    total = pmf.sum()
-                    # total == 0 only for padding-only subtrees (never sampled)
-                    if total > 0:
-                        np.cumsum(pmf, out=pmf)
-                        pmf /= total
-                        node_cdfs[k] = pmf
-                cdfs[node] = node_cdfs
-            self._cache["sample_cdfs"] = (cdfs, tree_n)
-        return self._cache["sample_cdfs"]
-
     def sample(
         self,
         rng: Optional[Union[int, np.random.Generator]] = None,
     ) -> np.ndarray:
         """
-        Draw one sample using the cached P-tree.
+        Draw one sample via top-down quota splitting on the product tree.
 
-        Parameters
-        ----------
-        rng  : seed or np.random.Generator
-
-        Returns
-        -------
-        (n,) int array of sorted item indices.
+        At each internal node with quota k, the split PMF is
+        pmf[j] = L[j] * R[k-j], computed on-the-fly from the stored
+        tree polynomials.
 
         Complexity: O(N (log N)^2) to build tree [cached] + O(n log N).
         """
         if not isinstance(rng, np.random.Generator):
             rng = np.random.default_rng(rng)
-        cdfs, tree_n = self._get_sample_cdfs()
+        Pc, _, tree_n, _, _ = self._build_tree()
         N, n = self.N, self.n
         selected = []
         stack = [(1, n)]
@@ -362,7 +333,13 @@ class ConditionalPoissonNumPy:
                 if node - tree_n < N:
                     selected.append(node - tree_n)
                 continue
-            cdf = cdfs[node][k]
+            L = np.maximum(np.asarray(Pc[2 * node]), 0.0)
+            R = np.maximum(np.asarray(Pc[2 * node + 1]), 0.0)
+            Lp = np.pad(L, (0, max(0, k + 1 - len(L))))
+            Rp = np.pad(R, (0, max(0, k + 1 - len(R))))
+            pmf = Lp[:k+1] * Rp[k::-1]
+            cdf = np.cumsum(pmf)
+            cdf /= cdf[-1]
             j = int(np.searchsorted(cdf, rng.random()))
             stack.append((2 * node + 1, k - j))
             stack.append((2 * node, j))

@@ -85,7 +85,6 @@ class ConditionalPoissonTorch:
         self._theta = _to_tensor(theta, dtype).detach().clone().to(device=device)
         self.n = int(n)
         self.N = len(self._theta)
-        self._sample_tree = None
         assert 0 <= self.n <= self.N, f"n={self.n} must be in [0, {self.N}]"
 
     # ── Constructors ──────────────────────────────────────────────────────────
@@ -199,48 +198,22 @@ class ConditionalPoissonTorch:
 
     # ── Sampling ──────────────────────────────────────────────────────────────
 
-    def _get_sample_cdfs(self):
-        """Precompute CDFs for sampling from the product tree (cached)."""
-        if self._sample_tree is not None:
-            return self._sample_tree
-
-        tree, tree_n, _, _ = self._build_tree(store=True)
-        n = self.n
-
-        # Convert tree tensors to lists for fast Python CDF computation.
-        Pc = [None] * (2 * tree_n)
-        for i in range(1, 2 * tree_n):
-            if tree[i] is not None:
-                Pc[i] = tree[i].detach().tolist()
-
-        # Precompute normalized CDFs for each (node, quota) pair.
-        # PMF of split distribution: pmf[j] = L[j] * R[k-j]
-        cdfs = [None] * (2 * tree_n)
-        for node in range(1, tree_n):
-            L, R = Pc[2 * node], Pc[2 * node + 1]
-            max_k = min(n, len(L) - 1 + len(R) - 1)
-            node_cdfs = [None] * (max_k + 1)
-            La = np.maximum(np.array(L), 0.0)
-            Ra = np.maximum(np.array(R), 0.0)
-            Lp = np.pad(La, (0, max(0, max_k + 1 - len(La))))
-            Rp = np.pad(Ra, (0, max(0, max_k + 1 - len(Ra))))
-            for k in range(1, max_k + 1):
-                pmf = Lp[:k+1] * Rp[k::-1]
-                total = pmf.sum()
-                # total == 0 only for padding-only subtrees (never sampled)
-                if total > 0:
-                    node_cdfs[k] = np.cumsum(pmf) / total
-            cdfs[node] = node_cdfs
-
-        self._sample_tree = (cdfs, tree_n)
-        return self._sample_tree
-
-    @staticmethod
-    def _draw_one(cdfs, tree_n, N, n, rng):
-        """Draw one sample via top-down quota splitting with precomputed CDFs.
-
-        Complexity: O(n log N).
+    def sample(self, rng=None) -> torch.Tensor:
         """
+        Draw one sample via top-down quota splitting on the product tree.
+
+        At each internal node with quota k, the split PMF is
+        pmf[j] = L[j] * R[k-j], computed on-the-fly from the stored
+        tree polynomials.
+
+        Complexity: O(N log^2 n) to build tree [cached] + O(n log N).
+        """
+        tree, tree_n, _, _ = self._build_tree(store=True)
+        N, n = self.N, self.n
+
+        if not isinstance(rng, np.random.Generator):
+            rng = np.random.default_rng(rng)
+
         selected = []
         stack = [(1, n)]
         while stack:
@@ -251,37 +224,18 @@ class ConditionalPoissonTorch:
                 if node - tree_n < N:
                     selected.append(node - tree_n)
                 continue
-            cdf = cdfs[node][k]
+            L = np.maximum(tree[2 * node].detach().numpy(), 0.0)
+            R = np.maximum(tree[2 * node + 1].detach().numpy(), 0.0)
+            Lp = np.pad(L, (0, max(0, k + 1 - len(L))))
+            Rp = np.pad(R, (0, max(0, k + 1 - len(R))))
+            pmf = Lp[:k+1] * Rp[k::-1]
+            cdf = np.cumsum(pmf)
+            cdf /= cdf[-1]
             j = int(np.searchsorted(cdf, rng.random()))
             stack.append((2 * node + 1, k - j))
             stack.append((2 * node, j))
         selected.sort()
-        return selected
-
-    def sample(self, rng=None) -> torch.Tensor:
-        """
-        Draw one sample using the cached product tree.
-
-        Parameters
-        ----------
-        rng  : int seed, random.Random, or np.random.Generator
-
-        Returns
-        -------
-        (n,) long tensor of sorted indices.
-
-        Complexity: O(N log^2 n) to build tree [cached] + O(n log N).
-        """
-        import numpy as np
-
-        cdfs, tree_n = self._get_sample_cdfs()
-        N, n = self.N, self.n
-
-        if not isinstance(rng, np.random.Generator):
-            rng = np.random.default_rng(rng)
-
-        s = self._draw_one(cdfs, tree_n, N, n, rng)
-        return torch.tensor(s, dtype=torch.long)
+        return torch.tensor(selected, dtype=torch.long)
 
     # ── Internal: product tree with contour scaling ───────────────────────────
 

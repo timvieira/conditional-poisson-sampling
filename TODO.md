@@ -30,7 +30,7 @@
 - [x] ~~Remove boundary handling (w=0/inf) from `conditional_poisson/numpy.py`~~ — done (all implementations now require finite positive weights)
 - [x] ~~Rename `conditional_poisson/numpy.py` → `tree_numpy.py` and `conditional_poisson/torch.py` → `tree_torch.py`~~ — done
 - [x] ~~Remove stupid wrapper methods~~ — done (moved `compute_pi`, `forward_log_Z`, `_find_r`, poly mul into class as instance/static methods)
-- [ ]  _get_sample_cdfs look way too complicated (and potentially slow) - I suspect it can be simplified considerably.
+- [x] ~~_get_sample_cdfs look way too complicated~~ — done (eliminated CDF precomputation; compute split PMF on-the-fly)
 - [x] ~~apply a similar refactor to numpy implementation (and sequential implementations too)~~ — done
 
 ### Sequential implementations
@@ -39,7 +39,7 @@
 - [ ] Fix numerical overflow in sequential `_get_seq_q` — the ESP recurrence operates in linear space without log-scaling, producing NaN at N ≥ 500. Affects both NumPy and Torch sequential classes.
 - [x] ~~`ConditionalPoissonSequentialTorch` should use `torch.autograd` for `incl_prob` (backprop on `log_normalizer`) instead of manual forward-backward DP~~ — done
 - [x] ~~Sequential sampling should work directly from the forward DP table instead of recomputing a separate backward ESP table (`_get_seq_q`)~~ — done (samples from the backward table computed in `_compute_table`)
-- [ ] Tree-based sampling should work similarly — compute split probabilities directly from the tree polynomials during the top-down walk, without a separate CDF precomputation pass
+- [x] ~~Tree-based sampling should work similarly — compute split probabilities directly from the tree polynomials during the top-down walk, without a separate CDF precomputation pass~~ — done
 - [x] ~~All four implementations should have the same public interface~~ — done (`from_weights`, `fit`, `sample`, `log_prob`, `incl_prob`, `log_normalizer`, `n`, `N`, `theta`; `w` removed)
 - [x] ~~Extend `tests/test_all_implementations.py` to cover `fit` and `log_prob`~~ — done
 
