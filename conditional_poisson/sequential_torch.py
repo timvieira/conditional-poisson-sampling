@@ -62,11 +62,9 @@ class ConditionalPoissonSequentialTorch:
         log_gm = theta.mean()
         q = torch.exp(theta - log_gm)
 
-        # F[k] tracks e_k(q[0:i]) with uniform row-wise scaling.
-        # We avoid in-place ops for autograd by creating new tensors.
         F = torch.zeros(n + 1, dtype=theta.dtype, device=theta.device)
         F[0] = 1.0
-        log_scale = torch.zeros(1, dtype=theta.dtype, device=theta.device)
+        sf = torch.ones(N, dtype=theta.dtype, device=theta.device)
 
         for i in range(N):
             new_F = F.clone()
@@ -74,10 +72,10 @@ class ConditionalPoissonSequentialTorch:
             mx = new_F.max()
             if mx > 0:
                 new_F = new_F / mx
-                log_scale = log_scale + torch.log(mx)
+                sf[i] = mx
             F = new_F
 
-        return torch.log(F[n]) + log_scale.squeeze() + n * log_gm
+        return torch.log(F[n]) + sf.log().sum() + n * log_gm
 
     @property
     def log_normalizer(self) -> float:
