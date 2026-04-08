@@ -333,8 +333,8 @@ class ConditionalPoissonNumPy:
                 if node - tree_n < N:
                     selected.append(node - tree_n)
                 continue
-            L = np.maximum(np.asarray(Pc[2 * node]), 0.0)
-            R = np.maximum(np.asarray(Pc[2 * node + 1]), 0.0)
+            L = Pc[2 * node]
+            R = Pc[2 * node + 1]
             Lp = np.pad(L, (0, max(0, k + 1 - len(L))))
             Rp = np.pad(R, (0, max(0, k + 1 - len(R))))
             pmf = Lp[:k+1] * Rp[k::-1]

@@ -224,8 +224,8 @@ class ConditionalPoissonTorch:
                 if node - tree_n < N:
                     selected.append(node - tree_n)
                 continue
-            L = np.maximum(tree[2 * node].detach().numpy(), 0.0)
-            R = np.maximum(tree[2 * node + 1].detach().numpy(), 0.0)
+            L = tree[2 * node].detach().numpy()
+            R = tree[2 * node + 1].detach().numpy()
             Lp = np.pad(L, (0, max(0, k + 1 - len(L))))
             Rp = np.pad(R, (0, max(0, k + 1 - len(R))))
             pmf = Lp[:k+1] * Rp[k::-1]
