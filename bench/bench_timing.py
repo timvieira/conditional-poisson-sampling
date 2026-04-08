@@ -151,6 +151,16 @@ def run_benchmarks(quick=False):
         add("NumPy tree (L-BFGS)", "fit", N, n, ms)
         print(f" {ms:.1f}ms", file=sys.stderr)
 
+        print("  fit: PyTorch FFT (L-BFGS)...", file=sys.stderr, end="", flush=True)
+        ms = time_fn(lambda: ConditionalPoissonTorch.fit(pi_target, n), reps=reps)
+        add("PyTorch FFT (L-BFGS)", "fit", N, n, ms)
+        print(f" {ms:.1f}ms", file=sys.stderr)
+
+        print("  fit: Sequential DP (L-BFGS)...", file=sys.stderr, end="", flush=True)
+        ms = time_fn(lambda: ConditionalPoissonSequentialNumPy.fit(pi_target, n), reps=reps)
+        add("Sequential DP (L-BFGS)", "fit", N, n, ms)
+        print(f" {ms:.1f}ms", file=sys.stderr)
+
         # ── R benchmarks (pi + fit + samples) ──────────────────────
         print("  R benchmarks...", file=sys.stderr, end="", flush=True)
         r_results = run_r_benchmark(N, n, seed, reps)

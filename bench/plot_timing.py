@@ -37,7 +37,9 @@ STYLE = {
     "NumPy tree + backprop":     {"color": "#5b9bd5", "marker": "o", "ls": "-",  "lw": 2,   "ms": 6},  # alias
     "PyTorch FFT + autograd":    {"color": "#c0504d", "marker": "^", "ls": "-",  "lw": 2,   "ms": 6},
     # Fit experiment
-    "NumPy tree (Newton-CG)":    {"color": "#5b9bd5", "marker": "o", "ls": "-",  "lw": 2,   "ms": 6},
+    "NumPy tree (L-BFGS)":       {"color": "#5b9bd5", "marker": "o", "ls": "-",  "lw": 2,   "ms": 6},
+    "PyTorch FFT (L-BFGS)":      {"color": "#c0504d", "marker": "^", "ls": "-",  "lw": 2,   "ms": 6},
+    "Sequential DP (L-BFGS)":    {"color": "#E91E63", "marker": "s", "ls": "--", "lw": 1.5, "ms": 5},
     "R:sampling (fit)":          {"color": "#FF9800", "marker": "p", "ls": "-.", "lw": 1.5, "ms": 7},
     # Samples experiment
     "R:sampling (1 sample, incl. DP)":      {"color": "#FF9800", "marker": "p", "ls": "-.", "lw": 1.5, "ms": 7},

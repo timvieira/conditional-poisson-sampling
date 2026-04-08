@@ -3210,14 +3210,14 @@ The leave-one-out methods (gray, dashed) are $\sim\!N\times$ slower than their b
 
 Given target inclusion probabilities $\bpiptgt$, find weights $\bw$ such that $\bpip(\bw) = \bpiptgt$:
 
-<a href="conditional_poisson/tree_numpy.py#fit" title="ConditionalPoissonNumPy.fit" class="verified" target="_blank">✓</a> Product tree + Newton-CG ·
+<a href="conditional_poisson/tree_numpy.py#fit" title="ConditionalPoissonNumPy.fit" class="verified" target="_blank">✓</a> Product tree + L-BFGS ·
 <a href="bench/bench_timing_r.R" title="UPMEpiktildefrompik" class="verified" target="_blank">✓</a> R `sampling::UPMEpiktildefrompik` (fixed-point iteration)
 
 <figure>
 <img src="../figures/timing_fit.svg" alt="Log-log plot: fitting target pi to weights" style="width:100%">
 </figure>
 
-Our Newton-CG optimizer uses true Hessian-vector products computed via the product tree, giving superlinear convergence.  R's [`UPMEpiktildefrompik`](https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R) uses $J = I$ rather than the true Jacobian, making it a fixed-point iteration ($\tilde{p} \mathrel{+}= \bpiptgt - \bpip(\tilde{p})$) despite the [docs](https://cran.r-project.org/web/packages/sampling/sampling.pdf) calling it Newton's method.  Each R iteration requires a full $\mathcal{O}(Nn)$ DP pass to recompute $\bpip$.
+Our L-BFGS optimizer uses the gradient $\bpip(\btheta) - \bpiptgt$ (computed via reverse-mode AD on the product tree) to fit weights to target inclusion probabilities.  R's [`UPMEpiktildefrompik`](https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R) uses $J = I$ rather than the true Jacobian, making it a fixed-point iteration ($\tilde{p} \mathrel{+}= \bpiptgt - \bpip(\tilde{p})$) despite the [docs](https://cran.r-project.org/web/packages/sampling/sampling.pdf) calling it Newton's method.  Each R iteration requires a full $\mathcal{O}(Nn)$ DP pass to recompute $\bpip$.
 
 ### Drawing Samples
 
@@ -3246,7 +3246,7 @@ var COLORS = {
   'DP forward': '#E91E63', 'NumPy tree': '#5b9bd5', 'PyTorch FFT': '#c0504d',
   'Fwd-bwd DP': '#E91E63', 'PyTorch FFT + autograd': '#c0504d',
   'N\u00d7DP loo': '#999', 'N\u00d7Tree loo': '#bbb', 'R:sampling (pi)': '#FF9800',
-  'NumPy tree (Newton-CG)': '#5b9bd5', 'R:sampling (fit)': '#FF9800',
+  'NumPy tree (L-BFGS)': '#5b9bd5', 'R:sampling (fit)': '#FF9800',
   'R:sampling (1 sample, incl. DP)': '#FF9800', 'R:sampling (1 sample, excl. DP)': '#FF9800',
   'NumPy tree (1 sample, incl. build)': '#5b9bd5',
   'NumPy tree (1 sample)': '#5b9bd5'
@@ -3256,7 +3256,7 @@ var COMPLEXITY = {
   'Fwd-bwd DP': 'O(Nn)', 'PyTorch FFT + autograd': 'O(N log\u00b2 n)',
   'N\u00d7DP loo': 'O(N\u00b2n)', 'N\u00d7Tree loo': 'O(N\u00b2 log\u00b2 n)',
   'R:sampling (pi)': 'O(Nn)',
-  'NumPy tree (Newton-CG)': 'Newton-CG', 'R:sampling (fit)': 'fixed-point',
+  'NumPy tree (L-BFGS)': 'L-BFGS', 'R:sampling (fit)': 'fixed-point',
   'R:sampling (1 sample, incl. DP)': 'incl. DP', 'R:sampling (1 sample, excl. DP)': 'excl. DP',
   'NumPy tree (1 sample, incl. build)': 'incl. build',
   'NumPy tree (1 sample)': 'O(n log N)'
