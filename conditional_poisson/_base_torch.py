@@ -14,9 +14,11 @@ class ConditionalPoissonTorchBase:
     """Base class for PyTorch implementations.
 
     Subclasses must implement:
-        _log_Z(self, theta) -> differentiable scalar tensor
-        sample(self) -> tensor of indices
+        _circuit(self, theta) -> (log_Z, aux)
+            log_Z: differentiable scalar tensor
+            aux: arbitrary data needed by _sample_data and sample
         _sample_data (cached_property) -> data for sampling loop
+        sample(self) -> tensor of indices
     """
 
     def __init__(self, n: int, theta, *, dtype=torch.float64, device=None):
@@ -50,7 +52,8 @@ class ConditionalPoissonTorchBase:
         def closure():
             optimizer.zero_grad()
             cp.clear()
-            loss = cp._log_Z(cp.theta) - target_incl @ cp.theta
+            log_Z, _ = cp._circuit(cp.theta)
+            loss = log_Z - target_incl @ cp.theta
             loss.backward()
             return loss
 
@@ -65,31 +68,29 @@ class ConditionalPoissonTorchBase:
         for attr in ('_forward', 'log_normalizer', 'incl_prob', '_sample_data'):
             self.__dict__.pop(attr, None)
 
-    def _log_Z(self, theta):
-        """Compute log Z as a differentiable scalar tensor.  Override in subclass."""
+    def _circuit(self, theta):
+        """Override: return (log_Z, aux) where log_Z is differentiable."""
         raise NotImplementedError
 
     @cached_property
     def _forward(self):
         """Cached forward pass with autograd-enabled theta."""
         theta = self.theta.detach().requires_grad_(True)
-        log_Z = self._log_Z(theta)
-        return log_Z, theta
+        log_Z, aux = self._circuit(theta)
+        return log_Z, theta, aux
 
     @cached_property
     def log_normalizer(self) -> float:
-        """Log normalizing constant."""
-        log_Z, _ = self._forward
+        log_Z, _, _ = self._forward
         return log_Z.item()
 
     @cached_property
     def incl_prob(self) -> torch.Tensor:
         """Inclusion probabilities pi_i = d(log Z)/d(theta_i) via autograd."""
-        log_Z, theta = self._forward
+        log_Z, theta, _ = self._forward
         return torch.autograd.grad(log_Z, theta)[0].detach()
 
     def log_prob(self, S) -> float:
-        """log P(S) = sum_{i in S} theta_i - log Z."""
         S = torch.as_tensor(S, dtype=torch.long)
         return float(self.theta[S].sum() - self.log_normalizer)
 

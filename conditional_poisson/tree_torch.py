@@ -45,42 +45,9 @@ class ConditionalPoissonTorch(ConditionalPoissonTorchBase):
             t -= g / gp
         return math.exp(t)
 
-    def _log_Z(self, theta):
-        """Product tree with contour scaling.  O(N log^2 n)."""
+    def _circuit(self, theta):
+        """Product tree with contour scaling.  Returns (log_Z, (tree, tree_n, node_scale))."""
         n, N = self.n, self.N
-        dtype, device = theta.dtype, theta.device
-
-        w = torch.exp(theta)
-        r = self._r
-        w_scaled = w * r
-
-        tree_n = 1 << max(1, (N - 1).bit_length())
-        polys = torch.ones(tree_n, 2, dtype=dtype, device=device)
-        polys[:N, 1] = w_scaled
-        polys[N:, 1] = 0.0
-
-        scales = torch.zeros(tree_n, dtype=dtype, device=device)
-        level_size = tree_n
-        while level_size > 1:
-            left, right = polys[0::2], polys[1::2]
-            if left.shape[1] > n + 1: left = left[:, :n + 1]
-            if right.shape[1] > n + 1: right = right[:, :n + 1]
-            products = self._batch_poly_mul(left, right)
-            if products.shape[1] > n + 1: products = products[:, :n + 1]
-            new_scales = scales[0::2] + scales[1::2]
-            max_abs = products.abs().max(dim=1).values.clamp(min=1e-300)
-            products = products / max_abs.unsqueeze(1)
-            new_scales = new_scales + torch.log(max_abs)
-            level_size //= 2
-            polys, scales = products, new_scales
-
-        return torch.log(polys[0][n]) + scales[0] - n * math.log(r)
-
-    @cached_property
-    def _sample_data(self):
-        """Build full tree and convert to plain lists for sampling."""
-        n, N = self.n, self.N
-        theta = self.theta.detach()
         dtype, device = theta.dtype, theta.device
 
         w = torch.exp(theta)
@@ -115,14 +82,20 @@ class ConditionalPoissonTorch(ConditionalPoissonTorchBase):
                 node_scale[level_size + i] = max_abs[i].item()
             polys, scales = products, new_scales
 
+        log_Z = torch.log(polys[0][n]) + scales[0] - n * math.log(r)
+        return log_Z, (tree, tree_n, node_scale)
+
+    @cached_property
+    def _sample_data(self):
+        """Tree data from _forward, detached."""
+        _, _, (tree, tree_n, node_scale) = self._forward
         return (
-            [t.detach().tolist() if t is not None else [] for t in tree],
+            [t.detach() if t is not None else torch.zeros(1) for t in tree],
             node_scale, tree_n,
         )
 
     def sample(self) -> torch.Tensor:
         """Top-down quota splitting on the product tree.  O(n log N)."""
-        import random
         Pc, ratio, tree_n = self._sample_data
         N, n = self.N, self.n
         selected = []
@@ -137,11 +110,11 @@ class ConditionalPoissonTorch(ConditionalPoissonTorchBase):
                 continue
             L = Pc[2 * node]
             R = Pc[2 * node + 1]
-            u = random.random() * Pc[node][k] * ratio[node]
+            u = torch.rand(1).item() * Pc[node][k].item() * ratio[node]
             acc = 0.0
             for j in range(k + 1):
-                lv = L[j] if j < len(L) else 0.0
-                rv = R[k - j] if k - j < len(R) else 0.0
+                lv = L[j].item() if j < len(L) else 0.0
+                rv = R[k - j].item() if k - j < len(R) else 0.0
                 acc += lv * rv
                 if acc >= u:
                     break

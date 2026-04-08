@@ -13,8 +13,8 @@ class ConditionalPoissonSequentialTorch(ConditionalPoissonTorchBase):
     Methods:      log_prob(S), sample(), clear()
     """
 
-    def _log_Z(self, theta):
-        """ESP recurrence: E[k, n+1] = E[k, n] + w[n] * E[k-1, n]."""
+    def _circuit(self, theta):
+        """ESP recurrence returning (log_Z, E_columns)."""
         N, K = self.N, self.n
         w = torch.exp(theta)
         E = torch.zeros(K + 1, dtype=theta.dtype, device=theta.device)
@@ -24,28 +24,18 @@ class ConditionalPoissonSequentialTorch(ConditionalPoissonTorchBase):
             new_E = cols[i].clone()
             new_E[1:] = cols[i][1:] + w[i] * cols[i][:K]
             cols.append(new_E)
-        return torch.log(cols[N][K])
+        log_Z = torch.log(cols[N][K])
+        return log_Z, (cols, w)
 
     @cached_property
     def _sample_data(self):
-        E_full, w = [], torch.exp(self.theta).detach().tolist()
-        theta = self.theta.detach()
-        N, K = self.N, self.n
-        E = [0.0] * (K + 1)
-        E[0] = 1.0
-        E_full.append(list(E))
-        wt = torch.exp(theta).tolist()
-        for i in range(N):
-            new_E = list(E)
-            for k in range(1, K + 1):
-                new_E[k] = E[k] + wt[i] * E[k - 1]
-            E = new_E
-            E_full.append(list(E))
-        return E_full, w
+        """ESP table and weights from _forward, detached."""
+        _, _, (cols, w) = self._forward
+        E = torch.stack(cols).detach()
+        return E, w.detach()
 
     def sample(self) -> torch.Tensor:
         """Right-to-left scan on the forward ESP table.  O(N)."""
-        import random
         E, w = self._sample_data
         N, K = self.N, self.n
         selected = []
@@ -53,7 +43,7 @@ class ConditionalPoissonSequentialTorch(ConditionalPoissonTorchBase):
         for i in reversed(range(N)):
             if k == 0:
                 break
-            if random.random() * E[i + 1][k] <= w[i] * E[i][k - 1]:
+            if torch.rand(1).item() * E[i + 1, k].item() <= w[i].item() * E[i, k - 1].item():
                 selected.append(i)
                 k -= 1
         selected.reverse()

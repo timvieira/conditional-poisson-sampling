@@ -47,12 +47,10 @@ class ConditionalPoissonSequentialNumPy(ConditionalPoissonNumPyBase):
 
     @cached_property
     def _sample_data(self):
-        E, w = self._forward
-        return E.tolist(), w.tolist()
+        return self._forward
 
     def sample(self) -> np.ndarray:
         """Right-to-left scan on the forward ESP table.  O(N)."""
-        import random
         E, w = self._sample_data
         N, K = self.N, self.n
         selected = []
@@ -60,7 +58,7 @@ class ConditionalPoissonSequentialNumPy(ConditionalPoissonNumPyBase):
         for i in reversed(range(N)):
             if k == 0:
                 break
-            if random.random() * E[k][i + 1] <= w[i] * E[k - 1][i]:
+            if np.random.random() * E[k, i + 1] <= w[i] * E[k - 1, i]:
                 selected.append(i)
                 k -= 1
         selected.reverse()

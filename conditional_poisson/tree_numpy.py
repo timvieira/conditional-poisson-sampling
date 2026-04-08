@@ -102,17 +102,13 @@ class ConditionalPoissonNumPy(ConditionalPoissonNumPyBase):
     @cached_property
     def _sample_data(self):
         Pc, Pls, tree_n, _, _ = self._forward
-        ratio = [1.0] * (2 * tree_n)
+        ratio = np.ones(2 * tree_n)
         for i in range(1, tree_n):
             ratio[i] = np.exp(Pls[i] - Pls[2 * i] - Pls[2 * i + 1])
-        return (
-            [p.tolist() if p is not None else [] for p in Pc],
-            ratio, tree_n,
-        )
+        return Pc, ratio, tree_n
 
     def sample(self) -> np.ndarray:
         """Top-down quota splitting on the product tree.  O(n log N)."""
-        import random
         Pc, ratio, tree_n = self._sample_data
         N, n = self.N, self.n
         selected = []
@@ -127,7 +123,7 @@ class ConditionalPoissonNumPy(ConditionalPoissonNumPyBase):
                 continue
             L = Pc[2 * node]
             R = Pc[2 * node + 1]
-            u = random.random() * Pc[node][k] * ratio[node]
+            u = np.random.random() * Pc[node][k] * ratio[node]
             acc = 0.0
             for j in range(k + 1):
                 lv = L[j] if j < len(L) else 0.0
