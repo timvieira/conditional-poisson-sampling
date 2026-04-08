@@ -65,29 +65,48 @@ class ConditionalPoissonSequentialNumPy:
         log_gm = np.mean(self.theta)
         q = w / np.exp(log_gm)
 
-        # Forward: F[i, k] = e_k(q[0:i]) (scaled)
         F, Fls = self._forward_dp(q)
 
-        # Backward: B[i, k] = e_k(q[i:N]) (scaled)
+        # Backward: B[i, k] = e_k(q[i:N]) with uniform row-wise scaling.
+        # scale_factor[i] is the rescaling applied at row i; the true value
+        # is B[i,k] * prod(scale_factor[i:N]).
         B = np.zeros((N + 1, n + 1))
-        Bls = np.zeros(N + 1)
+        scale_factor = np.ones(N + 1)
         B[N, 0] = 1.0
         for i in range(N - 1, -1, -1):
-            row = np.empty(n + 1)
-            row[0] = 1.0
-            if n >= 1:
-                row[1] = B[i+1, 1] + q[i] * np.exp(-Bls[i+1])
-            if n >= 2:
-                row[2:] = B[i+1, 2:] + q[i] * B[i+1, 1:n]
-            mx = np.max(row[1:]) if n >= 1 else 1.0
+            B[i] = B[i+1].copy()
+            B[i, 1:] += q[i] * B[i+1, :n]
+            mx = np.max(B[i])
             if mx > 0:
-                row[1:] /= mx
-                Bls[i] = Bls[i+1] + np.log(mx)
-            else:
-                Bls[i] = Bls[i+1]
-            B[i] = row
-        return (q, F, Fls, B, Bls, log_gm)
+                B[i] /= mx
+                scale_factor[i] = mx
 
+        # Cumulative log scale (only needed for incl_prob, not sampling)
+        Bls = np.cumsum(np.log(scale_factor[::-1]))[::-1].copy()
+
+        return (q, F, Fls, B, Bls, scale_factor, log_gm)
+
+    def _forward_dp(self, q):
+        """Weighted Pascal DP table with uniform row-wise scaling.
+
+        true value: e_k(q[0:i]) = W[i, k] * exp(ls[i])
+
+        Recurrence: W[i, k] = W[i-1, k] + q[i-1] * W[i-1, k-1]
+        """
+        N, n = self.N, self.n
+        W = np.zeros((N + 1, n + 1))
+        ls = np.zeros(N + 1)
+        W[0, 0] = 1.0
+        for i in range(1, N + 1):
+            W[i] = W[i-1]
+            W[i, 1:] += q[i-1] * W[i-1, :n]
+            mx = np.max(W[i])
+            if mx > 0:
+                W[i] /= mx
+                ls[i] = ls[i-1] + np.log(mx)
+            else:
+                ls[i] = ls[i-1]
+        return W, ls
 
     # ── Log normalizer ───────────────────────────────────────────────────────
 
@@ -95,9 +114,9 @@ class ConditionalPoissonSequentialNumPy:
     def log_normalizer(self) -> float:
         """log Z(w, n).  O(Nn)."""
         if "log_Z" not in self._cache:
-            _, F, Fls, _, _, log_gm = self._get_dp()
+            _, F, Fls, _, _, _, log_gm = self._get_dp()
             self._cache["log_Z"] = (
-                np.log(abs(F[self.N, self.n])) + Fls[self.N]
+                np.log(F[self.N, self.n]) + Fls[self.N]
                 + self.n * log_gm
             )
         return self._cache["log_Z"]
@@ -108,9 +127,12 @@ class ConditionalPoissonSequentialNumPy:
     def incl_prob(self) -> np.ndarray:
         """Inclusion probability vector pi.  O(Nn)."""
         if "pi" not in self._cache:
-            q, F, Fls, B, Bls, _ = self._get_dp()
+            q, F, Fls, B, Bls, _, _ = self._get_dp()
             N, n = self.N, self.n
-            log_Z = np.log(abs(F[N, n])) + Fls[N]
+            log_Z = np.log(F[N, n]) + Fls[N]
+
+            # TODO: this looks does not look efficient -- remember that the
+            # algorithm to compute the incl_prob should match backpropagation for \nabla_{\theta} log Z
 
             pi = np.zeros(N)
             for i in range(N):
@@ -123,8 +145,8 @@ class ConditionalPoissonSequentialNumPy:
                     f_val, b_val = F[i, j], B[i+1, k]
                     if f_val == 0 or b_val == 0:
                         continue
-                    log_f = np.log(abs(f_val)) + (Fls[i] if j >= 1 else 0.0)
-                    log_b = np.log(abs(b_val)) + (Bls[i+1] if k >= 1 else 0.0)
+                    log_f = np.log(f_val) + Fls[i]
+                    log_b = np.log(b_val) + Bls[i+1]
                     log_term = log_f + log_b
                     if total_log == -np.inf:
                         total_log = log_term
@@ -141,33 +163,24 @@ class ConditionalPoissonSequentialNumPy:
 
     def sample(self) -> np.ndarray:
         """
-        Draw one sample via sequential scan using the backward DP table.
+        Draw one sample via sequential scan.
 
-        Conditional probability of including item i given k items still
-        needed from i..N-1:
-
-            P(include i | k) = q[i] * B_true[i+1, k-1] / B_true[i, k]
-
-        where B_true[i, k] = B[i, k] * exp(Bls[i]) is the true (unscaled)
-        backward ESP value.
+        P(include i | k remaining) = q[i] * B[i+1,k-1] / (B[i,k] * scale_factor[i])
 
         Complexity: O(Nn) to build tables [cached] + O(N).
         """
-        rng = np.random.default_rng()
-        q, _, _, B, Bls, _ = self._get_dp()
+        if "sample_data" not in self._cache:
+            q, _, _, B, _, scale_factor, _ = self._get_dp()
+            self._cache["sample_data"] = (q.tolist(), B.tolist(), scale_factor.tolist())
+        q, B, sf = self._cache["sample_data"]
         N, n = self.N, self.n
         selected = []
         k = n
         for i in range(N):
             if k == 0:
                 break
-            # P(include i | k) = q[i] * B_true[i+1, k-1] / B_true[i, k]
-            # B_true[i, k] = B[i,k] * exp(Bls[i]) for k>=1; B_true[i, 0] = 1
-            if k == 1:
-                prob = q[i] * np.exp(-Bls[i]) / B[i, k]
-            else:
-                prob = q[i] * B[i+1, k-1] / B[i, k] * np.exp(Bls[i+1] - Bls[i])
-            if rng.random() < prob:
+            prob = q[i] * B[i+1][k-1] / (B[i][k] * sf[i])
+            if np.random.random() < prob:
                 selected.append(i)
                 k -= 1
         return np.array(selected, dtype=np.int32)
@@ -194,7 +207,7 @@ class ConditionalPoissonSequentialNumPy:
             obj.theta = theta
             obj._cache.clear()
             pi = obj.incl_prob
-            loss = obj.log_normalizer - float(np.dot(target_incl, theta))
+            loss = obj.log_normalizer - float(target_incl @ theta)
             grad = pi - target_incl
             if verbose:
                 err = float(np.max(np.abs(grad)))
@@ -212,31 +225,3 @@ class ConditionalPoissonSequentialNumPy:
 
     def __repr__(self):
         return f"ConditionalPoissonSequentialNumPy(N={self.N}, n={self.n})"
-
-    def _forward_dp(self, q):
-        """Weighted Pascal DP table with row-wise scaling.
-
-        True value: Z(q[0:i] choose k) = W[i, k] * exp(ls[i])  for k >= 1.
-        W[i, 0] = 1 always (unscaled).
-
-        Recurrence:  Z[i, k] = Z[i-1, k] + q[i-1] * Z[i-1, k-1]
-        """
-        N, n = self.N, self.n
-        W = np.zeros((N + 1, n + 1))
-        ls = np.zeros(N + 1)
-        W[0, 0] = 1.0
-        for i in range(1, N + 1):
-            row = np.empty(n + 1)
-            row[0] = 1.0
-            if n >= 1:
-                row[1] = W[i-1, 1] + q[i-1] * np.exp(-ls[i-1])
-            if n >= 2:
-                row[2:] = W[i-1, 2:] + q[i-1] * W[i-1, 1:n]
-            mx = np.max(row[1:]) if n >= 1 else 1.0
-            if mx > 0:
-                row[1:] /= mx
-                ls[i] = ls[i-1] + np.log(mx)
-            else:
-                ls[i] = ls[i-1]
-            W[i] = row
-        return W, ls

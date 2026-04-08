@@ -54,41 +54,28 @@ class ConditionalPoissonSequentialTorch:
     def _log_Z(self):
         """Compute log Z as a differentiable scalar tensor.
 
-        Uses the weighted Pascal recurrence:
-            F[i, k] = F[i-1, k] + w[i-1] * F[i-1, k-1]
-        with row-wise renormalization for numerical stability.
-        log Z = log|F[N, n]| + cumulative_log_scale + n * log(geometric_mean).
+        Uses the weighted Pascal recurrence F[k] += q[i] * F[k-1]
+        with uniform row-wise rescaling for numerical stability.
         """
         theta = self.theta
         N, n = self.N, self.n
-        w = torch.exp(theta)
-
-        # Geometric-mean normalization for stability
         log_gm = theta.mean()
-        q = w / torch.exp(log_gm)
+        q = torch.exp(theta - log_gm)
 
-        # Forward DP: F[k] = e_k(q[0:i]) after processing i items.
-        # Row-wise scaling: true value at k>=1 is F[k] * exp(log_scale).
-        # F[0] = 1 always (unscaled), so the k=1 update must compensate:
-        #   F_new[1] = F[1] + q[i] * exp(-log_scale)
-        #   F_new[k] = F[k] + q[i] * F[k-1]   for k >= 2
+        # F[k] tracks e_k(q[0:i]) with uniform row-wise scaling.
+        # We avoid in-place ops for autograd by creating new tensors.
         F = torch.zeros(n + 1, dtype=theta.dtype, device=theta.device)
         F[0] = 1.0
         log_scale = torch.zeros(1, dtype=theta.dtype, device=theta.device)
 
         for i in range(N):
-            parts = [F[:1]]  # F[0] = 1 unchanged
-            # k=1: compensate for unscaled F[0]
-            parts.append(F[1:2] + q[i] * torch.exp(-log_scale))
-            if n >= 2:
-                # k=2..n: both F[k] and F[k-1] share the same scale
-                parts.append(F[2:] + q[i] * F[1:n])
-            new_tail = torch.cat(parts[1:])
-            mx = new_tail.abs().max()
+            new_F = F.clone()
+            new_F[1:] = F[1:] + q[i] * F[:n]
+            mx = new_F.max()
             if mx > 0:
-                new_tail = new_tail / mx
+                new_F = new_F / mx
                 log_scale = log_scale + torch.log(mx)
-            F = torch.cat([F[:1], new_tail])
+            F = new_F
 
         return torch.log(F[n]) + log_scale.squeeze() + n * log_gm
 
@@ -111,53 +98,52 @@ class ConditionalPoissonSequentialTorch:
 
     # ── Sampling ─────────────────────────────────────────────────────────────
 
+    def _get_suffix_table(self):
+        """Build and cache the suffix ESP table for sampling.
+
+        B[i] is the uniformly-scaled ESP vector for items i..N-1.
+        true value: e_k(q[i:N]) = B[i,k] * exp(Bls[i]).
+        """
+        if "suffix" not in self._cache:
+            N, n = self.N, self.n
+            theta = self.theta.detach()
+            log_gm = theta.mean()
+            q = torch.exp(theta - log_gm)
+
+            B = torch.zeros(N + 1, n + 1, dtype=theta.dtype)
+            scale_factor = torch.ones(N + 1, dtype=theta.dtype)
+            B[N, 0] = 1.0
+            for i in range(N - 1, -1, -1):
+                B[i] = B[i+1].clone()
+                B[i, 1:] += q[i] * B[i+1, :n]
+                mx = B[i].max().item()
+                if mx > 0:
+                    B[i] /= mx
+                    scale_factor[i] = mx
+            self._cache["suffix"] = (q, B, scale_factor)
+        return self._cache["suffix"]
+
     def sample(self) -> torch.Tensor:
         """
         Draw one sample via sequential scan.
 
-        Computes suffix ESPs B[i,k] = e_k(q[i:N]) via a right-to-left
-        DP pass, then scans left-to-right flipping biased coins.
-
-        Complexity: O(Nn).
+        Complexity: O(Nn) to build suffix table [cached] + O(N).
         """
-        import random as _random
+        if "sample_data" not in self._cache:
+            q, B, sf = self._get_suffix_table()
+            self._cache["sample_data"] = (
+                q.tolist(), B.tolist(), sf.tolist()
+            )
+        q, B, sf = self._cache["sample_data"]
         N, n = self.N, self.n
-        theta = self.theta.detach()
-        log_gm = theta.mean()
-        q = torch.exp(theta - log_gm)
-
-        # Suffix ESP table with row-wise scaling.
-        # True value: e_k(q[i:N]) = B[i,k] * exp(Bls[i]) for k>=1; e_0 = 1.
-        B = torch.zeros(N + 1, n + 1, dtype=theta.dtype)
-        Bls = torch.zeros(N + 1, dtype=theta.dtype)
-        B[N, 0] = 1.0
-        for i in range(N - 1, -1, -1):
-            row = torch.zeros(n + 1, dtype=theta.dtype)
-            row[0] = 1.0
-            if n >= 1:
-                row[1] = B[i+1, 1] + q[i] * torch.exp(-Bls[i+1])
-            if n >= 2:
-                row[2:] = B[i+1, 2:] + q[i] * B[i+1, 1:n]
-            mx = row[1:].max().item() if n >= 1 else 1.0
-            if mx > 0:
-                row[1:] /= mx
-                Bls[i] = Bls[i+1] + torch.log(torch.tensor(mx, dtype=theta.dtype))
-            else:
-                Bls[i] = Bls[i+1]
-            B[i] = row
-
-        rng = _random.Random()
-
+        import random
         selected = []
         k = n
         for i in range(N):
             if k == 0:
                 break
-            if k == 1:
-                prob = (q[i] * torch.exp(-Bls[i]) / B[i, k]).item()
-            else:
-                prob = (q[i] * B[i+1, k-1] / B[i, k] * torch.exp(Bls[i+1] - Bls[i])).item()
-            if rng.random() < prob:
+            prob = q[i] * B[i+1][k-1] / (B[i][k] * sf[i])
+            if random.random() < prob:
                 selected.append(i)
                 k -= 1
         return torch.tensor(selected, dtype=torch.long)
