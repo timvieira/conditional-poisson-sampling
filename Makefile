@@ -1,98 +1,69 @@
-.PHONY: help test test-identity test-unit test-all test-r test-js \
-       bench bench-timing bench-grid bench-sample-speed bench-accuracy \
-       figures data deploy dev clean install lint
+TIMEOUT ?= 120
+
+.PHONY: help test bench-timing bench-grid figures data snippets deploy dev clean install
 
 help:
-	@echo "Usage: make <target>"
-	@echo ""
-	@echo "Testing:"
-	@echo "  test              Run all tests (identity + unit + parameterized)"
-	@echo "  test-identity     Run identity tests (blog post claims)"
-	@echo "  test-unit         Run unit tests for ConditionalPoissonNumPy"
-	@echo "  test-all          Run parameterized tests across all implementations"
-	@echo "  test-r            Run R agreement tests (requires R + sampling package)"
-	@echo ""
-	@echo "Benchmarks:"
-	@echo "  bench             Run all benchmarks"
-	@echo "  bench-timing      Run timing benchmarks → bench/results/timing_data.json"
-	@echo "  bench-grid        Run timing grid sweep → bench/results/timing_grid.json"
-	@echo "  bench-sample-speed  Compare single-sample speed across implementations"
-	@echo "  bench-accuracy    Compare numerical accuracy across implementations"
-	@echo ""
-	@echo "Figures & data:"
-	@echo "  data              Regenerate all benchmark data (timing + grid)"
-	@echo "  figures           Regenerate all SVG plots from benchmark data"
-	@echo "  snippets          Regenerate popover.js code snippets"
-	@echo ""
-	@echo "Site:"
-	@echo "  dev               Start dev server with auto-rebuild"
-	@echo "  deploy            Build site and deploy to GitHub Pages"
-	@echo ""
-	@echo "Setup:"
-	@echo "  install           Install package in editable mode with dev deps"
-	@echo "  clean             Remove build artifacts and caches"
-
-# ── Testing ──────────────────────────────────────────────────────────────────
+	@echo "Usage: make [-j4] <target>"
+	@echo "  test          Run all tests"
+	@echo "  bench-timing  Run all timing benchmarks (use -j for parallel)"
+	@echo "  bench-grid    Run timing grid sweep"
+	@echo "  figures       Regenerate SVG plots from timing data"
+	@echo "  snippets      Regenerate popover.js code snippets"
+	@echo "  deploy        Build and deploy to GitHub Pages"
 
 test:
 	python -m pytest tests/ -v
 
-test-r:
-	python -m pytest tests/test_r_agreement.py -v
+# Timing benchmarks: one file per (method, experiment, N, n).
+# Use `make -j8 bench-timing` for parallel execution.
+METHODS := Sequential NumPy PyTorch
+EXPERIMENTS := Z pi fit sample
+define SIZE_template
+BENCH_TARGETS += $(foreach m,$(METHODS),$(foreach e,$(EXPERIMENTS),bench/results/$(m)_$(e)_$(1)_$(2).json))
+endef
+$(eval $(call SIZE_template,50,20))
+$(eval $(call SIZE_template,100,40))
+$(eval $(call SIZE_template,200,80))
+$(eval $(call SIZE_template,500,200))
+$(eval $(call SIZE_template,1000,400))
+$(eval $(call SIZE_template,2000,800))
+$(eval $(call SIZE_template,5000,2000))
 
-test-js:
-	node test_animation.mjs
+bench/results/%.json:
+	@mkdir -p bench/results
+	@method=$$(echo $* | cut -d_ -f1); \
+	 exp=$$(echo $* | cut -d_ -f2); \
+	 N=$$(echo $* | cut -d_ -f3); \
+	 n=$$(echo $* | cut -d_ -f4); \
+	 python bench/bench_one.py $$method $$exp $$N $$n --timeout $(TIMEOUT) > $@
 
-# ── Benchmarks ───────────────────────────────────────────────────────────────
-
-bench: bench-timing bench-grid bench-sample-speed bench-accuracy
-
-bench-timing:
-	python bench/bench_timing.py
-	@echo "Wrote bench/results/timing_data.json"
+bench-timing: $(BENCH_TARGETS)
+	@python -c "import json, glob; \
+	results = [json.load(open(f)) for f in sorted(glob.glob('bench/results/*.json')) if 'error' not in json.load(open(f))]; \
+	json.dump(results, open('bench/results/timing_data.json','w'), indent=2); \
+	print(f'Wrote {len(results)} results to bench/results/timing_data.json')"
 
 bench-grid:
 	python bench/bench_timing_grid.py
-	@echo "Wrote bench/results/timing_grid.json"
-
-bench-sample-speed:
-	python bench/bench_sample_speed.py
-
-bench-accuracy:
-	python bench/bench_accuracy.py
-
-# ── Figures & data ───────────────────────────────────────────────────────────
 
 data: bench-timing bench-grid
 
 figures: bench/results/timing_data.json
 	python bench/plot_timing.py bench/results/timing_data.json
-	@echo "Wrote content/figures/timing_*.svg"
-
-bench/results/timing_data.json:
-	$(MAKE) bench-timing
 
 snippets:
 	python extract_snippets.py
 
-# ── Site ─────────────────────────────────────────────────────────────────────
+deploy: test snippets
+	blog deploy
 
 dev:
 	blog dev
 
-deploy: test snippets
-	blog deploy
-
-# ── Setup ────────────────────────────────────────────────────────────────────
-
 install:
 	pip install -e ".[dev]"
-
-install-r:
-	conda create -n cps-r -y r-base r-sampling
-	@echo "R environment ready: conda run -n cps-r Rscript ..."
 
 clean:
 	rm -rf __pycache__ conditional_poisson/__pycache__ tests/__pycache__ bench/__pycache__
 	rm -rf *.egg-info build dist .pytest_cache
-	rm -rf bench/results/*.json
+	rm -rf bench/results/
