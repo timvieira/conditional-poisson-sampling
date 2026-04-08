@@ -275,17 +275,25 @@ class ConditionalPoissonNumPy:
     # ── Sampling ──────────────────────────────────────────────────────────────
 
     def sample(self) -> np.ndarray:
-        """
-        Draw one sample via top-down quota splitting on the product tree.
+        """Draw one sample via top-down quota splitting on the product tree.
 
-        At each internal node with quota k, the split PMF is
-        pmf[j] = L[j] * R[k-j], computed on-the-fly from the stored
-        tree polynomials.
+        At each internal node with quota k, sample the left quota j
+        from pmf[j] = L[j] * R[k-j].
 
         Complexity: O(N (log N)^2) to build tree [cached] + O(n log N).
         """
-        rng = np.random.default_rng()
-        Pc, _, tree_n, _, _ = self._build_tree()
+        import random
+        if "sample_tree" not in self._cache:
+            Pc, Pls, tree_n, _, _ = self._build_tree()
+            # Per-node scale ratio: sum L[j]*R[k-j] = P[k] * ratio[node]
+            ratio = [1.0] * (2 * tree_n)
+            for i in range(1, tree_n):
+                ratio[i] = np.exp(Pls[i] - Pls[2*i] - Pls[2*i+1])
+            self._cache["sample_tree"] = (
+                [p.tolist() if p is not None else [] for p in Pc],
+                ratio, tree_n,
+            )
+        Pc, ratio, tree_n = self._cache["sample_tree"]
         N, n = self.N, self.n
         selected = []
         stack = [(1, n)]
@@ -299,12 +307,14 @@ class ConditionalPoissonNumPy:
                 continue
             L = Pc[2 * node]
             R = Pc[2 * node + 1]
-            Lp = np.pad(L, (0, max(0, k + 1 - len(L))))
-            Rp = np.pad(R, (0, max(0, k + 1 - len(R))))
-            pmf = Lp[:k+1] * Rp[k::-1]
-            cdf = np.cumsum(pmf)
-            cdf /= cdf[-1]
-            j = int(np.searchsorted(cdf, rng.random()))
+            u = random.random() * Pc[node][k] * ratio[node]
+            acc = 0.0
+            for j in range(k + 1):
+                lv = L[j] if j < len(L) else 0.0
+                rv = R[k - j] if k - j < len(R) else 0.0
+                acc += lv * rv
+                if acc >= u:
+                    break
             stack.append((2 * node + 1, k - j))
             stack.append((2 * node, j))
         selected.sort()

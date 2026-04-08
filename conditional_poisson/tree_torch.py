@@ -71,6 +71,7 @@ class ConditionalPoissonTorch:
         self.theta = _to_tensor(theta, dtype).detach().clone().to(device=device)
         self.n = int(n)
         self.N = len(self.theta)
+        self._cache: dict = {}
         assert 0 <= self.n <= self.N, f"n={self.n} must be in [0, {self.N}]"
 
     # ── Constructors ──────────────────────────────────────────────────────────
@@ -190,9 +191,15 @@ class ConditionalPoissonTorch:
 
         Complexity: O(N log^2 n) to build tree [cached] + O(n log N).
         """
-        tree, tree_n, _, _ = self._build_tree(store=True)
+        import random
+        if "sample_tree" not in self._cache:
+            tree, tree_n, _, _, node_scale = self._build_tree(store=True)
+            self._cache["sample_tree"] = (
+                [t.detach().tolist() if t is not None else [] for t in tree],
+                node_scale, tree_n,
+            )
+        Pc, ratio, tree_n = self._cache["sample_tree"]
         N, n = self.N, self.n
-
         selected = []
         stack = [(1, n)]
         while stack:
@@ -203,12 +210,16 @@ class ConditionalPoissonTorch:
                 if node - tree_n < N:
                     selected.append(node - tree_n)
                 continue
-            L = tree[2 * node].detach()
-            R = tree[2 * node + 1].detach()
-            Lp = F.pad(L, (0, max(0, k + 1 - len(L))))
-            Rp = F.pad(R, (0, max(0, k + 1 - len(R))))
-            pmf = Lp[:k+1] * torch.flip(Rp[:k+1], [0])
-            j = int(torch.multinomial(pmf, 1))
+            L = Pc[2 * node]
+            R = Pc[2 * node + 1]
+            u = random.random() * Pc[node][k] * ratio[node]
+            acc = 0.0
+            for j in range(k + 1):
+                lv = L[j] if j < len(L) else 0.0
+                rv = R[k - j] if k - j < len(R) else 0.0
+                acc += lv * rv
+                if acc >= u:
+                    break
             stack.append((2 * node + 1, k - j))
             stack.append((2 * node, j))
         selected.sort()
@@ -327,6 +338,7 @@ class ConditionalPoissonTorch:
 
         if store:
             tree = [None] * (2 * tree_n)
+            node_scale = [1.0] * (2 * tree_n)
             for i in range(tree_n):
                 tree[tree_n + i] = polys[i]
 
@@ -358,12 +370,14 @@ class ConditionalPoissonTorch:
             if store:
                 for i in range(level_size):
                     tree[level_size + i] = products[i]
+                    # Store the rescaling factor for this node
+                    node_scale[level_size + i] = max_abs[i].item()
 
             polys = products
             scales = new_scales
 
         if store:
-            return tree, tree_n, log_r, scales[0]
+            return tree, tree_n, log_r, scales[0], node_scale
         return polys[0], scales[0], log_r
 
     # ── Repr ──────────────────────────────────────────────────────────────────
