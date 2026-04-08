@@ -70,7 +70,9 @@ class ConditionalPoissonTorch:
 
         def closure():
             optimizer.zero_grad()
-            loss = cp._log_Z_differentiable() - target_incl @ cp.theta
+            cp.__dict__.pop('_r', None)  # r depends on theta
+            tree, tree_n, log_r, root_log_scale, _ = cp._build_tree()
+            loss = torch.log(tree[1][n]) + root_log_scale - n * log_r - target_incl @ cp.theta
             loss.backward()
             return loss
 
@@ -82,29 +84,35 @@ class ConditionalPoissonTorch:
 
     def clear(self):
         """Flush all cached computations."""
-        for attr in ('log_normalizer', 'incl_prob', '_sample_tree'):
+        for attr in ('_r', '_forward', 'log_normalizer', 'incl_prob', '_sample_tree'):
             self.__dict__.pop(attr, None)
 
     @cached_property
+    def _forward(self):
+        """Differentiable forward pass: builds tree, computes log Z (cached).
+
+        Returns (log_Z_tensor, tree, tree_n, node_scale, theta_grad).
+        theta_grad is the requires_grad copy used for the build.
+        """
+        theta_grad = self.theta.detach().requires_grad_(True)
+        saved = self.theta
+        self.theta = theta_grad
+        tree, tree_n, log_r, root_log_scale, node_scale = self._build_tree()
+        self.theta = saved
+        log_Z = torch.log(tree[1][self.n]) + root_log_scale - self.n * log_r
+        return log_Z, tree, tree_n, node_scale, theta_grad
+
+    @cached_property
     def log_normalizer(self) -> float:
-        """Log normalizing constant.  Does not trigger backward pass."""
-        return self._log_Z_differentiable().item()
+        """Log normalizing constant."""
+        log_Z, _, _, _, _ = self._forward
+        return float(log_Z.item())
 
     @cached_property
     def incl_prob(self) -> torch.Tensor:
         """Inclusion probabilities pi_i = d(log Z)/d(theta_i) via autograd."""
-        theta = self.theta.detach().requires_grad_(True)
-        saved = self.theta
-        self.theta = theta
-        log_Z = self._log_Z_differentiable()
-        pi = torch.autograd.grad(log_Z, theta)[0].detach()
-        self.theta = saved
-        return pi
-
-    def _log_Z_differentiable(self):
-        """Compute log Z as a differentiable scalar tensor (forward pass only)."""
-        root, root_log_scale, log_r = self._build_tree(store=False)
-        return torch.log(root[self.n]) + root_log_scale - self.n * log_r
+        log_Z, _, _, _, theta_grad = self._forward
+        return torch.autograd.grad(log_Z, theta_grad)[0].detach()
 
     def log_prob(self, S) -> Union[float, torch.Tensor]:
         """log P(S) = sum_{i in S} theta_i - log Z."""
@@ -121,8 +129,8 @@ class ConditionalPoissonTorch:
 
     @cached_property
     def _sample_tree(self):
-        """Build tree data for fast sampling loop."""
-        tree, tree_n, _, _, node_scale = self._build_tree(store=True)
+        """Convert cached tree to plain lists for fast sampling loop."""
+        _, tree, tree_n, node_scale, _ = self._forward
         return (
             [t.detach().tolist() if t is not None else [] for t in tree],
             node_scale, tree_n,
@@ -161,16 +169,17 @@ class ConditionalPoissonTorch:
         selected.sort()
         return torch.tensor(selected, dtype=torch.long)
 
-    def _find_r(self, tol=1e-12, max_iter=100):
-        """Find optimal contour radius via Newton's method."""
+    @cached_property
+    def _r(self):
+        """Optimal contour radius (cached).  Not on the autograd graph."""
         log_w = self.theta.detach().double()
         n = self.n
         t = -torch.median(log_w).item()
-        for _ in range(max_iter):
+        for _ in range(100):
             p = torch.sigmoid(log_w + t)
             g = p.sum().item() - n
             gp = (p * (1 - p)).sum().item()
-            if abs(g) < tol:
+            if abs(g) < 1e-12:
                 break
             if gp < 1e-100:
                 t += -1.0 if g > 0 else 1.0
@@ -201,27 +210,29 @@ class ConditionalPoissonTorch:
             return cls._batch_poly_mul_direct(a_batch, b_batch)
         return cls._batch_poly_mul_fft(a_batch, b_batch)
 
-    def _build_tree(self, store=False):
-        """Build the product tree via batched FFT with contour scaling."""
+    def _build_tree(self):
+        """Build the product tree via batched FFT with contour scaling.
+
+        Returns (tree, tree_n, log_r, root_log_scale, node_scale).
+        """
         n, N = self.n, self.N
         theta = self.theta
         dtype, device = theta.dtype, theta.device
 
         w = torch.exp(theta)
-        r = self._find_r()
+        r = self._r
         log_r = math.log(r)
         w_scaled = w * r
 
         tree_n = 1 << max(1, (N - 1).bit_length())
+        tree = [None] * (2 * tree_n)
+        node_scale = [1.0] * (2 * tree_n)
+
         polys = torch.ones(tree_n, 2, dtype=dtype, device=device)
         polys[:N, 1] = w_scaled
         polys[N:, 1] = 0.0
-
-        if store:
-            tree = [None] * (2 * tree_n)
-            node_scale = [1.0] * (2 * tree_n)
-            for i in range(tree_n):
-                tree[tree_n + i] = polys[i]
+        for i in range(tree_n):
+            tree[tree_n + i] = polys[i]
 
         scales = torch.zeros(tree_n, dtype=dtype, device=device)
         level_size = tree_n
@@ -239,16 +250,13 @@ class ConditionalPoissonTorch:
             new_scales = new_scales + torch.log(max_abs)
 
             level_size //= 2
-            if store:
-                for i in range(level_size):
-                    tree[level_size + i] = products[i]
-                    node_scale[level_size + i] = max_abs[i].item()
+            for i in range(level_size):
+                tree[level_size + i] = products[i]
+                node_scale[level_size + i] = max_abs[i].item()
 
             polys, scales = products, new_scales
 
-        if store:
-            return tree, tree_n, log_r, scales[0], node_scale
-        return polys[0], scales[0], log_r
+        return tree, tree_n, log_r, scales[0], node_scale
 
     def __repr__(self):
         return f"ConditionalPoissonTorch(n={self.n}, N={self.N})"
