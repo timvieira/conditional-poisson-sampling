@@ -73,13 +73,13 @@ class ConditionalPoissonTorch(ConditionalPoissonTorchBase):
             products = self._batch_poly_mul(left, right)
             if products.shape[1] > n + 1: products = products[:, :n + 1]
             new_scales = scales[0::2] + scales[1::2]
-            max_abs = products.abs().max(dim=1).values.clamp(min=1e-300)
-            products = products / max_abs.unsqueeze(1)
-            new_scales = new_scales + torch.log(max_abs)
+            m = products.max(dim=1).values.clamp(min=1e-300)
+            products = products / m.unsqueeze(1)
+            new_scales = new_scales + torch.log(m)
             level_size //= 2
             for i in range(level_size):
                 tree[level_size + i] = products[i]
-                node_scale[level_size + i] = max_abs[i].item()
+                node_scale[level_size + i] = m[i].item()
             polys, scales = products, new_scales
 
         log_Z = torch.log(polys[0][n]) + scales[0] - n * math.log(r)
