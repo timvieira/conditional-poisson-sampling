@@ -41,7 +41,6 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import math
-from bisect import bisect_left as _bisect_left
 from typing import Union
 
 
@@ -253,7 +252,7 @@ class ConditionalPoissonTorch:
                     selected.append(node - tree_n)
                 continue
             cdf = cdfs[node][k]
-            j = _bisect_left(cdf, rng.random())
+            j = int(np.searchsorted(cdf, rng.random()))
             stack.append((2 * node + 1, k - j))
             stack.append((2 * node, j))
         selected.sort()
@@ -273,16 +272,13 @@ class ConditionalPoissonTorch:
 
         Complexity: O(N log^2 n) to build tree [cached] + O(n log N).
         """
-        import random as _random
         import numpy as np
 
         cdfs, tree_n = self._get_sample_cdfs()
         N, n = self.N, self.n
 
-        if isinstance(rng, np.random.Generator) or isinstance(rng, _random.Random):
-            pass  # use as-is
-        else:
-            rng = _random.Random(rng)
+        if not isinstance(rng, np.random.Generator):
+            rng = np.random.default_rng(rng)
 
         s = self._draw_one(cdfs, tree_n, N, n, rng)
         return torch.tensor(s, dtype=torch.long)

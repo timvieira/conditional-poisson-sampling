@@ -153,63 +153,39 @@ class ConditionalPoissonSequentialNumPy:
 
     # ── Sampling ─────────────────────────────────────────────────────────────
 
-    def _get_seq_q(self):
-        """Build and cache the sequential conditional probability table q.
-
-        q[i, k] = P(include item i | k items still needed from i..N-1).
-        Uses the backward ESP recurrence.  O(Nn).
-        """
-        if "seq_q" not in self._cache:
-            w = np.exp(self._theta)
-            N, n = self.N, self.n
-            # Backward ESP recurrence: expa[i, k] = e_k(w[i:N])
-            expa = np.zeros((N, n))
-            for i in range(N):
-                expa[i, 0] = np.sum(w[i:N])
-            for i in range(N - n, N):
-                expa[i, N - i - 1] = np.prod(w[i:N])
-            for i in range(N - 3, -1, -1):
-                for k in range(1, min(N - i - 1, n)):
-                    expa[i, k] = w[i] * expa[i + 1, k - 1] + expa[i + 1, k]
-            # Sequential conditional probabilities
-            q = np.zeros((N, n))
-            for i in range(N - 1, -1, -1):
-                q[i, 0] = w[i] / expa[i, 0]
-            for i in range(N - n, N):
-                q[i, N - i - 1] = 1.0
-            for i in range(N - 3, -1, -1):
-                for k in range(1, min(N - i - 1, n)):
-                    q[i, k] = w[i] * expa[i + 1, k - 1] / expa[i, k]
-            self._cache["seq_q"] = q
-        return self._cache["seq_q"]
-
     def sample(
         self,
         rng: Optional[Union[int, np.random.Generator]] = None,
     ) -> np.ndarray:
         """
-        Draw one sample via sequential scan.
+        Draw one sample via sequential scan using the backward DP table.
 
-        Parameters
-        ----------
-        rng  : seed or np.random.Generator
+        Conditional probability of including item i given k items still
+        needed from i..N-1:
 
-        Returns
-        -------
-        (n,) int array of sorted item indices.
+            P(include i | k) = q[i] * B_true[i+1, k-1] / B_true[i, k]
 
-        Complexity: O(Nn) to build q table [cached] + O(N).
+        where B_true[i, k] = B[i, k] * exp(Bls[i]) is the true (unscaled)
+        backward ESP value.
+
+        Complexity: O(Nn) to build tables [cached] + O(N).
         """
         if not isinstance(rng, np.random.Generator):
             rng = np.random.default_rng(rng)
-        q = self._get_seq_q()
+        q, _, _, B, Bls, _ = self._get_dp()
         N, n = self.N, self.n
         selected = []
         k = n
         for i in range(N):
             if k == 0:
                 break
-            if rng.random() < q[i, k - 1]:
+            # P(include i | k) = q[i] * B_true[i+1, k-1] / B_true[i, k]
+            # B_true[i, k] = B[i,k] * exp(Bls[i]) for k>=1; B_true[i, 0] = 1
+            if k == 1:
+                prob = q[i] * np.exp(-Bls[i]) / B[i, k]
+            else:
+                prob = q[i] * B[i+1, k-1] / B[i, k] * np.exp(Bls[i+1] - Bls[i])
+            if rng.random() < prob:
                 selected.append(i)
                 k -= 1
         return np.array(selected, dtype=np.int32)

@@ -126,70 +126,62 @@ class ConditionalPoissonSequentialTorch:
 
     # ── Sampling ─────────────────────────────────────────────────────────────
 
-    def _get_seq_q(self):
-        """Build and cache the sequential conditional probability table q.
+    def _get_backward_table(self):
+        """Build and cache the backward DP table for sampling.
 
-        q[i, k] = P(include item i | k items still needed from i..N-1).
-        Uses the backward ESP recurrence.  O(Nn).
+        B[i, k] * exp(Bls[i]) = e_k(q[i:N]), the k-th ESP of scaled
+        weights from item i onward.  q = w / exp(mean(theta)).
         """
-        if "seq_q" not in self._cache:
-            w = torch.exp(self._theta).tolist()
+        if "backward" not in self._cache:
             N, n = self.N, self.n
-            # Backward ESP recurrence: expa[i, k] = e_k(w[i:N])
-            expa = [[0.0] * n for _ in range(N)]
-            for i in range(N):
-                expa[i][0] = sum(w[i:N])
-            for i in range(N - n, N):
-                p = 1.0
-                for j in range(i, N):
-                    p *= w[j]
-                expa[i][N - i - 1] = p
-            for i in range(N - 3, -1, -1):
-                for k in range(1, min(N - i - 1, n)):
-                    expa[i][k] = w[i] * expa[i + 1][k - 1] + expa[i + 1][k]
-            # Sequential conditional probabilities
-            q = [[0.0] * n for _ in range(N)]
+            theta = self._theta.detach()
+            log_gm = theta.mean()
+            q = torch.exp(theta - log_gm)
+
+            B = torch.zeros(N + 1, n + 1, dtype=theta.dtype)
+            Bls = torch.zeros(N + 1, dtype=theta.dtype)
+            B[N, 0] = 1.0
             for i in range(N - 1, -1, -1):
-                q[i][0] = w[i] / expa[i][0]
-            for i in range(N - n, N):
-                q[i][N - i - 1] = 1.0
-            for i in range(N - 3, -1, -1):
-                for k in range(1, min(N - i - 1, n)):
-                    q[i][k] = w[i] * expa[i + 1][k - 1] / expa[i][k]
-            self._cache["seq_q"] = q
-        return self._cache["seq_q"]
+                row = torch.zeros(n + 1, dtype=theta.dtype)
+                row[0] = 1.0
+                if n >= 1:
+                    row[1] = B[i+1, 1] + q[i] * torch.exp(-Bls[i+1])
+                if n >= 2:
+                    row[2:] = B[i+1, 2:] + q[i] * B[i+1, 1:n]
+                mx = row[1:].max().item() if n >= 1 else 1.0
+                if mx > 0:
+                    row[1:] /= mx
+                    Bls[i] = Bls[i+1] + torch.log(torch.tensor(mx))
+                else:
+                    Bls[i] = Bls[i+1]
+                B[i] = row
+            self._cache["backward"] = (q, B, Bls)
+        return self._cache["backward"]
 
     def sample(self, rng=None) -> torch.Tensor:
         """
-        Draw one sample via sequential scan.
+        Draw one sample via sequential scan using the backward DP table.
 
-        Parameters
-        ----------
-        rng  : int seed, random.Random, or np.random.Generator
-
-        Returns
-        -------
-        (n,) long tensor of sorted indices.
-
-        Complexity: O(Nn) to build q table [cached] + O(N).
+        Complexity: O(Nn) to build table [cached] + O(N).
         """
-        import random as _random
         import numpy as np
 
-        q = self._get_seq_q()
+        q, B, Bls = self._get_backward_table()
         N, n = self.N, self.n
 
-        if isinstance(rng, np.random.Generator) or isinstance(rng, _random.Random):
-            pass
-        else:
-            rng = _random.Random(rng)
+        if not isinstance(rng, np.random.Generator):
+            rng = np.random.default_rng(rng)
 
         selected = []
         k = n
         for i in range(N):
             if k == 0:
                 break
-            if rng.random() < q[i][k - 1]:
+            if k == 1:
+                prob = (q[i] * torch.exp(-Bls[i]) / B[i, k]).item()
+            else:
+                prob = (q[i] * B[i+1, k-1] / B[i, k] * torch.exp(Bls[i+1] - Bls[i])).item()
+            if rng.random() < prob:
                 selected.append(i)
                 k -= 1
         return torch.tensor(selected, dtype=torch.long)
