@@ -214,7 +214,7 @@ Drag the weight sliders to explore.
           slLabels.push(sl);
           // Label
           var lbl=panel.append('div').style('position','absolute')
-            .style('left',nd.x+'px').style('top',(topPad+slH-4)+'px')
+            .style('left',nd.x+'px').style('top',(topPad+slH+12)+'px')
             .style('transform','translateX(-50%)').style('font-size','13px').style('color',CI)
             .style('pointer-events','none').html('$w_{'+(idx+1)+'}$');
           // Drag area
@@ -241,7 +241,7 @@ Drag the weight sliders to explore.
           piTexts.push(pt);
           // Label
           panel.append('div').style('position','absolute')
-            .style('left',nd.x+'px').style('top',(topPad+slH-4)+'px')
+            .style('left',nd.x+'px').style('top',(topPad+slH+12)+'px')
             .style('transform','translateX(-50%)').style('font-size','13px').style('color',CR)
             .style('pointer-events','none').html('$\\pi_{'+(idx+1)+'}$');
           // Arrow from leaf
