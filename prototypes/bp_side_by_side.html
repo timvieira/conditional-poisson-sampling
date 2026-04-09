@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Backprop Visualization — Side-by-Side Prototype</title>
+<title>Backprop Visualization — Side-by-Side</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
 window.MathJax = {
@@ -11,317 +11,250 @@ window.MathJax = {
 };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
-<style>
-body { font-family: system-ui, sans-serif; margin: 20px; }
-</style>
+<style>body { font-family: system-ui, sans-serif; margin: 20px; }</style>
 </head>
 <body>
-
-<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0; width: fit-content;">
+<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px;">
 
 <b>Interactive backpropagation tree (side-by-side).</b>
 The <span style="color:#5b9bd5">forward pass</span> (left) computes the polynomial product tree bottom-up.
 The <span style="color:#7b2d8e">backward pass</span> (right) propagates adjoints top-down.
+Each child's adjoint comes from the <span style="color:#7b2d8e">parent adjoint</span> cross-correlated with the <span style="color:#5b9bd5">sibling's forward polynomial</span>.
 At the leaves, $\pi_i = w_i \cdot \bar{c}_1^{(i)}$.
 Drag the weight sliders to explore.
 
 <div id="bp"></div>
 <script>
 (function() {
-  var N = 4, n = 2;
-  var w = [0.5, 1.2, 0.3, 1.0];
-  var WMAX = 3;
-  var CW = '#5b9bd5', CA = '#7b2d8e', CI = '#d4a24e', CR = '#c0504d';
+  var N=4, n=2, w=[0.5,1.2,0.3,1.0], WMAX=3;
+  var CW='#5b9bd5', CA='#7b2d8e', CI='#d4a24e', CR='#c0504d', CCROSS='#bbb';
 
-  function polyMul(a, b) {
-    var out = new Array(a.length + b.length - 1).fill(0);
-    for (var i = 0; i < a.length; i++)
-      for (var j = 0; j < b.length; j++) out[i+j] += a[i] * b[j];
-    return out;
+  function polyMul(a,b){var o=new Array(a.length+b.length-1).fill(0);for(var i=0;i<a.length;i++)for(var j=0;j<b.length;j++)o[i+j]+=a[i]*b[j];return o;}
+  function buildTree(w,n){
+    var lv=w.map(function(wi,i){return{poly:[1,wi],leaf:true,idx:i};});
+    var sz=1;while(sz<lv.length)sz*=2;while(lv.length<sz)lv.push({poly:[1],pad:true});
+    var level=lv,all=[level];
+    while(level.length>1){var nx=[];for(var i=0;i<level.length;i+=2){var p=polyMul(level[i].poly,level[i+1].poly);if(p.length>n+1)p=p.slice(0,n+1);nx.push({left:level[i],right:level[i+1],poly:p});}level=nx;all.push(level);}
+    return{root:level[0],levels:all};
   }
-  function buildTree(w, n) {
-    var leaves = w.map(function(wi,i){ return {poly:[1,wi], leaf:true, idx:i}; });
-    var sz = 1; while (sz < leaves.length) sz *= 2;
-    while (leaves.length < sz) leaves.push({poly:[1], pad:true});
-    var level = leaves, all = [level];
-    while (level.length > 1) {
-      var next = [];
-      for (var i = 0; i < level.length; i += 2) {
-        var p = polyMul(level[i].poly, level[i+1].poly);
-        if (p.length > n+1) p = p.slice(0, n+1);
-        next.push({left:level[i], right:level[i+1], poly:p});
-      }
-      level = next; all.push(level);
-    }
-    return {root:level[0], levels:all};
-  }
-  function crossCorr(pa, sp, ml) {
-    var out = new Array(ml).fill(0);
-    for (var j=0;j<ml;j++) for (var k=0;k<sp.length;k++) if (j+k<pa.length) out[j]+=pa[j+k]*sp[k];
-    return out;
-  }
-  function backprop(tree, n) {
-    var rt = tree.root, Z = rt.poly[Math.min(n,rt.poly.length-1)]||0;
-    var al = Math.min(rt.poly.length, n+1);
-    rt.adj = new Array(al).fill(0);
-    if (n < al && Z > 0) rt.adj[n] = 1/Z;
-    (function walk(nd){
-      if (!nd.left) return;
-      nd.left.adj = crossCorr(nd.adj, nd.right.poly, Math.min(nd.left.poly.length, n+1));
-      nd.right.adj = crossCorr(nd.adj, nd.left.poly, Math.min(nd.right.poly.length, n+1));
-      walk(nd.left); walk(nd.right);
-    })(rt);
+  function crossCorr(pa,sp,ml){var o=new Array(ml).fill(0);for(var j=0;j<ml;j++)for(var k=0;k<sp.length;k++)if(j+k<pa.length)o[j]+=pa[j+k]*sp[k];return o;}
+  function backprop(tree,n){
+    var rt=tree.root,Z=rt.poly[Math.min(n,rt.poly.length-1)]||0;
+    var al=Math.min(rt.poly.length,n+1);rt.adj=new Array(al).fill(0);
+    if(n<al&&Z>0)rt.adj[n]=1/Z;
+    (function walk(nd){if(!nd.left)return;nd.left.adj=crossCorr(nd.adj,nd.right.poly,Math.min(nd.left.poly.length,n+1));nd.right.adj=crossCorr(nd.adj,nd.left.poly,Math.min(nd.right.poly.length,n+1));walk(nd.left);walk(nd.right);})(rt);
     return Z;
   }
-  function fmt(v) { return v===0?'0':Math.abs(v)<.005?'':Math.abs(v)>=10?v.toFixed(0):Math.abs(v)>=1?v.toFixed(1):v.toFixed(2); }
+  function fmt(v){return v===0?'0':Math.abs(v)<.005?'':Math.abs(v)>=10?v.toFixed(0):Math.abs(v)>=1?v.toFixed(1):v.toFixed(2);}
 
-  var bW=28, bH=70, bGap=4, nPad=12, vGap=30, hGap=20, slH=70;
-  var root = d3.select('#bp');
+  var bW=28,bH=70,bGap=4,nPad=12,vGap=30,hGap=20,slH=70;
+  var root=d3.select('#bp');
 
-  function fullBuild() {
+  function fullBuild(){
     root.selectAll('*').remove();
-
-    // Controls
-    var ctrl = root.append('div').style('display','flex').style('align-items','center')
-      .style('gap','12px').style('margin-bottom','8px').style('font-size','0.9em');
+    var ctrl=root.append('div').style('display','flex').style('align-items','center').style('gap','12px').style('margin-bottom','8px').style('font-size','0.9em');
     ctrl.append('span').html('$N$ = ');
-    ctrl.append('input').attr('type','number').attr('min',2).attr('value',N)
-      .style('width','44px').on('change', function(){ var v=Math.max(2,+this.value); if(v===N)return; while(w.length<v)w.push(.5+Math.random()); w=w.slice(0,v); N=v; n=Math.min(n,N); fullBuild(); });
+    ctrl.append('input').attr('type','number').attr('min',2).attr('value',N).style('width','44px')
+      .on('change',function(){var v=Math.max(2,+this.value);if(v===N)return;while(w.length<v)w.push(.5+Math.random());w=w.slice(0,v);N=v;n=Math.min(n,N);fullBuild();});
     ctrl.append('span').html('&ensp;$n$ = ');
-    ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n)
-      .style('width','44px').on('change', function(){ var v=Math.max(0,Math.min(N,+this.value)); if(v===n)return; n=v; fullBuild(); });
+    ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n).style('width','44px')
+      .on('change',function(){var v=Math.max(0,Math.min(N,+this.value));if(v===n)return;n=v;fullBuild();});
 
-    var tree = buildTree(w, n);
-    var Z = backprop(tree, n);
-    var levels = tree.levels, depth = levels.length;
-    var totalLeaves = levels[0].length;
+    var tree=buildTree(w,n), Z=backprop(tree,n);
+    var levels=tree.levels, depth=levels.length;
+    var totalLeaves=levels[0].length;
 
-    // Layout
-    var leafSp = 0;
-    levels[0].forEach(function(nd){
-      if(nd.pad) return;
-      var nc = Math.min(Math.max(nd.poly.length, (nd.adj||[]).length), n+1);
-      var ww = nc*(bW+bGap)-bGap+nPad+hGap;
-      if(ww>leafSp) leafSp=ww;
-    });
-    leafSp = Math.max(leafSp, bW+hGap+10);
+    // Layout for one panel
+    var leafSp=0;
+    levels[0].forEach(function(nd){if(nd.pad)return;var nc=Math.min(Math.max(nd.poly.length,(nd.adj||[]).length),n+1);var ww=nc*(bW+bGap)-bGap+nPad+hGap;if(ww>leafSp)leafSp=ww;});
+    leafSp=Math.max(leafSp,bW+hGap+10);
 
-    var nodeH = bH+nPad, topPad=10, labelH=16;
-    var inputBot = topPad+slH+labelH+10, sep1Y=inputBot+10;
-    var leafY = sep1Y+20;
-    var rootBot = leafY+(depth-1)*(nodeH+vGap)+nodeH;
-    var panelW = totalLeaves*leafSp+50;
-    var panelH = rootBot+30;
+    var nodeH=bH+nPad, topPad=10, labelH=16;
+    var inputBot=topPad+slH+labelH+10, sep1Y=inputBot+10, leafY=sep1Y+20;
+    var rootBot=leafY+(depth-1)*(nodeH+vGap)+nodeH;
+    var panelW=totalLeaves*leafSp+50;
+    var gap=60; // gap between panels for cross-connections
+    var totalW=panelW*2+gap;
+    var panelH=rootBot+30;
 
-    // Positions (shared)
+    // Node positions for left (forward) panel
+    var fwdX={}, adjX={};
     for(var i=0;i<totalLeaves;i++){
-      levels[0][i].x=20+i*leafSp+leafSp/2; levels[0][i].y=leafY;
+      levels[0][i].fx=20+i*leafSp+leafSp/2;
+      levels[0][i].ax=panelW+gap+20+i*leafSp+leafSp/2;
+      levels[0][i].y=leafY;
     }
     for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
-      nd.x=(nd.left.x+(nd.right?nd.right.x:nd.left.x))/2;
+      nd.fx=(nd.left.fx+(nd.right?nd.right.fx:nd.left.fx))/2;
+      nd.ax=(nd.left.ax+(nd.right?nd.right.ax:nd.left.ax))/2;
       nd.y=leafY+li*(nodeH+vGap);
     });
 
-    // Two panels
-    var wrap = root.append('div').style('display','flex').style('gap','30px');
+    // Single SVG spanning both panels
+    var svgWrap=root.append('div').style('position','relative').style('width',totalW+'px').style('height',panelH+'px');
+    var svg=svgWrap.append('svg').attr('width',totalW).attr('height',panelH).style('display','block');
 
-    function makePanel(parent, mode) {
-      var color = mode==='fwd'?CW:CA;
-      var outer = parent.append('div');
-      outer.append('div').style('text-align','center').style('font-weight','bold')
-        .style('color',color).style('font-size','13px').style('margin-bottom','4px')
-        .text(mode==='fwd'?'Forward Pass':'Backward Pass (Adjoints)');
-      var panel = outer.append('div').style('position','relative')
-        .style('width',panelW+'px').style('height',panelH+'px');
-      var svg = panel.append('svg').attr('width',panelW).attr('height',panelH).style('display','block');
+    // Panel titles
+    svgWrap.append('div').style('position','absolute').style('left',(panelW/2)+'px').style('top','-20px')
+      .style('transform','translateX(-50%)').style('font-weight','bold').style('color',CW).style('font-size','13px')
+      .text('Forward Pass');
+    svgWrap.append('div').style('position','absolute').style('left',(panelW+gap+panelW/2)+'px').style('top','-20px')
+      .style('transform','translateX(-50%)').style('font-weight','bold').style('color',CA).style('font-size','13px')
+      .text('Backward Pass (Adjoints)');
 
-      // Separator
-      svg.append('line').attr('x1',10).attr('x2',panelW-10).attr('y1',sep1Y).attr('y2',sep1Y)
-        .attr('stroke','#e0e0e0').attr('stroke-dasharray','4,4');
+    // Separators
+    svg.append('line').attr('x1',10).attr('x2',panelW-10).attr('y1',sep1Y).attr('y2',sep1Y).attr('stroke','#e0e0e0').attr('stroke-dasharray','4,4');
+    svg.append('line').attr('x1',panelW+gap+10).attr('x2',totalW-10).attr('y1',sep1Y).attr('y2',sep1Y).attr('stroke','#e0e0e0').attr('stroke-dasharray','4,4');
 
-      // Edges
-      var hs=5;
-      for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
-        [nd.left,nd.right].forEach(function(ch){
-          if(!ch||ch.pad) return;
-          var px=nd.x, py=nd.y, cx=ch.x, cy=ch.y+nodeH;
-          if(mode==='fwd'){
-            svg.append('line').attr('x1',cx).attr('y1',cy).attr('x2',px).attr('y2',py+2)
-              .attr('stroke','#ccc').attr('stroke-width',1.5);
-          } else {
-            svg.append('line').attr('x1',px).attr('y1',py).attr('x2',cx).attr('y2',cy-2)
-              .attr('stroke',color).attr('stroke-width',1.2).attr('stroke-dasharray','4,3').attr('opacity',.6);
-            // arrowhead
-            var dx=cx-px, dy=cy-py, len=Math.sqrt(dx*dx+dy*dy), ux=dx/len, uy=dy/len;
-            svg.append('polygon')
-              .attr('points',[cx+','+(cy-2),(cx-hs*uy-hs*.6*ux)+','+(cy-2-hs*ux+hs*.6*uy),(cx+hs*uy-hs*.6*ux)+','+(cy-2+hs*ux+hs*.6*uy)].join(' '))
-              .attr('fill',color).attr('opacity',.6);
-          }
-        });
+    // Vertical divider
+    svg.append('line').attr('x1',panelW+gap/2).attr('x2',panelW+gap/2).attr('y1',leafY-10).attr('y2',rootBot+10)
+      .attr('stroke','#e8e8e8').attr('stroke-width',1).attr('stroke-dasharray','6,4');
+
+    // Forward edges (solid gray, downward)
+    for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
+      [nd.left,nd.right].forEach(function(ch){
+        if(!ch||ch.pad)return;
+        svg.append('line').attr('x1',ch.fx).attr('y1',ch.y+nodeH).attr('x2',nd.fx).attr('y2',nd.y+2)
+          .attr('stroke','#ccc').attr('stroke-width',1.5);
       });
+    });
 
-      // Annotation arrow
-      var aX=panelW-14, aTop=leafY+10, aBot=leafY+(depth-1)*(nodeH+vGap)+nodeH-10, aH=12;
-      if(mode==='fwd'){
-        svg.append('line').attr('x1',aX).attr('y1',aTop).attr('x2',aX).attr('y2',aBot-aH).attr('stroke','#c8c8c8').attr('stroke-width',3);
-        svg.append('polygon').attr('points',(aX-aH)+','+(aBot-aH*1.5)+' '+(aX+aH)+','+(aBot-aH*1.5)+' '+aX+','+aBot).attr('fill','#c8c8c8');
-      } else {
-        svg.append('line').attr('x1',aX).attr('y1',aBot).attr('x2',aX).attr('y2',aTop+aH).attr('stroke','#c8c8c8').attr('stroke-width',3);
-        svg.append('polygon').attr('points',(aX-aH)+','+(aTop+aH*1.5)+' '+(aX+aH)+','+(aTop+aH*1.5)+' '+aX+','+aTop).attr('fill','#c8c8c8');
-      }
+    // Backward edges: parent adjoint → child adjoint (dashed purple, downward)
+    // AND cross-connections: sibling forward → child adjoint (dotted gray)
+    var hs=5;
+    for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
+      if(!nd.left)return;
+      // For left child: adjoint comes from parent adj + right sibling fwd
+      [{child:nd.left, sibling:nd.right}, {child:nd.right, sibling:nd.left}].forEach(function(pair){
+        var ch=pair.child, sib=pair.sibling;
+        if(!ch||ch.pad)return;
 
-      // Node bars
-      var logMax = mode==='fwd'?Math.log1p(Math.pow(WMAX,n)):Math.log1p(1);
-      var refs = [];
+        // Edge from parent adjoint to child adjoint (within backward panel)
+        svg.append('line').attr('x1',nd.ax).attr('y1',nd.y).attr('x2',ch.ax).attr('y2',ch.y+nodeH-2)
+          .attr('stroke',CA).attr('stroke-width',1.2).attr('stroke-dasharray','4,3').attr('opacity',.6);
+        // Arrowhead
+        var dx=ch.ax-nd.ax,dy=(ch.y+nodeH-2)-nd.y,len=Math.sqrt(dx*dx+dy*dy);
+        if(len>0){var ux=dx/len,uy=dy/len;
+        svg.append('polygon')
+          .attr('points',[ch.ax+','+(ch.y+nodeH-2),(ch.ax-hs*uy-hs*.6*ux)+','+(ch.y+nodeH-2-hs*ux+hs*.6*uy),(ch.ax+hs*uy-hs*.6*ux)+','+(ch.y+nodeH-2+hs*ux+hs*.6*uy)].join(' '))
+          .attr('fill',CA).attr('opacity',.6);}
+
+        // Cross-connection: sibling forward poly → child adjoint
+        if(sib&&!sib.pad){
+          var sx=sib.fx, sy=sib.y+nodeH/2; // midpoint of sibling in forward panel
+          var cx=ch.ax, cy=ch.y+nodeH/2; // midpoint of child in backward panel
+          svg.append('path')
+            .attr('d','M'+sx+','+sy+' C'+(panelW+gap/2)+','+sy+' '+(panelW+gap/2)+','+cy+' '+cx+','+cy)
+            .attr('fill','none').attr('stroke',CCROSS).attr('stroke-width',1)
+            .attr('stroke-dasharray','3,3').attr('opacity',.5);
+          // Small circle at source (sibling forward)
+          svg.append('circle').attr('cx',sx).attr('cy',sy).attr('r',3).attr('fill',CW).attr('opacity',.5);
+          // Small circle at target (child adjoint)
+          svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',3).attr('fill',CA).attr('opacity',.5);
+        }
+      });
+    });
+
+    // Annotation arrows
+    var aX1=panelW-14, aX2=totalW-14, aTop=leafY+10, aBot=rootBot-10, aH=12;
+    svg.append('line').attr('x1',aX1).attr('y1',aTop).attr('x2',aX1).attr('y2',aBot-aH).attr('stroke','#c8c8c8').attr('stroke-width',3);
+    svg.append('polygon').attr('points',(aX1-aH)+','+(aBot-aH*1.5)+' '+(aX1+aH)+','+(aBot-aH*1.5)+' '+aX1+','+aBot).attr('fill','#c8c8c8');
+    svg.append('line').attr('x1',aX2).attr('y1',aBot).attr('x2',aX2).attr('y2',aTop+aH).attr('stroke','#c8c8c8').attr('stroke-width',3);
+    svg.append('polygon').attr('points',(aX2-aH)+','+(aTop+aH*1.5)+' '+(aX2+aH)+','+(aTop+aH*1.5)+' '+aX2+','+aTop).attr('fill','#c8c8c8');
+
+    // Draw node bars
+    var logMaxFwd=Math.log1p(Math.pow(WMAX,n)), logMaxAdj=Math.log1p(1);
+    var fwdRefs=[], adjRefs=[];
+
+    function drawBars(levels, xKey, color, logMax, refs) {
       for(var li=0;li<depth;li++) levels[li].forEach(function(nd){
         if(nd.pad){refs.push(null);return;}
-        var coeffs = mode==='fwd'?nd.poly:(nd.adj||[]);
-        var nc = Math.min(coeffs.length, n+1);
+        var coeffs = (xKey==='fx')?nd.poly:(nd.adj||[]);
+        var nc=Math.min(coeffs.length,n+1);
         if(!nc){refs.push(null);return;}
-        var boxW=nc*(bW+bGap)-bGap+nPad, gx=nd.x-boxW/2;
+        var boxW=nc*(bW+bGap)-bGap+nPad, gx=nd[xKey]-boxW/2;
         var g=svg.append('g').attr('transform','translate('+gx+','+nd.y+')');
         g.append('rect').attr('width',boxW).attr('height',nodeH).attr('fill','#f9f9f9').attr('rx',5);
-        var rects=[], texts=[];
+        var rects=[],texts=[];
         for(var k=0;k<nc;k++){
-          var bx=nPad/2+k*(bW+bGap);
-          var v=k<coeffs.length?coeffs[k]:0;
+          var bx=nPad/2+k*(bW+bGap), v=k<coeffs.length?coeffs[k]:0;
           var fr=Math.min(1,Math.log1p(Math.abs(v))/logMax);
           var px=Math.max(.5,fr*(bH-12));
-          var isHL=(li===depth-1&&k===n);
-          var c=isHL?CR:color;
-          var r=g.append('rect').attr('x',bx+1).attr('width',bW-2).attr('rx',2)
-            .attr('y',nPad/2+(bH-12)-px).attr('height',px).attr('fill',c).attr('opacity',.7);
-          rects.push(r);
-          var t=g.append('text').attr('x',bx+bW/2).attr('y',nPad/2+(bH-12)-px-3)
-            .attr('text-anchor','middle').style('font-size','8px').style('fill',c).text(fmt(v));
-          texts.push(t);
+          var isHL=(li===depth-1&&k===n), c=isHL?CR:color;
+          rects.push(g.append('rect').attr('x',bx+1).attr('width',bW-2).attr('rx',2)
+            .attr('y',nPad/2+(bH-12)-px).attr('height',px).attr('fill',c).attr('opacity',.7));
+          texts.push(g.append('text').attr('x',bx+bW/2).attr('y',nPad/2+(bH-12)-px-3)
+            .attr('text-anchor','middle').style('font-size','8px').style('fill',c).text(fmt(v)));
         }
         refs.push({rects:rects,texts:texts,nc:nc});
       });
-
-      // Sliders (forward) or pi bars (backward)
-      var slFills=[], slLabels=[], piBars=[], piTexts=[];
-      levels[0].forEach(function(nd,idx){
-        if(nd.pad) return;
-        var bx = nd.x - bW/2;
-        if(mode==='fwd'){
-          // Weight slider
-          var frac=Math.min(w[idx]/WMAX,1);
-          var sf=svg.append('rect').attr('x',bx+2).attr('width',bW-4).attr('rx',2)
-            .attr('y',topPad+slH-frac*slH).attr('height',frac*slH)
-            .attr('fill',CI).attr('opacity',.8).style('pointer-events','none');
-          slFills.push(sf);
-          var sl=svg.append('text').attr('x',nd.x).attr('y',topPad+slH-frac*slH-2)
-            .attr('text-anchor','middle').style('font-size','9px').style('fill',CI).text(w[idx].toFixed(2));
-          slLabels.push(sl);
-          // Label
-          panel.append('div').style('position','absolute')
-            .style('left',nd.x+'px').style('top',(topPad+slH)+'px')
-            .style('transform','translateX(-50%)').style('font-size','13px').style('color',CI)
-            .style('pointer-events','none').html('$w_{'+(idx+1)+'}$');
-          // Drag area
-          svg.append('rect').attr('x',bx-4).attr('y',topPad-2).attr('width',bW+8).attr('height',slH+4)
-            .attr('fill','transparent').attr('cursor','ns-resize').style('touch-action','none')
-            .call(d3.drag().on('drag',function(event){
-              var fr=(topPad+slH-event.y)/slH;
-              w[idx]=Math.max(.01,Math.min(WMAX,fr*WMAX));
-              update();
-            }));
-          // Arrow to leaf
-          svg.append('line').attr('x1',nd.x).attr('y1',inputBot).attr('x2',nd.x).attr('y2',nd.y)
-            .attr('stroke','#ccc').attr('stroke-width',1);
-        } else {
-          // Pi bar
-          var pi_i = nd.adj&&nd.adj.length>1?w[idx]*nd.adj[1]:0;
-          var pf=Math.min(pi_i,1);
-          var pb=svg.append('rect').attr('x',bx+2).attr('width',bW-4).attr('rx',2)
-            .attr('y',topPad+slH-pf*slH).attr('height',pf*slH)
-            .attr('fill',CR).attr('opacity',.7).style('pointer-events','none');
-          piBars.push(pb);
-          var pt=svg.append('text').attr('x',nd.x).attr('y',topPad+slH-pf*slH-2)
-            .attr('text-anchor','middle').style('font-size','9px').style('fill',CR).text(pi_i.toFixed(3));
-          piTexts.push(pt);
-          // Label
-          panel.append('div').style('position','absolute')
-            .style('left',nd.x+'px').style('top',(topPad+slH)+'px')
-            .style('transform','translateX(-50%)').style('font-size','13px').style('color',CR)
-            .style('pointer-events','none').html('$\\pi_{'+(idx+1)+'}$');
-          // Arrow from leaf
-          svg.append('line').attr('x1',nd.x).attr('y1',nd.y).attr('x2',nd.x).attr('y2',inputBot)
-            .attr('stroke','#d4a0a0').attr('stroke-width',1);
-        }
-      });
-
-      // Seed label
-      if(mode==='adj'){
-        var rn=levels[depth-1][0];
-        panel.append('div').style('position','absolute')
-          .style('left',rn.x+'px').style('top',(rn.y-14)+'px')
-          .style('transform','translateX(-50%)').style('font-size','10px').style('color',CR)
-          .style('pointer-events','none').html('$\\bar{c}_n = 1/Z$');
-      }
-
-      return {refs:refs, logMax:logMax, slFills:slFills, slLabels:slLabels, piBars:piBars, piTexts:piTexts, mode:mode, color:color};
     }
+    drawBars(levels,'fx',CW,logMaxFwd,fwdRefs);
+    drawBars(levels,'ax',CA,logMaxAdj,adjRefs);
 
-    var fwd = makePanel(wrap, 'fwd');
-    var adj = makePanel(wrap, 'adj');
+    // Weight sliders (forward panel, top)
+    var slFills=[],slLabels=[];
+    levels[0].forEach(function(nd,idx){
+      if(nd.pad)return;
+      (function(idx){
+        var bx=nd.fx-bW/2, frac=Math.min(w[idx]/WMAX,1);
+        slFills.push(svg.append('rect').attr('x',bx+2).attr('width',bW-4).attr('rx',2)
+          .attr('y',topPad+slH-frac*slH).attr('height',frac*slH).attr('fill',CI).attr('opacity',.8).style('pointer-events','none'));
+        slLabels.push(svg.append('text').attr('x',nd.fx).attr('y',topPad+slH-frac*slH-2)
+          .attr('text-anchor','middle').style('font-size','9px').style('fill',CI).text(w[idx].toFixed(2)));
+        svgWrap.append('div').style('position','absolute').style('left',nd.fx+'px').style('top',(topPad+slH)+'px')
+          .style('transform','translateX(-50%)').style('font-size','13px').style('color',CI).style('pointer-events','none')
+          .html('$w_{'+(idx+1)+'}$');
+        svg.append('line').attr('x1',nd.fx).attr('y1',inputBot).attr('x2',nd.fx).attr('y2',nd.y).attr('stroke','#ccc').attr('stroke-width',1);
+        svg.append('rect').attr('x',bx-4).attr('y',topPad-2).attr('width',bW+8).attr('height',slH+4)
+          .attr('fill','transparent').attr('cursor','ns-resize').style('touch-action','none')
+          .call(d3.drag().on('drag',function(event){
+            var fr=(topPad+slH-event.y)/slH;
+            w[idx]=Math.max(.01,Math.min(WMAX,fr*WMAX)); update();
+          }));
+      })(idx);
+    });
 
-    function update() {
-      var tr=buildTree(w,n), Z=backprop(tr,n), lv=tr.levels;
+    // Pi bars (backward panel, top)
+    var piBars=[],piTexts=[];
+    levels[0].forEach(function(nd,idx){
+      if(nd.pad)return;
+      var bx=nd.ax-bW/2, pi_i=nd.adj&&nd.adj.length>1?w[idx]*nd.adj[1]:0, pf=Math.min(pi_i,1);
+      piBars.push(svg.append('rect').attr('x',bx+2).attr('width',bW-4).attr('rx',2)
+        .attr('y',topPad+slH-pf*slH).attr('height',pf*slH).attr('fill',CR).attr('opacity',.7).style('pointer-events','none'));
+      piTexts.push(svg.append('text').attr('x',nd.ax).attr('y',topPad+slH-pf*slH-2)
+        .attr('text-anchor','middle').style('font-size','9px').style('fill',CR).text(pi_i.toFixed(3)));
+      svgWrap.append('div').style('position','absolute').style('left',nd.ax+'px').style('top',(topPad+slH)+'px')
+        .style('transform','translateX(-50%)').style('font-size','13px').style('color',CR).style('pointer-events','none')
+        .html('$\\pi_{'+(idx+1)+'}$');
+      svg.append('line').attr('x1',nd.ax).attr('y1',nd.y).attr('x2',nd.ax).attr('y2',inputBot).attr('stroke','#d4a0a0').attr('stroke-width',1);
+    });
 
-      // Update forward bars
+    // Seed label
+    var rn=levels[depth-1][0];
+    svgWrap.append('div').style('position','absolute').style('left',rn.ax+'px').style('top',(rn.y-14)+'px')
+      .style('transform','translateX(-50%)').style('font-size','10px').style('color',CR).style('pointer-events','none')
+      .html('$\\bar{c}_n = 1/Z$');
+
+    function update(){
+      var tr=buildTree(w,n),Z=backprop(tr,n),lv=tr.levels;
       var ri=0;
       for(var li=0;li<lv.length;li++) lv[li].forEach(function(nd){
-        var ref=fwd.refs[ri++]; if(!ref) return;
-        for(var k=0;k<ref.nc;k++){
-          var v=k<nd.poly.length?nd.poly[k]:0;
-          var fr=Math.min(1,Math.log1p(Math.abs(v))/fwd.logMax);
-          var px=Math.max(1,fr*(bH-12));
-          ref.rects[k].attr('y',nPad/2+(bH-12)-px).attr('height',px);
-          ref.texts[k].attr('y',nPad/2+(bH-12)-px-3).text(fmt(v));
-        }
+        var ref=fwdRefs[ri++];if(!ref)return;
+        for(var k=0;k<ref.nc;k++){var v=k<nd.poly.length?nd.poly[k]:0;var fr=Math.min(1,Math.log1p(Math.abs(v))/logMaxFwd);var px=Math.max(1,fr*(bH-12));ref.rects[k].attr('y',nPad/2+(bH-12)-px).attr('height',px);ref.texts[k].attr('y',nPad/2+(bH-12)-px-3).text(fmt(v));}
       });
-
-      // Update adjoint bars
       ri=0;
       for(var li=0;li<lv.length;li++) lv[li].forEach(function(nd){
-        var ref=adj.refs[ri++]; if(!ref) return;
-        var a=nd.adj||[];
-        for(var k=0;k<ref.nc;k++){
-          var v=k<a.length?a[k]:0;
-          var fr=Math.min(1,Math.log1p(Math.abs(v))/adj.logMax);
-          var px=Math.max(1,fr*(bH-12));
-          ref.rects[k].attr('y',nPad/2+(bH-12)-px).attr('height',px);
-          ref.texts[k].attr('y',nPad/2+(bH-12)-px-3).text(fmt(v));
-        }
+        var ref=adjRefs[ri++];if(!ref)return;var a=nd.adj||[];
+        for(var k=0;k<ref.nc;k++){var v=k<a.length?a[k]:0;var fr=Math.min(1,Math.log1p(Math.abs(v))/logMaxAdj);var px=Math.max(1,fr*(bH-12));ref.rects[k].attr('y',nPad/2+(bH-12)-px).attr('height',px);ref.texts[k].attr('y',nPad/2+(bH-12)-px-3).text(fmt(v));}
       });
-
-      // Update sliders
-      for(var i=0;i<fwd.slFills.length;i++){
-        var fr=Math.min(w[i]/WMAX,1);
-        fwd.slFills[i].attr('y',topPad+slH-fr*slH).attr('height',fr*slH);
-        fwd.slLabels[i].attr('y',topPad+slH-fr*slH-2).text(w[i].toFixed(2));
-      }
-
-      // Update pi bars
-      var pi=[];
-      for(var i=0;i<N;i++){
-        var leaf=lv[0][i];
-        pi.push(leaf.adj&&leaf.adj.length>1?w[i]*leaf.adj[1]:0);
-      }
-      for(var i=0;i<adj.piBars.length;i++){
-        var pf=Math.min(pi[i],1);
-        adj.piBars[i].attr('y',topPad+slH-pf*slH).attr('height',pf*slH);
-        adj.piTexts[i].attr('y',topPad+slH-pf*slH-2).text(pi[i].toFixed(3));
-      }
+      for(var i=0;i<slFills.length;i++){var fr=Math.min(w[i]/WMAX,1);slFills[i].attr('y',topPad+slH-fr*slH).attr('height',fr*slH);slLabels[i].attr('y',topPad+slH-fr*slH-2).text(w[i].toFixed(2));}
+      var pi=[];for(var i=0;i<N;i++){var leaf=lv[0][i];pi.push(leaf.adj&&leaf.adj.length>1?w[i]*leaf.adj[1]:0);}
+      for(var i=0;i<piBars.length;i++){var pf=Math.min(pi[i],1);piBars[i].attr('y',topPad+slH-pf*slH).attr('height',pf*slH);piTexts[i].attr('y',topPad+slH-pf*slH-2).text(pi[i].toFixed(3));}
     }
 
-    setTimeout(function(){
-      if(window.MathJax&&MathJax.typesetPromise) MathJax.typesetPromise([document.getElementById('bp')]);
-    },50);
+    setTimeout(function(){if(window.MathJax&&MathJax.typesetPromise)MathJax.typesetPromise([document.getElementById('bp')]);},50);
   }
-
   fullBuild();
 })();
 </script>
