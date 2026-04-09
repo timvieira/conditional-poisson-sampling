@@ -4,11 +4,9 @@
 <meta charset="utf-8">
 <title>Backprop Visualization — Side-by-Side</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
 <script>
-window.MathJax = {
-  tex: { inlineMath: [['$', '$']] },
-  startup: { typeset: false }
-};
+window.MathJax = { tex: { inlineMath: [['$', '$']] }, startup: { typeset: false } };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
 <style>body { font-family: system-ui, sans-serif; margin: 20px; }</style>
@@ -27,7 +25,7 @@ Drag the weight sliders to explore.
 <script>
 (function() {
   var N=4, n=2, w=[0.5,1.2,0.3,1.0], WMAX=3;
-  var CW='#5b9bd5', CA='#7b2d8e', CI='#d4a24e', CR='#c0504d', CCROSS='#bbb';
+  var CW='#5b9bd5', CA='#7b2d8e', CI='#d4a24e', CR='#c0504d', CCROSS='#aaa';
 
   function polyMul(a,b){var o=new Array(a.length+b.length-1).fill(0);for(var i=0;i<a.length;i++)for(var j=0;j<b.length;j++)o[i+j]+=a[i]*b[j];return o;}
   function buildTree(w,n){
@@ -38,7 +36,7 @@ Drag the weight sliders to explore.
     return{root:level[0],levels:all};
   }
   function crossCorr(pa,sp,ml){var o=new Array(ml).fill(0);for(var j=0;j<ml;j++)for(var k=0;k<sp.length;k++)if(j+k<pa.length)o[j]+=pa[j+k]*sp[k];return o;}
-  function backprop(tree,n){
+  function doBackprop(tree,n){
     var rt=tree.root,Z=rt.poly[Math.min(n,rt.poly.length-1)]||0;
     var al=Math.min(rt.poly.length,n+1);rt.adj=new Array(al).fill(0);
     if(n<al&&Z>0)rt.adj[n]=1/Z;
@@ -60,11 +58,11 @@ Drag the weight sliders to explore.
     ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n).style('width','44px')
       .on('change',function(){var v=Math.max(0,Math.min(N,+this.value));if(v===n)return;n=v;fullBuild();});
 
-    var tree=buildTree(w,n), Z=backprop(tree,n);
+    var tree=buildTree(w,n), Z=doBackprop(tree,n);
     var levels=tree.levels, depth=levels.length;
     var totalLeaves=levels[0].length;
 
-    // Layout for one panel
+    // Layout
     var leafSp=0;
     levels[0].forEach(function(nd){if(nd.pad)return;var nc=Math.min(Math.max(nd.poly.length,(nd.adj||[]).length),n+1);var ww=nc*(bW+bGap)-bGap+nPad+hGap;if(ww>leafSp)leafSp=ww;});
     leafSp=Math.max(leafSp,bW+hGap+10);
@@ -73,44 +71,80 @@ Drag the weight sliders to explore.
     var inputBot=topPad+slH+labelH+10, sep1Y=inputBot+10, leafY=sep1Y+20;
     var rootBot=leafY+(depth-1)*(nodeH+vGap)+nodeH;
     var panelW=totalLeaves*leafSp+50;
-    var gap=60; // gap between panels for cross-connections
+    var gap=80;
     var totalW=panelW*2+gap;
     var panelH=rootBot+30;
 
-    // Node positions for left (forward) panel
-    var fwdX={}, adjX={};
+    // Assign node positions: fx,fy for forward; ax,ay for adjoint
+    // Assign IDs for dagre
+    var nodeId=0;
     for(var i=0;i<totalLeaves;i++){
-      levels[0][i].fx=20+i*leafSp+leafSp/2;
-      levels[0][i].ax=panelW+gap+20+i*leafSp+leafSp/2;
-      levels[0][i].y=leafY;
+      var nd=levels[0][i];
+      nd.fx=20+i*leafSp+leafSp/2; nd.ax=panelW+gap+20+i*leafSp+leafSp/2;
+      nd.y=leafY; nd.fid='f'+nodeId; nd.aid='a'+nodeId; nodeId++;
     }
     for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
       nd.fx=(nd.left.fx+(nd.right?nd.right.fx:nd.left.fx))/2;
       nd.ax=(nd.left.ax+(nd.right?nd.right.ax:nd.left.ax))/2;
       nd.y=leafY+li*(nodeH+vGap);
+      nd.fid='f'+nodeId; nd.aid='a'+nodeId; nodeId++;
     });
 
-    // Single SVG spanning both panels
+    // Compute node box widths
+    function boxW(nd, mode) {
+      var coeffs = mode==='fwd'?nd.poly:(nd.adj||[]);
+      return Math.min(coeffs.length,n+1)*(bW+bGap)-bGap+nPad;
+    }
+
+    // Build dagre graph for cross-connection routing
+    var g = new dagre.graphlib.Graph({multigraph:true});
+    g.setGraph({rankdir:'LR', nodesep:10, edgesep:10, ranksep:20});
+    g.setDefaultEdgeLabel(function(){return{};});
+
+    // Add all nodes with fixed positions
+    for(var li=0;li<depth;li++) levels[li].forEach(function(nd){
+      if(nd.pad) return;
+      var fw=boxW(nd,'fwd'), aw=boxW(nd,'adj');
+      g.setNode(nd.fid, {x:nd.fx, y:nd.y+nodeH/2, width:fw, height:nodeH});
+      g.setNode(nd.aid, {x:nd.ax, y:nd.y+nodeH/2, width:aw, height:nodeH});
+    });
+
+    // Add cross-connection edges (sibling forward → child adjoint)
+    for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
+      if(!nd.left) return;
+      [{child:nd.left, sibling:nd.right}, {child:nd.right, sibling:nd.left}].forEach(function(pair,ei){
+        var ch=pair.child, sib=pair.sibling;
+        if(!ch||ch.pad||!sib||sib.pad) return;
+        g.setEdge(sib.fid, ch.aid, {}, nd.fid+'_'+ei);
+      });
+    });
+
+    // Add backward tree edges (parent adjoint → child adjoint)
+    for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
+      if(!nd.left) return;
+      [nd.left, nd.right].forEach(function(ch){
+        if(!ch||ch.pad) return;
+        g.setEdge(nd.aid, ch.aid, {}, 'bk_'+nd.aid+'_'+ch.aid);
+      });
+    });
+
+    dagre.layout(g);
+
+    // SVG
     var svgWrap=root.append('div').style('position','relative').style('width',totalW+'px').style('height',panelH+'px');
     var svg=svgWrap.append('svg').attr('width',totalW).attr('height',panelH).style('display','block');
 
     // Panel titles
     svgWrap.append('div').style('position','absolute').style('left',(panelW/2)+'px').style('top','-20px')
-      .style('transform','translateX(-50%)').style('font-weight','bold').style('color',CW).style('font-size','13px')
-      .text('Forward Pass');
+      .style('transform','translateX(-50%)').style('font-weight','bold').style('color',CW).style('font-size','13px').text('Forward Pass');
     svgWrap.append('div').style('position','absolute').style('left',(panelW+gap+panelW/2)+'px').style('top','-20px')
-      .style('transform','translateX(-50%)').style('font-weight','bold').style('color',CA).style('font-size','13px')
-      .text('Backward Pass (Adjoints)');
+      .style('transform','translateX(-50%)').style('font-weight','bold').style('color',CA).style('font-size','13px').text('Backward Pass (Adjoints)');
 
     // Separators
     svg.append('line').attr('x1',10).attr('x2',panelW-10).attr('y1',sep1Y).attr('y2',sep1Y).attr('stroke','#e0e0e0').attr('stroke-dasharray','4,4');
     svg.append('line').attr('x1',panelW+gap+10).attr('x2',totalW-10).attr('y1',sep1Y).attr('y2',sep1Y).attr('stroke','#e0e0e0').attr('stroke-dasharray','4,4');
 
-    // Vertical divider
-    svg.append('line').attr('x1',panelW+gap/2).attr('x2',panelW+gap/2).attr('y1',leafY-10).attr('y2',rootBot+10)
-      .attr('stroke','#e8e8e8').attr('stroke-width',1).attr('stroke-dasharray','6,4');
-
-    // Forward edges (solid gray, downward)
+    // Forward tree edges (simple straight lines)
     for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
       [nd.left,nd.right].forEach(function(ch){
         if(!ch||ch.pad)return;
@@ -119,66 +153,33 @@ Drag the weight sliders to explore.
       });
     });
 
-    // Backward edges: parent adjoint → child adjoint (dashed purple, downward)
-    // AND cross-connections: sibling forward → child adjoint (dotted gray)
-    var hs=5;
-    for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
-      if(!nd.left)return;
-      // For left child: adjoint comes from parent adj + right sibling fwd
-      [{child:nd.left, sibling:nd.right}, {child:nd.right, sibling:nd.left}].forEach(function(pair){
-        var ch=pair.child, sib=pair.sibling;
-        if(!ch||ch.pad)return;
+    // Render dagre edges
+    var line = d3.line().x(function(d){return d.x;}).y(function(d){return d.y;}).curve(d3.curveBasis);
+    g.edges().forEach(function(e){
+      var edge = g.edge(e);
+      var isCross = e.v.charAt(0)==='f' && e.w.charAt(0)==='a';
+      var color = isCross ? CCROSS : CA;
+      var opacity = isCross ? 0.4 : 0.6;
+      var dash = isCross ? '3,3' : '4,3';
+      var sw = isCross ? 1 : 1.2;
 
-        // Edge from parent adjoint to child adjoint (within backward panel)
-        svg.append('line').attr('x1',nd.ax).attr('y1',nd.y).attr('x2',ch.ax).attr('y2',ch.y+nodeH-2)
-          .attr('stroke',CA).attr('stroke-width',1.2).attr('stroke-dasharray','4,3').attr('opacity',.6);
-        // Arrowhead
-        var dx=ch.ax-nd.ax,dy=(ch.y+nodeH-2)-nd.y,len=Math.sqrt(dx*dx+dy*dy);
-        if(len>0){var ux=dx/len,uy=dy/len;
-        svg.append('polygon')
-          .attr('points',[ch.ax+','+(ch.y+nodeH-2),(ch.ax-hs*uy-hs*.6*ux)+','+(ch.y+nodeH-2-hs*ux+hs*.6*uy),(ch.ax+hs*uy-hs*.6*ux)+','+(ch.y+nodeH-2+hs*ux+hs*.6*uy)].join(' '))
-          .attr('fill',CA).attr('opacity',.6);}
+      if(edge.points && edge.points.length > 1) {
+        svg.append('path')
+          .attr('d', line(edge.points))
+          .attr('fill','none').attr('stroke',color).attr('stroke-width',sw)
+          .attr('stroke-dasharray',dash).attr('opacity',opacity);
 
-        // Cross-connection: sibling forward poly → child adjoint
-        // Route entirely through the gap — never through node areas
-        if(sib&&!sib.pad){
-          var nc_sib = Math.min(sib.poly.length, n+1);
-          var sibBoxW = nc_sib*(bW+bGap)-bGap+nPad;
-          var nc_ch = Math.min((ch.adj||[]).length, n+1);
-          var chBoxW = nc_ch*(bW+bGap)-bGap+nPad;
-
-          var sy = sib.y + nodeH/2;
-          var ty = ch.y + nodeH/2;
-
-          // Exit/enter points at panel edges (not node edges)
-          var exitX = panelW;          // right edge of forward panel
-          var enterX = panelW + gap;   // left edge of backward panel
-          var gapMid = panelW + gap/2;
-
-          // Corners with small radius
-          var r = 6;
-          var path;
-          if (Math.abs(sy - ty) < 2) {
-            // Same level: straight horizontal through gap
-            path = 'M'+exitX+','+sy+' L'+enterX+','+ty;
-          } else {
-            // Different levels: horizontal → vertical → horizontal
-            path = 'M'+exitX+','+sy
-              +' L'+(gapMid-r)+','+sy
-              +' Q'+gapMid+','+sy+' '+gapMid+','+(sy+(ty>sy?r:-r))
-              +' L'+gapMid+','+(ty+(ty>sy?-r:r))
-              +' Q'+gapMid+','+ty+' '+(gapMid+r)+','+ty
-              +' L'+enterX+','+ty;
-          }
-
-          svg.append('path')
-            .attr('d', path)
-            .attr('fill','none').attr('stroke',CCROSS).attr('stroke-width',1)
-            .attr('stroke-dasharray','3,3').attr('opacity',.4);
-          svg.append('circle').attr('cx',exitX).attr('cy',sy).attr('r',3).attr('fill',CW).attr('opacity',.5);
-          svg.append('circle').attr('cx',enterX).attr('cy',ty).attr('r',3).attr('fill',CA).attr('opacity',.5);
+        // Arrowhead at end
+        var pts = edge.points;
+        var last = pts[pts.length-1], prev = pts[pts.length-2];
+        var dx=last.x-prev.x, dy=last.y-prev.y, len=Math.sqrt(dx*dx+dy*dy);
+        if(len>0){
+          var ux=dx/len, uy=dy/len, hs=4;
+          svg.append('polygon')
+            .attr('points',[last.x+','+last.y,(last.x-hs*uy-hs*ux)+','+(last.y+hs*ux-hs*uy),(last.x+hs*uy-hs*ux)+','+(last.y-hs*ux-hs*uy)].join(' '))
+            .attr('fill',color).attr('opacity',opacity);
         }
-      });
+      }
     });
 
     // Annotation arrows
@@ -195,21 +196,21 @@ Drag the weight sliders to explore.
     function drawBars(levels, xKey, color, logMax, refs) {
       for(var li=0;li<depth;li++) levels[li].forEach(function(nd){
         if(nd.pad){refs.push(null);return;}
-        var coeffs = (xKey==='fx')?nd.poly:(nd.adj||[]);
+        var coeffs=(xKey==='fx')?nd.poly:(nd.adj||[]);
         var nc=Math.min(coeffs.length,n+1);
         if(!nc){refs.push(null);return;}
-        var boxW=nc*(bW+bGap)-bGap+nPad, gx=nd[xKey]-boxW/2;
-        var g=svg.append('g').attr('transform','translate('+gx+','+nd.y+')');
-        g.append('rect').attr('width',boxW).attr('height',nodeH).attr('fill','#f9f9f9').attr('rx',5);
+        var bxW=nc*(bW+bGap)-bGap+nPad, gx=nd[xKey]-bxW/2;
+        var gg=svg.append('g').attr('transform','translate('+gx+','+nd.y+')');
+        gg.append('rect').attr('width',bxW).attr('height',nodeH).attr('fill','#f9f9f9').attr('rx',5);
         var rects=[],texts=[];
         for(var k=0;k<nc;k++){
           var bx=nPad/2+k*(bW+bGap), v=k<coeffs.length?coeffs[k]:0;
           var fr=Math.min(1,Math.log1p(Math.abs(v))/logMax);
           var px=Math.max(.5,fr*(bH-12));
           var isHL=(li===depth-1&&k===n), c=isHL?CR:color;
-          rects.push(g.append('rect').attr('x',bx+1).attr('width',bW-2).attr('rx',2)
+          rects.push(gg.append('rect').attr('x',bx+1).attr('width',bW-2).attr('rx',2)
             .attr('y',nPad/2+(bH-12)-px).attr('height',px).attr('fill',c).attr('opacity',.7));
-          texts.push(g.append('text').attr('x',bx+bW/2).attr('y',nPad/2+(bH-12)-px-3)
+          texts.push(gg.append('text').attr('x',bx+bW/2).attr('y',nPad/2+(bH-12)-px-3)
             .attr('text-anchor','middle').style('font-size','8px').style('fill',c).text(fmt(v)));
         }
         refs.push({rects:rects,texts:texts,nc:nc});
@@ -218,7 +219,7 @@ Drag the weight sliders to explore.
     drawBars(levels,'fx',CW,logMaxFwd,fwdRefs);
     drawBars(levels,'ax',CA,logMaxAdj,adjRefs);
 
-    // Weight sliders (forward panel, top)
+    // Weight sliders
     var slFills=[],slLabels=[];
     levels[0].forEach(function(nd,idx){
       if(nd.pad)return;
@@ -241,7 +242,7 @@ Drag the weight sliders to explore.
       })(idx);
     });
 
-    // Pi bars (backward panel, top)
+    // Pi bars
     var piBars=[],piTexts=[];
     levels[0].forEach(function(nd,idx){
       if(nd.pad)return;
@@ -263,7 +264,7 @@ Drag the weight sliders to explore.
       .html('$\\bar{c}_n = 1/Z$');
 
     function update(){
-      var tr=buildTree(w,n),Z=backprop(tr,n),lv=tr.levels;
+      var tr=buildTree(w,n),Z=doBackprop(tr,n),lv=tr.levels;
       var ri=0;
       for(var li=0;li<lv.length;li++) lv[li].forEach(function(nd){
         var ref=fwdRefs[ri++];if(!ref)return;
