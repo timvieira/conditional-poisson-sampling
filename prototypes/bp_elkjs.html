@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Backprop Visualization — Side-by-Side</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/elkjs@0.9.3/lib/elk.bundled.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['$', '$']] }, startup: { typeset: false } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<style>body { font-family: system-ui, sans-serif; margin: 20px; }</style>
+</head>
+<body>
+<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px;">
+
+<b>Interactive backpropagation tree (side-by-side).</b>
+The <span style="color:#5b9bd5">forward pass</span> (left) computes the polynomial product tree bottom-up.
+The <span style="color:#7b2d8e">backward pass</span> (right) propagates adjoints top-down.
+Each child's adjoint comes from the <span style="color:#7b2d8e">parent adjoint</span> cross-correlated with the <span style="color:#5b9bd5">sibling's forward polynomial</span>.
+At the leaves, $\pi_i = w_i \cdot \bar{c}_1^{(i)}$.
+Drag the weight sliders to explore.
+
+<div id="bp"></div>
+<script>
+(function() {
+  var N=4, n=2, w=[0.5,1.2,0.3,1.0], WMAX=3;
+  var CW='#5b9bd5', CA='#7b2d8e', CI='#d4a24e', CR='#c0504d', CCROSS='#aaa';
+
+  function polyMul(a,b){var o=new Array(a.length+b.length-1).fill(0);for(var i=0;i<a.length;i++)for(var j=0;j<b.length;j++)o[i+j]+=a[i]*b[j];return o;}
+  function buildTree(w,n){
+    var lv=w.map(function(wi,i){return{poly:[1,wi],leaf:true,idx:i};});
+    var sz=1;while(sz<lv.length)sz*=2;while(lv.length<sz)lv.push({poly:[1],pad:true});
+    var level=lv,all=[level];
+    while(level.length>1){var nx=[];for(var i=0;i<level.length;i+=2){var p=polyMul(level[i].poly,level[i+1].poly);if(p.length>n+1)p=p.slice(0,n+1);nx.push({left:level[i],right:level[i+1],poly:p});}level=nx;all.push(level);}
+    return{root:level[0],levels:all};
+  }
+  function crossCorr(pa,sp,ml){var o=new Array(ml).fill(0);for(var j=0;j<ml;j++)for(var k=0;k<sp.length;k++)if(j+k<pa.length)o[j]+=pa[j+k]*sp[k];return o;}
+  function doBackprop(tree,n){
+    var rt=tree.root,Z=rt.poly[Math.min(n,rt.poly.length-1)]||0;
+    var al=Math.min(rt.poly.length,n+1);rt.adj=new Array(al).fill(0);
+    if(n<al&&Z>0)rt.adj[n]=1/Z;
+    (function walk(nd){if(!nd.left)return;nd.left.adj=crossCorr(nd.adj,nd.right.poly,Math.min(nd.left.poly.length,n+1));nd.right.adj=crossCorr(nd.adj,nd.left.poly,Math.min(nd.right.poly.length,n+1));walk(nd.left);walk(nd.right);})(rt);
+    return Z;
+  }
+  function fmt(v){return v===0?'0':Math.abs(v)<.005?'':Math.abs(v)>=10?v.toFixed(0):Math.abs(v)>=1?v.toFixed(1):v.toFixed(2);}
+
+  var bW=28,bH=70,bGap=4,nPad=12,vGap=30,hGap=20,slH=70;
+  var root=d3.select('#bp');
+
+  function fullBuild(){
+    root.selectAll('*').remove();
+    var ctrl=root.append('div').style('display','flex').style('align-items','center').style('gap','12px').style('margin-bottom','8px').style('font-size','0.9em');
+    ctrl.append('span').html('$N$ = ');
+    ctrl.append('input').attr('type','number').attr('min',2).attr('value',N).style('width','44px')
+      .on('change',function(){var v=Math.max(2,+this.value);if(v===N)return;while(w.length<v)w.push(.5+Math.random());w=w.slice(0,v);N=v;n=Math.min(n,N);fullBuild();});
+    ctrl.append('span').html('&ensp;$n$ = ');
+    ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n).style('width','44px')
+      .on('change',function(){var v=Math.max(0,Math.min(N,+this.value));if(v===n)return;n=v;fullBuild();});
+
+    var tree=buildTree(w,n), Z=doBackprop(tree,n);
+    var levels=tree.levels, depth=levels.length;
+    var totalLeaves=levels[0].length;
+
+    // Layout
+    var leafSp=0;
+    levels[0].forEach(function(nd){if(nd.pad)return;var nc=Math.min(Math.max(nd.poly.length,(nd.adj||[]).length),n+1);var ww=nc*(bW+bGap)-bGap+nPad+hGap;if(ww>leafSp)leafSp=ww;});
+    leafSp=Math.max(leafSp,bW+hGap+10);
+
+    var nodeH=bH+nPad, topPad=10, labelH=16;
+    var inputBot=topPad+slH+labelH+10, sep1Y=inputBot+10, leafY=sep1Y+20;
+    var rootBot=leafY+(depth-1)*(nodeH+vGap)+nodeH;
+    var panelW=totalLeaves*leafSp+50;
+    var gap=80;
+    var totalW=panelW*2+gap;
+    var panelH=rootBot+30;
+
+    // Assign node positions: fx,fy for forward; ax,ay for adjoint
+    // Assign IDs for elk
+    var nodeId=0;
+    for(var i=0;i<totalLeaves;i++){
+      var nd=levels[0][i];
+      nd.fx=20+i*leafSp+leafSp/2; nd.ax=panelW+gap+20+i*leafSp+leafSp/2;
+      nd.y=leafY; nd.fid='f'+nodeId; nd.aid='a'+nodeId; nodeId++;
+    }
+    for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
+      nd.fx=(nd.left.fx+(nd.right?nd.right.fx:nd.left.fx))/2;
+      nd.ax=(nd.left.ax+(nd.right?nd.right.ax:nd.left.ax))/2;
+      nd.y=leafY+li*(nodeH+vGap);
+      nd.fid='f'+nodeId; nd.aid='a'+nodeId; nodeId++;
+    });
+
+    // Compute node box widths
+    function boxW(nd, mode) {
+      var coeffs = mode==='fwd'?nd.poly:(nd.adj||[]);
+      return Math.min(coeffs.length,n+1)*(bW+bGap)-bGap+nPad;
+    }
+
+    // SVG
+    var svgWrap=root.append('div').style('position','relative').style('width',totalW+'px').style('height',panelH+'px');
+    var svg=svgWrap.append('svg').attr('width',totalW).attr('height',panelH).style('display','block');
+
+    // Panel titles
+    svgWrap.append('div').style('position','absolute').style('left',(panelW/2)+'px').style('top','-20px')
+      .style('transform','translateX(-50%)').style('font-weight','bold').style('color',CW).style('font-size','13px').text('Forward Pass');
+    svgWrap.append('div').style('position','absolute').style('left',(panelW+gap+panelW/2)+'px').style('top','-20px')
+      .style('transform','translateX(-50%)').style('font-weight','bold').style('color',CA).style('font-size','13px').text('Backward Pass (Adjoints)');
+
+    // Separators
+    svg.append('line').attr('x1',10).attr('x2',panelW-10).attr('y1',sep1Y).attr('y2',sep1Y).attr('stroke','#e0e0e0').attr('stroke-dasharray','4,4');
+    svg.append('line').attr('x1',panelW+gap+10).attr('x2',totalW-10).attr('y1',sep1Y).attr('y2',sep1Y).attr('stroke','#e0e0e0').attr('stroke-dasharray','4,4');
+
+    // Forward tree edges (simple straight lines)
+    for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
+      [nd.left,nd.right].forEach(function(ch){
+        if(!ch||ch.pad)return;
+        svg.append('line').attr('x1',ch.fx).attr('y1',ch.y+nodeH).attr('x2',nd.fx).attr('y2',nd.y+2)
+          .attr('stroke','#ccc').attr('stroke-width',1.5);
+      });
+    });
+
+    // Build ELK graph for cross-connection and backward edge routing
+    var elkNodes = [], elkEdges = [], edgeMeta = {};
+
+    // Add all nodes with fixed positions (x,y used by INTERACTIVE strategies)
+    for(var li=0;li<depth;li++) levels[li].forEach(function(nd){
+      if(nd.pad) return;
+      var fw=boxW(nd,'fwd'), aw=boxW(nd,'adj');
+      elkNodes.push({id:nd.fid, x:nd.fx-fw/2, y:nd.y, width:fw, height:nodeH});
+      elkNodes.push({id:nd.aid, x:nd.ax-aw/2, y:nd.y, width:aw, height:nodeH});
+    });
+
+    // Add cross-connection edges (sibling forward → child adjoint)
+    for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
+      if(!nd.left) return;
+      [{child:nd.left, sibling:nd.right}, {child:nd.right, sibling:nd.left}].forEach(function(pair,ei){
+        var ch=pair.child, sib=pair.sibling;
+        if(!ch||ch.pad||!sib||sib.pad) return;
+        var eid = 'e_'+sib.fid+'_'+ch.aid+'_'+ei;
+        elkEdges.push({id:eid, sources:[sib.fid], targets:[ch.aid]});
+        edgeMeta[eid] = {type:'cross'};
+      });
+    });
+
+    // Add backward tree edges (parent adjoint → child adjoint)
+    for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
+      if(!nd.left) return;
+      [nd.left, nd.right].forEach(function(ch){
+        if(!ch||ch.pad) return;
+        var eid = 'e_bk_'+nd.aid+'_'+ch.aid;
+        elkEdges.push({id:eid, sources:[nd.aid], targets:[ch.aid]});
+        edgeMeta[eid] = {type:'backward'};
+      });
+    });
+
+    // A group to hold the routed edges (rendered after async layout)
+    var edgeGroup = svg.append('g').attr('class','elk-edges');
+
+    // Run ELK layout asynchronously
+    var elk = new ELK();
+    var elkGraph = {
+      id: 'root',
+      layoutOptions: {
+        'elk.algorithm': 'layered',
+        'elk.direction': 'DOWN',
+        'elk.layered.nodePlacement.strategy': 'INTERACTIVE',
+        'elk.layered.crossingMinimization.strategy': 'INTERACTIVE',
+        'elk.layered.layering.strategy': 'INTERACTIVE',
+        'elk.layered.cycleBreaking.strategy': 'INTERACTIVE',
+        'elk.spacing.nodeNode': '10',
+        'elk.spacing.edgeEdge': '8',
+        'elk.spacing.edgeNode': '10',
+        'elk.layered.spacing.edgeEdgeBetweenLayers': '8',
+        'elk.layered.spacing.edgeNodeBetweenLayers': '10',
+        'elk.edgeRouting': 'ORTHOGONAL'
+      },
+      children: elkNodes,
+      edges: elkEdges
+    };
+
+    elk.layout(elkGraph).then(function(layouted) {
+      var lineGen = d3.line().x(function(d){return d.x;}).y(function(d){return d.y;}).curve(d3.curveBasis);
+
+      layouted.edges.forEach(function(edge) {
+        var meta = edgeMeta[edge.id] || {};
+        var isCross = meta.type === 'cross';
+        var color = isCross ? CCROSS : CA;
+        var opacity = isCross ? 0.4 : 0.6;
+        var dash = isCross ? '3,3' : '4,3';
+        var sw = isCross ? 1 : 1.2;
+
+        // Collect points from ELK edge sections
+        var pts = [];
+        if(edge.sections) {
+          edge.sections.forEach(function(sec) {
+            pts.push({x:sec.startPoint.x, y:sec.startPoint.y});
+            if(sec.bendPoints) sec.bendPoints.forEach(function(bp){pts.push({x:bp.x,y:bp.y});});
+            pts.push({x:sec.endPoint.x, y:sec.endPoint.y});
+          });
+        }
+
+        if(pts.length > 1) {
+          edgeGroup.append('path')
+            .attr('d', lineGen(pts))
+            .attr('fill','none').attr('stroke',color).attr('stroke-width',sw)
+            .attr('stroke-dasharray',dash).attr('opacity',opacity);
+
+          // Arrowhead at end
+          var last = pts[pts.length-1], prev = pts[pts.length-2];
+          var dx=last.x-prev.x, dy=last.y-prev.y, len=Math.sqrt(dx*dx+dy*dy);
+          if(len>0){
+            var ux=dx/len, uy=dy/len, hs=4;
+            edgeGroup.append('polygon')
+              .attr('points',[last.x+','+last.y,(last.x-hs*uy-hs*ux)+','+(last.y+hs*ux-hs*uy),(last.x+hs*uy-hs*ux)+','+(last.y-hs*ux-hs*uy)].join(' '))
+              .attr('fill',color).attr('opacity',opacity);
+          }
+        }
+      });
+    }).catch(function(err){ console.error('ELK layout failed:', err); });
+
+    // Annotation arrows
+    var aX1=panelW-14, aX2=totalW-14, aTop=leafY+10, aBot=rootBot-10, aH=12;
+    svg.append('line').attr('x1',aX1).attr('y1',aTop).attr('x2',aX1).attr('y2',aBot-aH).attr('stroke','#c8c8c8').attr('stroke-width',3);
+    svg.append('polygon').attr('points',(aX1-aH)+','+(aBot-aH*1.5)+' '+(aX1+aH)+','+(aBot-aH*1.5)+' '+aX1+','+aBot).attr('fill','#c8c8c8');
+    svg.append('line').attr('x1',aX2).attr('y1',aBot).attr('x2',aX2).attr('y2',aTop+aH).attr('stroke','#c8c8c8').attr('stroke-width',3);
+    svg.append('polygon').attr('points',(aX2-aH)+','+(aTop+aH*1.5)+' '+(aX2+aH)+','+(aTop+aH*1.5)+' '+aX2+','+aTop).attr('fill','#c8c8c8');
+
+    // Draw node bars
+    var logMaxFwd=Math.log1p(Math.pow(WMAX,n)), logMaxAdj=Math.log1p(1);
+    var fwdRefs=[], adjRefs=[];
+
+    function drawBars(levels, xKey, color, logMax, refs) {
+      for(var li=0;li<depth;li++) levels[li].forEach(function(nd){
+        if(nd.pad){refs.push(null);return;}
+        var coeffs=(xKey==='fx')?nd.poly:(nd.adj||[]);
+        var nc=Math.min(coeffs.length,n+1);
+        if(!nc){refs.push(null);return;}
+        var bxW=nc*(bW+bGap)-bGap+nPad, gx=nd[xKey]-bxW/2;
+        var gg=svg.append('g').attr('transform','translate('+gx+','+nd.y+')');
+        gg.append('rect').attr('width',bxW).attr('height',nodeH).attr('fill','#f9f9f9').attr('rx',5);
+        var rects=[],texts=[];
+        for(var k=0;k<nc;k++){
+          var bx=nPad/2+k*(bW+bGap), v=k<coeffs.length?coeffs[k]:0;
+          var fr=Math.min(1,Math.log1p(Math.abs(v))/logMax);
+          var px=Math.max(.5,fr*(bH-12));
+          var isHL=(li===depth-1&&k===n), c=isHL?CR:color;
+          rects.push(gg.append('rect').attr('x',bx+1).attr('width',bW-2).attr('rx',2)
+            .attr('y',nPad/2+(bH-12)-px).attr('height',px).attr('fill',c).attr('opacity',.7));
+          texts.push(gg.append('text').attr('x',bx+bW/2).attr('y',nPad/2+(bH-12)-px-3)
+            .attr('text-anchor','middle').style('font-size','8px').style('fill',c).text(fmt(v)));
+        }
+        refs.push({rects:rects,texts:texts,nc:nc});
+      });
+    }
+    drawBars(levels,'fx',CW,logMaxFwd,fwdRefs);
+    drawBars(levels,'ax',CA,logMaxAdj,adjRefs);
+
+    // Weight sliders
+    var slFills=[],slLabels=[];
+    levels[0].forEach(function(nd,idx){
+      if(nd.pad)return;
+      (function(idx){
+        var bx=nd.fx-bW/2, frac=Math.min(w[idx]/WMAX,1);
+        slFills.push(svg.append('rect').attr('x',bx+2).attr('width',bW-4).attr('rx',2)
+          .attr('y',topPad+slH-frac*slH).attr('height',frac*slH).attr('fill',CI).attr('opacity',.8).style('pointer-events','none'));
+        slLabels.push(svg.append('text').attr('x',nd.fx).attr('y',topPad+slH-frac*slH-2)
+          .attr('text-anchor','middle').style('font-size','9px').style('fill',CI).text(w[idx].toFixed(2)));
+        svgWrap.append('div').style('position','absolute').style('left',nd.fx+'px').style('top',(topPad+slH)+'px')
+          .style('transform','translateX(-50%)').style('font-size','13px').style('color',CI).style('pointer-events','none')
+          .html('$w_{'+(idx+1)+'}$');
+        svg.append('line').attr('x1',nd.fx).attr('y1',inputBot).attr('x2',nd.fx).attr('y2',nd.y).attr('stroke','#ccc').attr('stroke-width',1);
+        svg.append('rect').attr('x',bx-4).attr('y',topPad-2).attr('width',bW+8).attr('height',slH+4)
+          .attr('fill','transparent').attr('cursor','ns-resize').style('touch-action','none')
+          .call(d3.drag().on('drag',function(event){
+            var fr=(topPad+slH-event.y)/slH;
+            w[idx]=Math.max(.01,Math.min(WMAX,fr*WMAX)); update();
+          }));
+      })(idx);
+    });
+
+    // Pi bars
+    var piBars=[],piTexts=[];
+    levels[0].forEach(function(nd,idx){
+      if(nd.pad)return;
+      var bx=nd.ax-bW/2, pi_i=nd.adj&&nd.adj.length>1?w[idx]*nd.adj[1]:0, pf=Math.min(pi_i,1);
+      piBars.push(svg.append('rect').attr('x',bx+2).attr('width',bW-4).attr('rx',2)
+        .attr('y',topPad+slH-pf*slH).attr('height',pf*slH).attr('fill',CR).attr('opacity',.7).style('pointer-events','none'));
+      piTexts.push(svg.append('text').attr('x',nd.ax).attr('y',topPad+slH-pf*slH-2)
+        .attr('text-anchor','middle').style('font-size','9px').style('fill',CR).text(pi_i.toFixed(3)));
+      svgWrap.append('div').style('position','absolute').style('left',nd.ax+'px').style('top',(topPad+slH)+'px')
+        .style('transform','translateX(-50%)').style('font-size','13px').style('color',CR).style('pointer-events','none')
+        .html('$\\pi_{'+(idx+1)+'}$');
+      svg.append('line').attr('x1',nd.ax).attr('y1',nd.y).attr('x2',nd.ax).attr('y2',inputBot).attr('stroke','#d4a0a0').attr('stroke-width',1);
+    });
+
+    // Seed label
+    var rn=levels[depth-1][0];
+    svgWrap.append('div').style('position','absolute').style('left',rn.ax+'px').style('top',(rn.y-14)+'px')
+      .style('transform','translateX(-50%)').style('font-size','10px').style('color',CR).style('pointer-events','none')
+      .html('$\\bar{c}_n = 1/Z$');
+
+    function update(){
+      var tr=buildTree(w,n),Z=doBackprop(tr,n),lv=tr.levels;
+      var ri=0;
+      for(var li=0;li<lv.length;li++) lv[li].forEach(function(nd){
+        var ref=fwdRefs[ri++];if(!ref)return;
+        for(var k=0;k<ref.nc;k++){var v=k<nd.poly.length?nd.poly[k]:0;var fr=Math.min(1,Math.log1p(Math.abs(v))/logMaxFwd);var px=Math.max(1,fr*(bH-12));ref.rects[k].attr('y',nPad/2+(bH-12)-px).attr('height',px);ref.texts[k].attr('y',nPad/2+(bH-12)-px-3).text(fmt(v));}
+      });
+      ri=0;
+      for(var li=0;li<lv.length;li++) lv[li].forEach(function(nd){
+        var ref=adjRefs[ri++];if(!ref)return;var a=nd.adj||[];
+        for(var k=0;k<ref.nc;k++){var v=k<a.length?a[k]:0;var fr=Math.min(1,Math.log1p(Math.abs(v))/logMaxAdj);var px=Math.max(1,fr*(bH-12));ref.rects[k].attr('y',nPad/2+(bH-12)-px).attr('height',px);ref.texts[k].attr('y',nPad/2+(bH-12)-px-3).text(fmt(v));}
+      });
+      for(var i=0;i<slFills.length;i++){var fr=Math.min(w[i]/WMAX,1);slFills[i].attr('y',topPad+slH-fr*slH).attr('height',fr*slH);slLabels[i].attr('y',topPad+slH-fr*slH-2).text(w[i].toFixed(2));}
+      var pi=[];for(var i=0;i<N;i++){var leaf=lv[0][i];pi.push(leaf.adj&&leaf.adj.length>1?w[i]*leaf.adj[1]:0);}
+      for(var i=0;i<piBars.length;i++){var pf=Math.min(pi[i],1);piBars[i].attr('y',topPad+slH-pf*slH).attr('height',pf*slH);piTexts[i].attr('y',topPad+slH-pf*slH-2).text(pi[i].toFixed(3));}
+    }
+
+    setTimeout(function(){if(window.MathJax&&MathJax.typesetPromise)MathJax.typesetPromise([document.getElementById('bp')]);},50);
+  }
+  fullBuild();
+})();
+</script>
+</div>
+</body>
+</html>
