@@ -140,17 +140,34 @@ Drag the weight sliders to explore.
           .attr('fill',CA).attr('opacity',.6);}
 
         // Cross-connection: sibling forward poly → child adjoint
+        // Route: exit source right → gap channel → enter target left
         if(sib&&!sib.pad){
-          var sx=sib.fx, sy=sib.y+nodeH/2; // midpoint of sibling in forward panel
-          var cx=ch.ax, cy=ch.y+nodeH/2; // midpoint of child in backward panel
+          var nc_sib = Math.min(sib.poly.length, n+1);
+          var sibBoxW = nc_sib*(bW+bGap)-bGap+nPad;
+          var nc_ch = Math.min((ch.adj||[]).length, n+1);
+          var chBoxW = nc_ch*(bW+bGap)-bGap+nPad;
+
+          var sx = sib.fx + sibBoxW/2 + 4;  // right edge of sibling node
+          var sy = sib.y + nodeH/2;
+          var tx = ch.ax - chBoxW/2 - 4;    // left edge of child node
+          var ty = ch.y + nodeH/2;
+
+          // Route through the gap with horizontal exits/entries
+          var gapL = panelW + 8;   // left side of gap
+          var gapR = panelW + gap - 8;  // right side of gap
+          // Stagger vertically in the gap to avoid overlap
+          var gapY = (sy + ty) / 2;
+
           svg.append('path')
-            .attr('d','M'+sx+','+sy+' C'+(panelW+gap/2)+','+sy+' '+(panelW+gap/2)+','+cy+' '+cx+','+cy)
+            .attr('d', 'M'+sx+','+sy
+              +' L'+gapL+','+sy
+              +' Q'+(gapL)+','+ gapY+' '+(panelW+gap/2)+','+gapY
+              +' Q'+gapR+','+gapY+' '+gapR+','+ty
+              +' L'+tx+','+ty)
             .attr('fill','none').attr('stroke',CCROSS).attr('stroke-width',1)
-            .attr('stroke-dasharray','3,3').attr('opacity',.5);
-          // Small circle at source (sibling forward)
+            .attr('stroke-dasharray','3,3').attr('opacity',.4);
           svg.append('circle').attr('cx',sx).attr('cy',sy).attr('r',3).attr('fill',CW).attr('opacity',.5);
-          // Small circle at target (child adjoint)
-          svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',3).attr('fill',CA).attr('opacity',.5);
+          svg.append('circle').attr('cx',tx).attr('cy',ty).attr('r',3).attr('fill',CA).attr('opacity',.5);
         }
       });
     });
