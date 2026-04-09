@@ -127,10 +127,12 @@ Drag the weight sliders to explore.
 
     function makePanel(parent, mode) {
       var color = mode==='fwd'?CW:CA;
-      var panel = parent.append('div').style('position','relative').style('width',panelW+'px').style('height',panelH+'px');
-      panel.append('div').style('text-align','center').style('font-weight','bold')
+      var outer = parent.append('div');
+      outer.append('div').style('text-align','center').style('font-weight','bold')
         .style('color',color).style('font-size','13px').style('margin-bottom','4px')
         .text(mode==='fwd'?'Forward Pass':'Backward Pass (Adjoints)');
+      var panel = outer.append('div').style('position','relative')
+        .style('width',panelW+'px').style('height',panelH+'px');
       var svg = panel.append('svg').attr('width',panelW).attr('height',panelH).style('display','block');
 
       // Separator
@@ -213,8 +215,8 @@ Drag the weight sliders to explore.
             .attr('text-anchor','middle').style('font-size','9px').style('fill',CI).text(w[idx].toFixed(2));
           slLabels.push(sl);
           // Label
-          var lbl=panel.append('div').style('position','absolute')
-            .style('left',nd.x+'px').style('top',(topPad+slH+12)+'px')
+          panel.append('div').style('position','absolute')
+            .style('left',nd.x+'px').style('top',(topPad+slH)+'px')
             .style('transform','translateX(-50%)').style('font-size','13px').style('color',CI)
             .style('pointer-events','none').html('$w_{'+(idx+1)+'}$');
           // Drag area
@@ -241,7 +243,7 @@ Drag the weight sliders to explore.
           piTexts.push(pt);
           // Label
           panel.append('div').style('position','absolute')
-            .style('left',nd.x+'px').style('top',(topPad+slH+12)+'px')
+            .style('left',nd.x+'px').style('top',(topPad+slH)+'px')
             .style('transform','translateX(-50%)').style('font-size','13px').style('color',CR)
             .style('pointer-events','none').html('$\\pi_{'+(idx+1)+'}$');
           // Arrow from leaf
