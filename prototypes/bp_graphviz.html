@@ -152,14 +152,16 @@ function fullBuild() {
   }
   let layout = JSON.parse(jsonStr);
   let bb = layout.bb.split(',').map(Number);
-  let gvH = bb[3]; // for y-flip
+  let gvH = bb[3];
 
   // Get node positions from Graphviz
+  // Graphviz y is bottom-up; flip to top-down and shift down for sliders
+  let yShift = slH + 30; // room for sliders/pi bars above the tree
   let gvPos = {};
   (layout.objects||[]).forEach(obj => {
     if(obj.name && obj.pos) {
       let [x,y] = obj.pos.split(',').map(Number);
-      gvPos[obj.name] = {x, y: gvH - y};
+      gvPos[obj.name] = {x, y: gvH - y + yShift};
     }
   });
 
@@ -184,10 +186,10 @@ function fullBuild() {
     (edge._draw_||[]).forEach(cmd => {
       if(cmd.op==='b'||cmd.op==='B') {
         let pts = cmd.points;
-        let d = 'M'+pts[0][0]+','+(gvH-pts[0][1]);
+        let d = 'M'+pts[0][0]+','+(gvH-pts[0][1]+yShift);
         for(let i=1; i<pts.length; i+=3) {
           if(i+2<pts.length)
-            d += ' C'+pts[i][0]+','+(gvH-pts[i][1])+' '+pts[i+1][0]+','+(gvH-pts[i+1][1])+' '+pts[i+2][0]+','+(gvH-pts[i+2][1]);
+            d += ' C'+pts[i][0]+','+(gvH-pts[i][1]+yShift)+' '+pts[i+1][0]+','+(gvH-pts[i+1][1]+yShift)+' '+pts[i+2][0]+','+(gvH-pts[i+2][1]+yShift);
         }
         svg.append('path').attr('d',d).attr('fill','none')
           .attr('stroke',color).attr('stroke-width',sw)
@@ -197,7 +199,7 @@ function fullBuild() {
     // Arrowhead
     (edge._hdraw_||[]).forEach(cmd => {
       if(cmd.op==='P'||cmd.op==='p') {
-        let pts = cmd.points.map(p => [p[0], gvH-p[1]]);
+        let pts = cmd.points.map(p => [p[0], gvH - p[1] + yShift]);
         svg.append('polygon').attr('points',pts.map(p=>p.join(',')).join(' '))
           .attr('fill',color).attr('opacity',opacity);
       }
