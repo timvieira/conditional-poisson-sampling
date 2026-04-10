@@ -178,7 +178,32 @@ Drag the weight sliders to explore.
       edges: elkEdges
     };
 
+    // Store our intended positions for delta computation
+    var ourPos = {};
+    elkNodes.forEach(function(en) { ourPos[en.id] = {x: en.x, y: en.y}; });
+
     elk.layout(elkGraph).then(function(layouted) {
+      // Build delta map: how much ELK shifted each node
+      var delta = {};
+      layouted.children.forEach(function(cn) {
+        var ours = ourPos[cn.id];
+        if (ours) delta[cn.id] = {dx: ours.x - cn.x, dy: ours.y - cn.y};
+      });
+
+      // For each edge point, interpolate the delta from source/target
+      function shiftPoints(pts, srcId, tgtId) {
+        var ds = delta[srcId] || {dx:0, dy:0};
+        var dt = delta[tgtId] || {dx:0, dy:0};
+        return pts.map(function(p, i) {
+          // Linear interpolation of delta along the path
+          var t = pts.length > 1 ? i / (pts.length - 1) : 0;
+          return {
+            x: p.x + ds.dx * (1-t) + dt.dx * t,
+            y: p.y + ds.dy * (1-t) + dt.dy * t
+          };
+        });
+      }
+
       var lineGen = d3.line().x(function(d){return d.x;}).y(function(d){return d.y;}).curve(d3.curveBasis);
 
       layouted.edges.forEach(function(edge) {
@@ -189,15 +214,17 @@ Drag the weight sliders to explore.
         var dash = isCross ? '3,3' : '4,3';
         var sw = isCross ? 1 : 1.2;
 
-        // Collect points from ELK edge sections
-        var pts = [];
+        // Collect points from ELK edge sections, shifted to our coordinate system
+        var srcId = edge.sources[0], tgtId = edge.targets[0];
+        var rawPts = [];
         if(edge.sections) {
           edge.sections.forEach(function(sec) {
-            pts.push({x:sec.startPoint.x, y:sec.startPoint.y});
-            if(sec.bendPoints) sec.bendPoints.forEach(function(bp){pts.push({x:bp.x,y:bp.y});});
-            pts.push({x:sec.endPoint.x, y:sec.endPoint.y});
+            rawPts.push({x:sec.startPoint.x, y:sec.startPoint.y});
+            if(sec.bendPoints) sec.bendPoints.forEach(function(bp){rawPts.push({x:bp.x,y:bp.y});});
+            rawPts.push({x:sec.endPoint.x, y:sec.endPoint.y});
           });
         }
+        var pts = shiftPoints(rawPts, srcId, tgtId);
 
         if(pts.length > 1) {
           edgeGroup.append('path')
