@@ -20,7 +20,7 @@ window.MathJax = { tex: { inlineMath: [['$', '$']] }, startup: { typeset: false 
 $\pi_i = w_i \cdot \bar{c}_1^{(i)}$.
 Drag weight sliders to explore.
 
-<div id="bp">Loading Graphviz...</div>
+<div id="bp"></div>
 
 <script type="module">
 import { Graphviz } from "https://cdn.jsdelivr.net/npm/@hpcc-js/wasm-graphviz@1.6.1/dist/index.js";
@@ -82,7 +82,7 @@ function fullBuild() {
 
   let totalLeaves = levels[0].length;
   let panelW = totalLeaves * leafSp + 40;
-  let gap = 100;
+  let gap = 160;
   let topY = 30;
   let vStep = nodeH + 40;
 
@@ -282,7 +282,7 @@ function fullBuild() {
     .style('transform','translateX(-50%)').style('font-size','10px').style('color',CR).style('pointer-events','none')
     .html('$\\bar{c}_n = 1/Z$');
 
-  setTimeout(()=>{if(window.MathJax&&MathJax.typesetPromise)MathJax.typesetPromise([document.getElementById('bp')]);},50);
+  setTimeout(()=>{if(window.MathJax&&MathJax.typesetPromise)MathJax.typesetPromise();},200);
 }
 
 fullBuild();
