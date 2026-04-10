@@ -130,19 +130,8 @@ Drag the weight sliders to explore.
       elkNodes.push({id:nd.aid, x:nd.ax-aw/2, y:nd.y, width:aw, height:nodeH});
     });
 
-    // Add cross-connection edges (sibling forward → child adjoint)
-    for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
-      if(!nd.left) return;
-      [{child:nd.left, sibling:nd.right}, {child:nd.right, sibling:nd.left}].forEach(function(pair,ei){
-        var ch=pair.child, sib=pair.sibling;
-        if(!ch||ch.pad||!sib||sib.pad) return;
-        var eid = 'e_'+sib.fid+'_'+ch.aid+'_'+ei;
-        elkEdges.push({id:eid, sources:[sib.fid], targets:[ch.aid]});
-        edgeMeta[eid] = {type:'cross'};
-      });
-    });
-
-    // Add backward tree edges (parent adjoint → child adjoint)
+    // Only backward edges go through ELK (same-panel, uniform delta)
+    // Cross-connections drawn manually below
     for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
       if(!nd.left) return;
       [nd.left, nd.right].forEach(function(ch){
@@ -190,17 +179,11 @@ Drag the weight sliders to explore.
         if (ours) delta[cn.id] = {dx: ours.x - cn.x, dy: ours.y - cn.y};
       });
 
-      // For each edge point, interpolate the delta from source/target
-      function shiftPoints(pts, srcId, tgtId) {
-        var ds = delta[srcId] || {dx:0, dy:0};
-        var dt = delta[tgtId] || {dx:0, dy:0};
-        return pts.map(function(p, i) {
-          // Linear interpolation of delta along the path
-          var t = pts.length > 1 ? i / (pts.length - 1) : 0;
-          return {
-            x: p.x + ds.dx * (1-t) + dt.dx * t,
-            y: p.y + ds.dy * (1-t) + dt.dy * t
-          };
+      // Backward edges: source and target in same panel, uniform shift
+      function shiftPoints(pts, srcId) {
+        var d = delta[srcId] || {dx:0, dy:0};
+        return pts.map(function(p) {
+          return {x: p.x + d.dx, y: p.y + d.dy};
         });
       }
 
@@ -224,7 +207,7 @@ Drag the weight sliders to explore.
             rawPts.push({x:sec.endPoint.x, y:sec.endPoint.y});
           });
         }
-        var pts = shiftPoints(rawPts, srcId, tgtId);
+        var pts = shiftPoints(rawPts, srcId);
 
         if(pts.length > 1) {
           edgeGroup.append('path')
@@ -244,6 +227,46 @@ Drag the weight sliders to explore.
         }
       });
     }).catch(function(err){ console.error('ELK layout failed:', err); });
+
+    // Cross-connections: sibling forward → child adjoint (manual orthogonal routing through gap)
+    var crossEdges = [];
+    for(var li=1;li<depth;li++) levels[li].forEach(function(nd){
+      if(!nd.left) return;
+      [{child:nd.left, sibling:nd.right}, {child:nd.right, sibling:nd.left}].forEach(function(pair){
+        var ch=pair.child, sib=pair.sibling;
+        if(!ch||ch.pad||!sib||sib.pad) return;
+        crossEdges.push({sib:sib, ch:ch});
+      });
+    });
+
+    var gapL = panelW + 6, gapR = panelW + gap - 6;
+    var laneW = (gapR - gapL) / (crossEdges.length + 1);
+
+    crossEdges.forEach(function(ce, idx) {
+      var fw = boxW(ce.sib,'fwd'), aw = boxW(ce.ch,'adj');
+      var sx = ce.sib.fx + fw/2 + 3, sy = ce.sib.y + nodeH/2;
+      var tx = ce.ch.ax - aw/2 - 3, ty = ce.ch.y + nodeH/2;
+      var laneX = gapL + (idx + 1) * laneW;
+      var r = Math.min(8, Math.abs(sy - ty) / 3);
+
+      var d;
+      if (Math.abs(sy - ty) < 2) {
+        d = 'M'+sx+','+sy+' L'+tx+','+ty;
+      } else {
+        var dir = ty > sy ? 1 : -1;
+        d = 'M'+sx+','+sy
+          +' L'+(laneX-r)+','+sy
+          +' A'+r+','+r+' 0 0 '+(dir>0?'1':'0')+' '+laneX+','+(sy+dir*r)
+          +' L'+laneX+','+(ty-dir*r)
+          +' A'+r+','+r+' 0 0 '+(dir>0?'0':'1')+' '+(laneX+r)+','+ty
+          +' L'+tx+','+ty;
+      }
+      svg.append('path').attr('d',d)
+        .attr('fill','none').attr('stroke',CCROSS).attr('stroke-width',1)
+        .attr('stroke-dasharray','2,3').attr('opacity',.45);
+      svg.append('circle').attr('cx',sx).attr('cy',sy).attr('r',2.5).attr('fill',CW).attr('opacity',.6);
+      svg.append('circle').attr('cx',tx).attr('cy',ty).attr('r',2.5).attr('fill',CA).attr('opacity',.6);
+    });
 
     // Annotation arrows
     var aX1=panelW-14, aX2=totalW-14, aTop=leafY+10, aBot=rootBot-10, aH=12;
