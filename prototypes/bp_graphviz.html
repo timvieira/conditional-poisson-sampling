@@ -83,7 +83,7 @@ function fullBuild() {
   let totalLeaves = levels[0].length;
   let panelW = totalLeaves * leafSp + 40;
   let gap = 160;
-  let topY = 30;
+  let topY = slH + 40;  // room for sliders/pi bars above the tree
   let vStep = nodeH + 40;
 
   let nid = 0;
@@ -154,7 +154,22 @@ function fullBuild() {
   let bb = layout.bb.split(',').map(Number);
   let gvH = bb[3]; // for y-flip
 
-  let svgW = bb[2] + 20, svgH = bb[3] + 20;
+  // Get node positions from Graphviz
+  let gvPos = {};
+  (layout.objects||[]).forEach(obj => {
+    if(obj.name && obj.pos) {
+      let [x,y] = obj.pos.split(',').map(Number);
+      gvPos[obj.name] = {x, y: gvH - y};
+    }
+  });
+
+  // Compute SVG size from actual node positions
+  let maxX = 0, maxY = 0;
+  Object.values(gvPos).forEach(p => {
+    if(p.x + 60 > maxX) maxX = p.x + 60;
+    if(p.y + nodeH > maxY) maxY = p.y + nodeH;
+  });
+  let svgW = maxX + 40, svgH = maxY + 40;
   let svgWrap = root.append('div').style('position','relative').style('width',svgW+'px').style('height',svgH+'px');
   let svg = svgWrap.append('svg').attr('width',svgW).attr('height',svgH).style('display','block');
 
@@ -189,14 +204,7 @@ function fullBuild() {
     });
   });
 
-  // Get actual rendered node positions from Graphviz
-  let gvPos = {};
-  (layout.objects||[]).forEach(obj => {
-    if(obj.name && obj.pos) {
-      let [x,y] = obj.pos.split(',').map(Number);
-      gvPos[obj.name] = {x, y: gvH - y};
-    }
-  });
+  // (gvPos already computed above)
 
   // Draw histogram bars at Graphviz node positions
   let logMaxFwd = Math.log1p(Math.pow(WMAX, n)), logMaxAdj = Math.log1p(1);
