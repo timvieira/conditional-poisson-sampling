@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Backprop Visualization — Graphviz Layout</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['$', '$']] }, startup: { typeset: false } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<style>body { font-family: system-ui, sans-serif; margin: 20px; }</style>
+</head>
+<body>
+<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px;">
+
+<b>Interactive backpropagation tree (Graphviz layout).</b>
+The <span style="color:#5b9bd5">forward pass</span> (left) computes the polynomial product tree bottom-up.
+The <span style="color:#7b2d8e">backward pass</span> (right) propagates adjoints top-down.
+Each child's adjoint = cross-correlation of <span style="color:#7b2d8e">parent adjoint</span> with <span style="color:#5b9bd5">sibling's forward polynomial</span>.
+At the leaves, $\pi_i = w_i \cdot \bar{c}_1^{(i)}$.
+Drag the weight sliders to explore.
+
+<div id="bp"></div>
+
+<script type="module">
+import { Graphviz } from "https://cdn.jsdelivr.net/npm/@hpcc-js/wasm-graphviz@1.6.1/dist/index.js";
+
+const gv = await Graphviz.load();
+
+var N=4, n=2, w=[0.5,1.2,0.3,1.0], WMAX=3;
+var CW='#5b9bd5', CA='#7b2d8e', CI='#d4a24e', CR='#c0504d';
+var bW=28, bH=70, bGap=4, nPad=12, slH=70;
+
+function polyMul(a,b){var o=new Array(a.length+b.length-1).fill(0);for(var i=0;i<a.length;i++)for(var j=0;j<b.length;j++)o[i+j]+=a[i]*b[j];return o;}
+function buildTree(w,n){
+  var lv=w.map((wi,i)=>({poly:[1,wi],leaf:true,idx:i}));
+  var sz=1;while(sz<lv.length)sz*=2;while(lv.length<sz)lv.push({poly:[1],pad:true});
+  var level=lv,all=[level];
+  while(level.length>1){var nx=[];for(var i=0;i<level.length;i+=2){var p=polyMul(level[i].poly,level[i+1].poly);if(p.length>n+1)p=p.slice(0,n+1);nx.push({left:level[i],right:level[i+1],poly:p});}level=nx;all.push(level);}
+  return{root:level[0],levels:all};
+}
+function crossCorr(pa,sp,ml){var o=new Array(ml).fill(0);for(var j=0;j<ml;j++)for(var k=0;k<sp.length;k++)if(j+k<pa.length)o[j]+=pa[j+k]*sp[k];return o;}
+function doBackprop(tree,n){
+  var rt=tree.root,Z=rt.poly[Math.min(n,rt.poly.length-1)]||0;
+  var al=Math.min(rt.poly.length,n+1);rt.adj=new Array(al).fill(0);
+  if(n<al&&Z>0)rt.adj[n]=1/Z;
+  (function walk(nd){if(!nd.left)return;nd.left.adj=crossCorr(nd.adj,nd.right.poly,Math.min(nd.left.poly.length,n+1));nd.right.adj=crossCorr(nd.adj,nd.left.poly,Math.min(nd.right.poly.length,n+1));walk(nd.left);walk(nd.right);})(rt);
+  return Z;
+}
+function fmt(v){return v===0?'0':Math.abs(v)<.005?'':Math.abs(v)>=10?v.toFixed(0):Math.abs(v)>=1?v.toFixed(1):v.toFixed(2);}
+
+function boxW(nd, mode) {
+  var coeffs = mode==='fwd'?nd.poly:(nd.adj||[]);
+  var nc = Math.min(coeffs.length, n+1);
+  return nc*(bW+bGap)-bGap+nPad;
+}
+
+var root = d3.select('#bp');
+
+function fullBuild() {
+  root.selectAll('*').remove();
+
+  // Controls
+  var ctrl = root.append('div').style('display','flex').style('align-items','center')
+    .style('gap','12px').style('margin-bottom','8px').style('font-size','0.9em');
+  ctrl.append('span').html('$N$ = ');
+  ctrl.append('input').attr('type','number').attr('min',2).attr('value',N).style('width','44px')
+    .on('change',function(){var v=Math.max(2,+this.value);if(v===N)return;while(w.length<v)w.push(.5+Math.random());w=w.slice(0,v);N=v;n=Math.min(n,N);fullBuild();});
+  ctrl.append('span').html('&ensp;$n$ = ');
+  ctrl.append('input').attr('type','number').attr('min',0).attr('max',N).attr('value',n).style('width','44px')
+    .on('change',function(){var v=Math.max(0,Math.min(N,+this.value));if(v===n)return;n=v;fullBuild();});
+
+  var tree = buildTree(w, n);
+  var Z = doBackprop(tree, n);
+  var levels = tree.levels, depth = levels.length;
+
+  // Assign IDs
+  var nid = 0;
+  for (var li = 0; li < depth; li++) levels[li].forEach(nd => {
+    nd.fid = 'f' + nid; nd.aid = 'a' + nid; nid++;
+  });
+
+  // Build DOT string with subgraphs
+  var nodeH = bH + nPad;
+  var lines = ['digraph G {', '  rankdir=TB;', '  splines=ortho;', '  nodesep=0.3;', '  ranksep=0.5;'];
+
+  // Forward subgraph
+  lines.push('  subgraph cluster_fwd {');
+  lines.push('    label="Forward Pass"; fontcolor="' + CW + '"; style=dashed; color="#ddd";');
+  for (var li = 0; li < depth; li++) {
+    // Same rank for same level
+    var rankNodes = [];
+    levels[li].forEach(nd => {
+      if (nd.pad) return;
+      var w_in = (boxW(nd, 'fwd') / 72).toFixed(2); // inches
+      var h_in = (nodeH / 72).toFixed(2);
+      lines.push('    ' + nd.fid + ' [shape=box, width=' + w_in + ', height=' + h_in + ', fixedsize=true, label=""];');
+      rankNodes.push(nd.fid);
+    });
+    if (rankNodes.length > 1) lines.push('    {rank=same; ' + rankNodes.join('; ') + '}');
+  }
+  // Forward edges (child -> parent, reversed for top-down layout)
+  for (var li = 1; li < depth; li++) levels[li].forEach(nd => {
+    if (nd.left && !nd.left.pad) lines.push('    ' + nd.left.fid + ' -> ' + nd.fid + ' [style=solid, color="#cccccc", arrowsize=0.5];');
+    if (nd.right && !nd.right.pad) lines.push('    ' + nd.right.fid + ' -> ' + nd.fid + ' [style=solid, color="#cccccc", arrowsize=0.5];');
+  });
+  lines.push('  }');
+
+  // Backward subgraph
+  lines.push('  subgraph cluster_adj {');
+  lines.push('    label="Backward Pass (Adjoints)"; fontcolor="' + CA + '"; style=dashed; color="#ddd";');
+  for (var li = 0; li < depth; li++) {
+    var rankNodes = [];
+    levels[li].forEach(nd => {
+      if (nd.pad) return;
+      var w_in = (boxW(nd, 'adj') / 72).toFixed(2);
+      var h_in = (nodeH / 72).toFixed(2);
+      lines.push('    ' + nd.aid + ' [shape=box, width=' + w_in + ', height=' + h_in + ', fixedsize=true, label=""];');
+      rankNodes.push(nd.aid);
+    });
+    if (rankNodes.length > 1) lines.push('    {rank=same; ' + rankNodes.join('; ') + '}');
+  }
+  // Backward edges (parent -> child)
+  for (var li = 1; li < depth; li++) levels[li].forEach(nd => {
+    if (nd.left && !nd.left.pad) lines.push('    ' + nd.aid + ' -> ' + nd.left.aid + ' [style=dashed, color="' + CA + '", arrowsize=0.5];');
+    if (nd.right && !nd.right.pad) lines.push('    ' + nd.aid + ' -> ' + nd.right.aid + ' [style=dashed, color="' + CA + '", arrowsize=0.5];');
+  });
+  lines.push('  }');
+
+  // Cross-connections: sibling forward -> child adjoint
+  for (var li = 1; li < depth; li++) levels[li].forEach(nd => {
+    if (!nd.left) return;
+    [{child: nd.left, sibling: nd.right}, {child: nd.right, sibling: nd.left}].forEach(pair => {
+      var ch = pair.child, sib = pair.sibling;
+      if (!ch || ch.pad || !sib || sib.pad) return;
+      lines.push('  ' + sib.fid + ' -> ' + ch.aid + ' [style=dotted, color="#999999", constraint=false, arrowsize=0.4];');
+    });
+  });
+
+  // Align forward and backward leaves at same rank
+  for (var i = 0; i < levels[0].length; i++) {
+    var nd = levels[0][i];
+    if (!nd.pad) lines.push('  {rank=same; ' + nd.fid + '; ' + nd.aid + '}');
+  }
+
+  lines.push('}');
+  var dot = lines.join('\n');
+
+  // Run Graphviz
+  var jsonStr = gv.dot(dot, 'json');
+  var layout = JSON.parse(jsonStr);
+
+  // Parse node positions and edge paths from Graphviz JSON
+  var nodePos = {};  // id -> {x, y, w, h}
+  var bb = layout.bb ? layout.bb.split(',').map(Number) : [0,0,800,600];
+  var gvH = bb[3]; // graphviz y is bottom-up
+
+  layout.objects.forEach(obj => {
+    if (obj.name && obj.pos) {
+      var parts = obj.pos.split(',').map(Number);
+      var w = (obj.width || 1) * 72;
+      var h = (obj.height || 0.5) * 72;
+      nodePos[obj.name] = {x: parts[0], y: gvH - parts[1], w: w, h: h};
+    }
+    // Handle subgraph children
+    if (obj._gvid !== undefined && obj.nodes) {
+      // This is a cluster
+    }
+  });
+
+  // Fallback: scan all objects recursively
+  function scanObjects(objs) {
+    if (!objs) return;
+    objs.forEach(obj => {
+      if (obj.name && obj.pos) {
+        var parts = obj.pos.split(',').map(Number);
+        var w = (parseFloat(obj.width) || 1) * 72;
+        var h = (parseFloat(obj.height) || 0.5) * 72;
+        nodePos[obj.name] = {x: parts[0], y: gvH - parts[1], w: w, h: h};
+      }
+      if (obj.subgraphs) scanObjects(obj.subgraphs);
+      if (obj.objects) scanObjects(obj.objects);
+    });
+  }
+  scanObjects(layout.objects);
+
+  // Compute SVG dimensions from node positions
+  var maxX = 0, maxY = 0;
+  Object.values(nodePos).forEach(p => {
+    if (p.x + p.w/2 > maxX) maxX = p.x + p.w/2;
+    if (p.y + p.h/2 > maxY) maxY = p.y + p.h/2;
+  });
+  var svgW = maxX + 40, svgH = maxY + 40;
+
+  var svgWrap = root.append('div').style('position','relative').style('width', svgW+'px').style('height', svgH+'px');
+  var svg = svgWrap.append('svg').attr('width', svgW).attr('height', svgH).style('display','block');
+
+  // Draw edges from Graphviz
+  if (layout.edges) {
+    layout.edges.forEach(edge => {
+      if (!edge._draw_) return;
+      edge._draw_.forEach(cmd => {
+        if (cmd.op === 'b' || cmd.op === 'B') {
+          // Bezier spline
+          var pts = cmd.points.map(p => [p[0], gvH - p[1]]);
+          var d = 'M' + pts[0][0] + ',' + pts[0][1];
+          for (var i = 1; i < pts.length; i += 3) {
+            if (i + 2 < pts.length) {
+              d += ' C' + pts[i][0]+','+pts[i][1]+' '+pts[i+1][0]+','+pts[i+1][1]+' '+pts[i+2][0]+','+pts[i+2][1];
+            }
+          }
+          // Determine style from edge attributes
+          var isCross = edge.style === 'dotted';
+          var isBackward = edge.style === 'dashed';
+          var color = edge.color || '#999';
+          var dash = isCross ? '2,3' : isBackward ? '5,3' : 'none';
+          var opacity = isCross ? 0.5 : isBackward ? 0.6 : 1;
+
+          svg.append('path').attr('d', d)
+            .attr('fill','none').attr('stroke', color).attr('stroke-width', isCross ? 1 : 1.5)
+            .attr('stroke-dasharray', dash).attr('opacity', opacity);
+        }
+      });
+      // Arrowhead
+      if (edge._hdraw_) {
+        edge._hdraw_.forEach(cmd => {
+          if (cmd.op === 'P' || cmd.op === 'p') {
+            var pts = cmd.points.map(p => [p[0], gvH - p[1]]);
+            svg.append('polygon')
+              .attr('points', pts.map(p => p.join(',')).join(' '))
+              .attr('fill', edge.color || '#999').attr('opacity', 0.6);
+          }
+        });
+      }
+    });
+  }
+
+  // Draw histogram bars at each node position
+  var logMaxFwd = Math.log1p(Math.pow(WMAX, n)), logMaxAdj = Math.log1p(1);
+
+  function drawNodeBars(nd, mode) {
+    var id = mode === 'fwd' ? nd.fid : nd.aid;
+    var pos = nodePos[id];
+    if (!pos) return null;
+    var coeffs = mode === 'fwd' ? nd.poly : (nd.adj || []);
+    var nc = Math.min(coeffs.length, n+1);
+    if (!nc) return null;
+    var color = mode === 'fwd' ? CW : CA;
+    var logMax = mode === 'fwd' ? logMaxFwd : logMaxAdj;
+
+    var bxW = nc*(bW+bGap)-bGap+nPad;
+    var gx = pos.x - bxW/2, gy = pos.y - nodeH/2;
+    var g = svg.append('g').attr('transform','translate('+gx+','+gy+')');
+    g.append('rect').attr('width',bxW).attr('height',nodeH).attr('fill','#f9f9f9').attr('rx',5).attr('stroke','#eee');
+
+    var rects=[], texts=[];
+    for (var k=0; k<nc; k++) {
+      var bx = nPad/2 + k*(bW+bGap);
+      var v = k<coeffs.length ? coeffs[k] : 0;
+      var fr = Math.min(1, Math.log1p(Math.abs(v))/logMax);
+      var px = Math.max(.5, fr*(bH-12));
+      var isHL = (mode==='fwd' && nd===levels[depth-1][0] && k===n);
+      var c = isHL ? CR : color;
+      rects.push(g.append('rect').attr('x',bx+1).attr('width',bW-2).attr('rx',2)
+        .attr('y',nPad/2+(bH-12)-px).attr('height',px).attr('fill',c).attr('opacity',.7));
+      texts.push(g.append('text').attr('x',bx+bW/2).attr('y',nPad/2+(bH-12)-px-3)
+        .attr('text-anchor','middle').style('font-size','8px').style('fill',c).text(fmt(v)));
+    }
+    return {rects, texts, nc, pos};
+  }
+
+  var fwdRefs = [], adjRefs = [];
+  for (var li=0; li<depth; li++) levels[li].forEach(nd => {
+    if (nd.pad) { fwdRefs.push(null); adjRefs.push(null); return; }
+    fwdRefs.push(drawNodeBars(nd, 'fwd'));
+    adjRefs.push(drawNodeBars(nd, 'adj'));
+  });
+
+  // Weight sliders above forward leaves
+  var slFills=[], slLabels=[];
+  levels[0].forEach((nd, idx) => {
+    if (nd.pad) return;
+    var pos = nodePos[nd.fid];
+    if (!pos) return;
+    var cx = pos.x, topY = pos.y - nodeH/2 - slH - 20;
+    var bx = cx - bW/2;
+    var frac = Math.min(w[idx]/WMAX, 1);
+
+    slFills.push(svg.append('rect').attr('x',bx+2).attr('width',bW-4).attr('rx',2)
+      .attr('y',topY+slH-frac*slH).attr('height',frac*slH).attr('fill',CI).attr('opacity',.8).style('pointer-events','none'));
+    slLabels.push(svg.append('text').attr('x',cx).attr('y',topY+slH-frac*slH-2)
+      .attr('text-anchor','middle').style('font-size','9px').style('fill',CI).text(w[idx].toFixed(2)));
+
+    svgWrap.append('div').style('position','absolute').style('left',cx+'px').style('top',(topY+slH)+'px')
+      .style('transform','translateX(-50%)').style('font-size','13px').style('color',CI).style('pointer-events','none')
+      .html('$w_{'+(idx+1)+'}$');
+
+    svg.append('line').attr('x1',cx).attr('y1',topY+slH+14).attr('x2',cx).attr('y2',pos.y-nodeH/2)
+      .attr('stroke','#ccc').attr('stroke-width',1);
+
+    svg.append('rect').attr('x',bx-4).attr('y',topY-2).attr('width',bW+8).attr('height',slH+4)
+      .attr('fill','transparent').attr('cursor','ns-resize').style('touch-action','none')
+      .call(d3.drag().on('drag', event => {
+        var fr = (topY+slH-event.y)/slH;
+        w[idx] = Math.max(.01, Math.min(WMAX, fr*WMAX));
+        fullBuild();  // full rebuild for now
+      }));
+  });
+
+  // Pi bars above backward leaves
+  levels[0].forEach((nd, idx) => {
+    if (nd.pad) return;
+    var pos = nodePos[nd.aid];
+    if (!pos) return;
+    var cx = pos.x, topY = pos.y - nodeH/2 - slH - 20;
+    var pi_i = nd.adj && nd.adj.length > 1 ? w[idx] * nd.adj[1] : 0;
+    var pf = Math.min(pi_i, 1);
+    var bx = cx - bW/2;
+
+    svg.append('rect').attr('x',bx+2).attr('width',bW-4).attr('rx',2)
+      .attr('y',topY+slH-pf*slH).attr('height',pf*slH).attr('fill',CR).attr('opacity',.7);
+    svg.append('text').attr('x',cx).attr('y',topY+slH-pf*slH-2)
+      .attr('text-anchor','middle').style('font-size','9px').style('fill',CR).text(pi_i.toFixed(3));
+
+    svgWrap.append('div').style('position','absolute').style('left',cx+'px').style('top',(topY+slH)+'px')
+      .style('transform','translateX(-50%)').style('font-size','13px').style('color',CR).style('pointer-events','none')
+      .html('$\\pi_{'+(idx+1)+'}$');
+
+    svg.append('line').attr('x1',cx).attr('y1',pos.y-nodeH/2).attr('x2',cx).attr('y2',topY+slH+14)
+      .attr('stroke','#d4a0a0').attr('stroke-width',1);
+  });
+
+  // Seed label
+  var rootAdj = nodePos[levels[depth-1][0].aid];
+  if (rootAdj) {
+    svgWrap.append('div').style('position','absolute')
+      .style('left',rootAdj.x+'px').style('top',(rootAdj.y-nodeH/2-16)+'px')
+      .style('transform','translateX(-50%)').style('font-size','10px').style('color',CR)
+      .style('pointer-events','none').html('$\\bar{c}_n = 1/Z$');
+  }
+
+  setTimeout(() => {
+    if (window.MathJax && MathJax.typesetPromise)
+      MathJax.typesetPromise([document.getElementById('bp')]);
+  }, 50);
+}
+
+fullBuild();
+</script>
+</div>
+</body>
+</html>
