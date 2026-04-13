@@ -2,16 +2,23 @@
 
 ## Content
 
+- [ ] $P(i \in S)$ is unclear notation
 - [x] Add a disclaimer that this post was written with extensive help from Claude Code, especially in the interactive widgets, which would not have been possible without Claude Code.
-- [ ] Need to explain that controlling the inclusion probabilities is the key to the optimal, unbiased, k-sparse estimator of the distribution, which is what HT provides. The optimal inclusion probabilities are $\pi = \min(1, p_i \tau)$ where $\tau$ is the solution to $n = \sum_i \min(1, p_i \tau)$. Give a citation (or just prove it).
-- [ ] Compare CPS to priority sampling in the HT estimation section — replicate the style of the "estimating means in a finite universe" blog post (https://timvieira.github.io/blog/post/2017/07/03/estimating-means-in-a-finite-universe/). Show variance reduction of CPS-HT vs priority sampling vs i.i.d. Monte Carlo on the same estimation problem. CPS gives optimal variance (max-entropy) but is more expensive to set up; priority sampling is $O(N \log N)$ but suboptimal. The comparison would make the HT section much more concrete.
-- [ ] Review the sampling pseudocode
+
+- [ ] Widget contents spill out of containers on narrow screens (e.g., phone). Looks very bad.
+- [ ] Do we like the linear-gradient background on the widgets?
+- [ ] Sampling animation widget: visual language is inconsistent with the product tree widget, and some of the pop-up histograms are confusing. Consider highlighting the current step in the pseudocode to anchor the viewer.
+- [x] Review the sampling pseudocode
 - [ ] Should we refer to polynomials more consistently as generating functions here?
 - [ ] Would evaluating/plotting the polynomial as a function of z tell us anything interesting?
 - [x] Add link to Wikipedia page on [elementary symmetric polynomials](https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial)
 
 ## Timing Section
 
+- [ ] Timing section is still a mess — results are mostly missing, and many results don't make sense yet.
+- [ ] Is the 3D plot using old data? It doesn't appear to be updated. Where is it getting its data from?
+- [ ] Contour diagram needs work.
+- [ ] "Numerical validation" section — not sure this is the best way to present this information.
 - [ ] Hide all Python/plotting code—just show the plot. Link to relevant implementations using the checkmark/footnote pill system (e.g., each curve links to its implementation in the repo).
 - [ ] Add more baselines for computing $\pi$ — (1) backprop-on-DP at $O(Nn)$, (2) naive loop versions: $N \times O(Nn)$ DP and $N \times O(N \log^2 n)$ product tree. These show the value of backprop vs. leave-one-out recomputation.
 - [ ] Add a programmatically generated empirical slope table. For each method, fit log-log slopes (time vs $N$ at fixed $n$, and time vs $n$ at fixed $N$) from the grid sweep data and display alongside theoretical complexity bounds. Auto-flag rows where empirical slope deviates significantly from prediction.

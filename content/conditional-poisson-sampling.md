@@ -910,7 +910,7 @@ Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by ru
 
 In the PyTorch implementation, the gradient comes for free via `torch.autograd`—no hand-coded tree traversal needed.
 
-### Drawing Exact Samples
+### Drawing Samples
 
 Sampling reuses the product tree (no gradient computation needed).  Walk the tree top-down, splitting a quota of $n$ between children at each internal node:
 
@@ -3181,24 +3181,6 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
 
 Code: [`conditional_poisson/tree_torch.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson/tree_torch.py)
 
-## Application: Horvitz-Thompson Estimation
-
-So far we've built machinery for sampling fixed-size subsets and computing inclusion probabilities.  A natural question: what can you *do* with this?  One important application is unbiased estimation.
-
-**Setup.** Suppose you have a distribution $p$ over a universe $\mathcal{S}$ of $N$ items, and a function $f$ that is expensive to evaluate.  You want to estimate $\mu = \sum_{i=1}^{N} p(i)\, f(i)$ using only $n$ evaluations of $f$.  With i.i.d. Monte Carlo, you'd draw $n$ samples—but some items may repeat, wasting evaluations.
-
-**The estimator.** The **Horvitz-Thompson estimator** ([Horvitz & Thompson, 1952](https://doi.org/10.1080/01621459.1952.10483446)) uses sampling *without* replacement to guarantee $n$ *distinct* evaluations.  Draw a fixed-size subset $S \sim \Ps_n$ using conditional Poisson sampling, then form:
-
-$$
-\hat{\mu}_{\text{HT}}(S) = \sum_{i \in S} \frac{p(i)}{\pip_i}\, f(i), \quad S \sim \Ps_n
-$$
-
-This gives an unbiased estimate: $\mathbb{E}[\hat{\mu}_{\text{HT}}] = \mu$,<a href="tests/test_identities.py#test_horvitz_thompson_unbiased" title="test_horvitz_thompson_unbiased" class="verified" target="_blank">✓</a> provided $\pip_i > 0$ whenever $p(i) > 0$.  The inverse-probability weighting $p(i)/\pip_i$ corrects for the sampling bias—items with higher inclusion probability are down-weighted, and vice versa.
-
-**Example.** With $N = 100$ items and $n = 5$, set weights proportional to $p(i)$ so that high-probability items are more likely to be selected.  Each sample gives 5 distinct evaluations of $f$; the HT formula reweights them to produce an unbiased estimate of the full sum.
-
-For more on SWOR-based estimation (including the near-optimal priority sampling scheme), see my earlier post on [estimating means in a finite universe](https://timvieira.github.io/blog/post/2017/07/03/estimating-means-in-a-finite-universe/).
-
 ## Identities for $\Z$ and Its Relatives
 
 The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> [elementary symmetric polynomial](https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial) $e_n(\bw)$.  Here are some useful identities.
@@ -3291,8 +3273,6 @@ Found an error or have a suggestion? Please [open an issue](https://github.com/t
 - [Jaynes (1957)](https://doi.org/10.1103/PhysRev.106.620). "Information Theory and Statistical Mechanics." *Physical Review*, 106(4), 620–630.
 
 - [Chen, Dempster & Liu (1994)](https://academic.oup.com/biomet/article-abstract/81/3/457/256956). "Weighted Finite Population Sampling to Maximize Entropy." *Biometrika*, 81(3), 457–469.
-
-- [Horvitz & Thompson (1952)](https://doi.org/10.1080/01621459.1952.10483446). "A Generalization of Sampling Without Replacement from a Finite Universe." *Journal of the American Statistical Association*, 47(260), 663–685.
 
 - [Darroch (1964)](https://doi.org/10.1214/aoms/1177703287). "On the Distribution of the Number of Successes in Independent Trials." *The Annals of Mathematical Statistics*, 35(3), 1317–1321.
 - [Baur & Strassen (1983)](https://doi.org/10.1016/0304-3975(83)90110-X). "The Complexity of Partial Derivatives." *Theoretical Computer Science*, 22(3), 317–330.
