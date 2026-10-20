@@ -15,9 +15,8 @@ class ConditionalPoissonSequentialNumPy(ConditionalPoissonNumPyBase):
     Methods:      log_prob(S), sample(), clear()
     """
 
-    @cached_property
-    def _forward(self):
-        """Forward table of prefix ESPs, normalized.  O(Nn).
+    def _recurrence(self, keep_table: bool):
+        """Run the normalized ESP recurrence.  O(Nn) time.
 
         Rescale the weights by the contour radius r, v = r w (this does not
         change the distribution; see conditional_poisson._contour), and divide
@@ -31,26 +30,39 @@ class ConditionalPoissonSequentialNumPy(ConditionalPoissonNumPyBase):
 
             E[j+1, k] = (1 - p_j) E[j, k] + p_j E[j, k-1],
 
-        so no entry can overflow.
+        so no entry can overflow.  With keep_table, all N + 1 rows are kept
+        (incl_prob and sample need them); otherwise only two, O(n) memory.
+
+        Returns (E, last row, (p, q), log prod_i (1 + v_i), log r).
         """
         N, K = self.N, self.n
         log_r = log_contour_radius(self.theta, K)
         x = self.theta + log_r
         p, q = expit(x), expit(-x)              # q = 1 - p, accurate when p is near 1
-        E = np.zeros((N + 1, K + 1))
+        E = np.zeros((N + 1 if keep_table else 2, K + 1))
         E[0, 0] = 1.0
         for j, (pj, qj) in enumerate(zip(p.tolist(), q.tolist())):
-            np.multiply(E[j], qj, out=E[j + 1])
-            E[j + 1, 1:] += pj * E[j, :K]
-        # log prod_i (1 + v_i) = sum_i log(1 + exp(theta_i + log r))
+            cur, nxt = (j, j + 1) if keep_table else (j % 2, (j + 1) % 2)
+            np.multiply(E[cur], qj, out=E[nxt])
+            E[nxt, 1:] += pj * E[cur, :K]
+        last = E[N] if keep_table else E[N % 2]
         log_scale = float(np.logaddexp(0.0, x).sum())
-        return E, (p, q), log_scale, log_r
+        return E, last, (p, q), log_scale, log_r
+
+    @cached_property
+    def _forward(self):
+        """Forward table of normalized prefix ESPs (see _recurrence).  O(Nn)."""
+        return self._recurrence(keep_table=True)
 
     @cached_property
     def log_normalizer(self) -> float:
-        E, _, log_scale, log_r = self._forward
-        N, K = self.N, self.n
-        return float(np.log(E[N, K]) + log_scale - K * log_r)
+        """log Z.  Reuses the forward table if it exists; otherwise runs the
+        recurrence in O(n) memory, since Z alone does not need the table."""
+        if '_forward' in self.__dict__:
+            _, last, _, log_scale, log_r = self._forward
+        else:
+            _, last, _, log_scale, log_r = self._recurrence(keep_table=False)
+        return float(np.log(last[self.n]) + log_scale - self.n * log_r)
 
     @cached_property
     def incl_prob(self) -> np.ndarray:
@@ -65,7 +77,7 @@ class ConditionalPoissonSequentialNumPy(ConditionalPoissonNumPyBase):
             excl = (1 - p_j) * (E[j] . delta)
             pi_j = incl / (incl + excl).
         """
-        E, (p, q), _, _ = self._forward
+        E, _, (p, q), _, _ = self._forward
         N, K = self.N, self.n
         pi = np.zeros(N)
         if K == 0:
@@ -85,7 +97,7 @@ class ConditionalPoissonSequentialNumPy(ConditionalPoissonNumPyBase):
 
     @cached_property
     def _sample_data(self):
-        E, (p, q), _, _ = self._forward
+        E, _, (p, q), _, _ = self._forward
         return E.data, p.tolist(), q.tolist()   # fast scalar reads, no copy
 
     def sample(self) -> np.ndarray:

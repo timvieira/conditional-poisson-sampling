@@ -103,6 +103,14 @@ class TestLogNormalizer:
         cp = cls.from_weights(1, w)
         assert abs(cp.log_normalizer - np.log(np.sum(w))) < 1e-8
 
+    def test_independent_of_call_order(self, cls):
+        # Some classes compute log Z by a cheaper path when nothing else is cached.
+        w = np.random.default_rng(3).exponential(1.0, 40)
+        alone = cls.from_weights(15, w).log_normalizer
+        cp = cls.from_weights(15, w)
+        cp.incl_prob
+        assert abs(cp.log_normalizer - alone) < 1e-12 * abs(alone)
+
 
 # ── Log probability ──────────────────────────────────────────────────────────
 
