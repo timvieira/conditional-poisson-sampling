@@ -1,159 +1,107 @@
 #!/usr/bin/env python3
-"""
-Generate timing comparison plots from timing_data.json.
+"""Draw the article's static timing plots from content/figures/timing.json.
 
-Produces four SVG figures:
-  - content/figures/timing_Z.svg       — computing normalizing constant Z
-  - content/figures/timing_pi.svg      — computing inclusion probabilities pi
-  - content/figures/timing_fit.svg     — fitting target pi -> weights
-  - content/figures/timing_samples.svg — drawing samples
+Writes content/figures/timing_{Z,pi,samples}.svg, each a log-log plot of time
+against N with n = 0.4 N (the "ratio" sweep of bench/bench_timing.py).
+Empirical slopes are reported by the slope table in the article, which is
+computed in the browser from the (N, n) grid in the same file.
 
 Usage:
-    python3 plot_timing.py
-    python3 plot_timing.py timing_data.json   # custom input path
+    python bench/plot_timing.py
 """
 
 import json
-import os
-import sys
+from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter, LogLocator
 import numpy as np
 
-# ── Style ────────────────────────────────────────────────────────────────────
+REPO = Path(__file__).resolve().parent.parent
+FIGURES = REPO / "content" / "figures"
 
 STYLE = {
-    # Z experiment
-    "DP forward":                {"color": "#E91E63", "marker": "s", "ls": "--", "lw": 1.5, "ms": 5},
-    "NumPy tree":                {"color": "#5b9bd5", "marker": "o", "ls": "-",  "lw": 2,   "ms": 6},
-    "PyTorch FFT":               {"color": "#c0504d", "marker": "^", "ls": "-",  "lw": 2,   "ms": 6},
-    # Pi experiment
-    "N×DP (leave-one-out)":      {"color": "#aaa",    "marker": "s", "ls": "--", "lw": 1.5, "ms": 5},
-    "N×Tree (leave-one-out)":    {"color": "#bbb",    "marker": "D", "ls": "--", "lw": 1.5, "ms": 5},
-    "Forward-backward DP":       {"color": "#E91E63", "marker": "s", "ls": "-",  "lw": 2,   "ms": 6},
-    "R:sampling (pi)":           {"color": "#FF9800", "marker": "p", "ls": "-.", "lw": 1.5, "ms": 7},
-    "NumPy tree + backprop":     {"color": "#5b9bd5", "marker": "o", "ls": "-",  "lw": 2,   "ms": 6},  # alias
-    "PyTorch FFT + autograd":    {"color": "#c0504d", "marker": "^", "ls": "-",  "lw": 2,   "ms": 6},
-    # Fit experiment
-    "NumPy tree (L-BFGS)":       {"color": "#5b9bd5", "marker": "o", "ls": "-",  "lw": 2,   "ms": 6},
-    "PyTorch FFT (L-BFGS)":      {"color": "#c0504d", "marker": "^", "ls": "-",  "lw": 2,   "ms": 6},
-    "Sequential DP (L-BFGS)":    {"color": "#E91E63", "marker": "s", "ls": "--", "lw": 1.5, "ms": 5},
-    "R:sampling (fit)":          {"color": "#FF9800", "marker": "p", "ls": "-.", "lw": 1.5, "ms": 7},
-    # Samples experiment
-    "R:sampling (1 sample, incl. DP)":      {"color": "#FF9800", "marker": "p", "ls": "-.", "lw": 1.5, "ms": 7},
-    "R:sampling (1 sample, excl. DP)":      {"color": "#FF9800", "marker": "h", "ls": ":",  "lw": 1.5, "ms": 7},
-    "NumPy tree (1 sample, incl. build)":   {"color": "#5b9bd5", "marker": "D", "ls": "--", "lw": 1.5, "ms": 5},
-    "NumPy tree (1 sample)":     {"color": "#5b9bd5", "marker": "o", "ls": "-",  "lw": 2,   "ms": 6},
-    "PyTorch tree (1 sample)":   {"color": "#c0504d", "marker": "^", "ls": "-",  "lw": 2,   "ms": 6},
-    "Sequential (1 sample)":     {"color": "#E91E63", "marker": "s", "ls": "--", "lw": 1.5, "ms": 5},
+    "tree":     dict(color="#c0504d", marker="^", ls="-",  lw=2.0, ms=6),
+    "dp":       dict(color="#5b9bd5", marker="s", ls="-",  lw=2.0, ms=5),
+    "tree_loo": dict(color="#c0504d", marker="^", ls="--", lw=1.3, ms=5, alpha=0.55),
+    "dp_loo":   dict(color="#5b9bd5", marker="s", ls="--", lw=1.3, ms=4, alpha=0.55),
+    "r":        dict(color="#FF9800", marker="o", ls="-.", lw=1.5, ms=5),
 }
 
-# Map method names in pi experiment that reuse Z names
-PI_LABEL_MAP = {
-    "NumPy tree": "NumPy tree + backprop",
+LABELS = {
+    "Z": {
+        "tree": r"product tree (PyTorch), $\mathcal{O}(N \log^2 n)$",
+        "dp":   r"DP (NumPy), $\mathcal{O}(Nn)$",
+    },
+    "pi": {
+        "tree":     r"product tree + autograd, $\mathcal{O}(N \log^2 n)$",
+        "dp":       r"DP + reverse pass, $\mathcal{O}(Nn)$",
+        "tree_loo": r"leave-one-out, $N \times$ tree, $\mathcal{O}(N^2 \log^2 n)$",
+        "dp_loo":   r"leave-one-out, $N \times$ DP, $\mathcal{O}(N^2 n)$",
+        "r":        r"R sampling package, $\mathcal{O}(Nn)$",
+    },
+    "sample": {
+        "tree": r"product tree, $\mathcal{O}(n \log N)$ per sample",
+        "dp":   r"DP table, $\mathcal{O}(N)$ per sample",
+        "r":    r"R sampling package, $\mathcal{O}(N)$ per sample",
+    },
 }
 
-# Complexity labels for the legend
-COMPLEXITY = {
-    # Z
-    "DP forward":                r"$\mathcal{O}(Nn)$",
-    "NumPy tree":                r"$\mathcal{O}(N \log^2 N)$",
-    "PyTorch FFT":               r"$\mathcal{O}(N \log^2 n)$",
-    # Pi
-    "N×DP (leave-one-out)":      r"$\mathcal{O}(N^2 n)$",
-    "N×Tree (leave-one-out)":    r"$\mathcal{O}(N^2 \log^2 n)$",
-    "Forward-backward DP":       r"$\mathcal{O}(Nn)$",
-    "R:sampling (pi)":           r"R sampling",
-    "NumPy tree + backprop":     r"$\mathcal{O}(N \log^2 N)$",
-    "PyTorch FFT + autograd":    r"$\mathcal{O}(N \log^2 n)$",
-    # Fit
-    "NumPy tree (Newton-CG)":    r"product tree + Newton-CG",
-    "R:sampling (fit)":          r"R sampling (fixed-point)",
-    # Samples
-    "R:sampling (1 sample, incl. DP)":      r"R sampling (1 sample, incl. DP)",
-    "R:sampling (1 sample, excl. DP)":      r"R sampling (1 sample, excl. DP)",
-    "NumPy tree (1 sample, incl. build)":   r"product tree (1 sample, incl. build)",
-    "NumPy tree (1 sample)":     r"product tree (1 sample, excl. build)",
+TITLES = {
+    "Z": r"Computing $Z$",
+    "pi": r"Computing $\boldsymbol{\pi}$",
+    "sample": r"Drawing One Sample (after setup)",
 }
 
-
-def load_data(path):
-    with open(path) as f:
-        return json.load(f)
+FILES = {"Z": "timing_Z.svg", "pi": "timing_pi.svg", "sample": "timing_samples.svg"}
 
 
-def plot_experiment(ax, data, experiment, label_map=None):
-    """Plot all methods for one experiment on ax."""
-    # Group by method
-    methods = {}
-    for d in data:
-        if d["experiment"] != experiment:
+def fmt_seconds(t, _pos):
+    if t >= 1:
+        return f"{t:g} s"
+    if t >= 1e-3:
+        return f"{t * 1e3:g} ms"
+    return f"{t * 1e6:g} µs"
+
+
+def plot(results, experiment):
+    rows = [r for r in results if r["sweep"] == "ratio" and r["experiment"] == experiment]
+    fig, ax = plt.subplots(figsize=(7, 4.3))
+    for method, label in LABELS[experiment].items():
+        pts = sorted((r["N"], r["seconds"]) for r in rows
+                     if r["method"] == method and r["seconds"] is not None)
+        if not pts:
             continue
-        m = d["method"]
-        if label_map and m in label_map:
-            m = label_map[m]
-        methods.setdefault(m, ([], []))
-        methods[m][0].append(d["N"])
-        methods[m][1].append(d["time_ms"])
-
-    # Plot order: slow methods first (background), fast last (foreground)
-    order = list(STYLE.keys())
-    sorted_methods = sorted(methods.keys(),
-                            key=lambda m: order.index(m) if m in order else 999)
-
-    for m in sorted_methods:
-        Ns, ts = methods[m]
-        # Sort by N
-        idx = np.argsort(Ns)
-        Ns = [Ns[i] for i in idx]
-        ts = [ts[i] for i in idx]
-
-        s = STYLE.get(m, {"color": "gray", "marker": ".", "ls": "-", "lw": 1, "ms": 4})
-        complexity = COMPLEXITY.get(m, "")
-        label = f"{m}  {complexity}" if complexity else m
-        ax.loglog(Ns, ts, marker=s["marker"], color=s["color"],
-                  ls=s["ls"], lw=s["lw"], ms=s["ms"], label=label)
-
-    ax.set_xlabel("$N$")
-    ax.set_ylabel("time (ms)")
+        Ns, ts = map(np.array, zip(*pts))
+        ax.loglog(Ns, ts, label=label, **STYLE[method])
+        failed = [r for r in rows if r["method"] == method and r.get("failure")]
+        for r in failed:
+            ax.annotate(f"overflow at $N = {r['N']}$", xy=(Ns[-1], ts[-1]), xytext=(8, -3),
+                        textcoords="offset points", fontsize=8, color=STYLE[method]["color"])
+    ax.set_xlabel(r"$N$ (with $n = 0.4N$)")
+    ax.set_ylabel("time")
+    ax.yaxis.set_major_locator(LogLocator(base=10))
+    ax.yaxis.set_major_formatter(FuncFormatter(fmt_seconds))
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{x:g}"))
     ax.grid(True, alpha=0.15, which="both")
+    ax.set_title(TITLES[experiment], fontsize=11)
     ax.legend(frameon=False, fontsize=8, loc="upper left")
-
-
-def make_plot(data, experiment, title, out_path, label_map=None, figsize=(7, 4.5)):
-    fig, ax = plt.subplots(1, 1, figsize=figsize)
-    plot_experiment(ax, data, experiment, label_map=label_map)
-    ax.set_title(title, fontsize=11)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
     fig.tight_layout()
-    fig.savefig(out_path, bbox_inches="tight")
+    out = FIGURES / FILES[experiment]
+    fig.savefig(out, bbox_inches="tight", metadata={"Date": None})
     plt.close(fig)
-    print(f"Wrote {out_path}")
+    print(f"Wrote {out.relative_to(REPO)}")
 
 
 def main():
-    data_path = sys.argv[1] if len(sys.argv) > 1 else "results/timing_data.json"
-    data = load_data(data_path)
-
-    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    out_dirs = [
-        os.path.join(repo, "content", "figures"),
-    ]
-
-    plots = [
-        ("Z", "Computing the Normalizing Constant $Z$", "timing_Z.svg", None),
-        ("pi", "Computing Inclusion Probabilities $\\pi$", "timing_pi.svg", PI_LABEL_MAP),
-        ("fit", "Fitting: Target $\\pi$ → Weights", "timing_fit.svg", None),
-        ("samples", "Drawing Samples", "timing_samples.svg", None),
-    ]
-
-    for experiment, title, filename, label_map in plots:
-        for out_dir in out_dirs:
-            if os.path.isdir(out_dir):
-                make_plot(data, experiment, title,
-                          os.path.join(out_dir, filename),
-                          label_map=label_map)
+    plt.rcParams["svg.hashsalt"] = "timing"      # deterministic SVG ids
+    data = json.loads((FIGURES / "timing.json").read_text())
+    for experiment in FILES:
+        plot(data["results"], experiment)
 
 
 if __name__ == "__main__":

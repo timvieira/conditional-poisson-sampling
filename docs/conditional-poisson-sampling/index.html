@@ -2655,193 +2655,196 @@ $$
   max|pi-pi*| = 9.085e-11</p>
 </pre>
 
+<p><strong>Comparison with R.</strong>  The R <code>sampling</code> package solves the same problem with <a href="https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R"><code>UPMEpiktildefrompik</code></a>.  It works with Poisson inclusion probabilities $\tilde{p}_i$ (weights $\w_i = \tilde{p}_i / (1 - \tilde{p}_i)$), starts from $\tilde{p}_i = \piptgt_i$, and iterates $\tilde{p}_i \leftarrow \tilde{p}_i + \piptgt_i - \pip_i$, where $\pip_i$ is the inclusion probability under the current weights.  Its <a href="https://cran.r-project.org/web/packages/sampling/sampling.pdf">documentation</a> calls this Newton's method, but the update uses the identity matrix in place of the Jacobian, so it is a fixed-point iteration.  Each iteration recomputes $\bpip$ with an $\mathcal{O}(Nn)$ DP.</p>
 <h2 id="timing">Timing</h2>
-<p>The plots below compare wall-clock time across methods for four operations: computing the normalizing constant $\Z$, computing inclusion probabilities $\bpip$, fitting target $\bpip$ to weights, and drawing samples.  All timings use $n = 0.4N$ with weights drawn from $\text{Exp}(1)$.  Source code for each method is linked via the ✓ pills; the full benchmark script is <a href="bench/bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.</p>
-<h3 id="computing-math294">Computing $\Z$</h3>
-<p>Three methods for computing the normalizing constant:
-<a href="bench/bench_timing.py#dp_forward_Z" title="dp_forward_Z" class="verified" target="_blank">✓</a> DP forward pass $\mathcal{O}(Nn)$ ·
-<a href="conditional_poisson/tree_numpy.py" title="ConditionalPoissonNumPy.log_normalizer" class="verified" target="_blank">✓</a> NumPy product tree $\mathcal{O}(N \log^2 N)$ ·
-<a href="conditional_poisson/tree_torch.py#_log_Z" title="ConditionalPoissonTorch._log_Z" class="verified" target="_blank">✓</a> PyTorch FFT tree $\mathcal{O}(N \log^2 n)$</p>
+<p>Do the asymptotic claims hold up on a real machine?  This section times the product tree against the $\mathcal{O}(Nn)$ dynamic program (DP) and against the existing R implementation.</p>
+<p><strong>Setup.</strong>  The product tree is <code>ConditionalPoissonTorch</code> (PyTorch, FFT, $\bpip$ by autograd).  The DP is <code>ConditionalPoissonSequentialNumPy</code>: a loop over the $N$ items whose steps are vectorized over $k$, with $\bpip$ computed by a hand-written reverse pass.  The R baseline is the <a href="https://cran.r-project.org/web/packages/sampling/">sampling</a> package (version 2.11).  Weights are drawn from $\text{Exp}(1)$, and every method gets the same weights.  Measurements run one at a time on a single thread of an Intel Core i7-8650U laptop CPU, and each time is the fastest of up to five repeats after a warm-up call.<a href="bench/bench_timing.py#measure" title="measure" class="verified" target="_blank">✓</a>  Every method computes exact quantities, and the benchmark checks each output against an independent method:<a href="bench/bench_timing.py#check" title="check, Reference.__call__" class="verified" target="_blank">✓</a> the tree and the DP agree on $\bpip$ to within $4 \times 10^{-15}$ and on $\log \Z$ to within a relative $10^{-15}$ at every size, and R agrees with both wherever it runs.  The raw data is in <a href="../figures/timing.json">timing.json</a>, and the benchmark script is <a href="bench/bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.</p>
+<p>The first three plots fix $n = 0.4N$; the 3D plots at the end vary $N$ and $n$ separately.</p>
+<h3 id="computing-math309">Computing $\Z$</h3>
+<p><a href="conditional_poisson/tree_torch.py#_circuit" title="ConditionalPoissonTorch._circuit" class="verified" target="_blank">✓</a> product tree $\mathcal{O}(N \log^2 n)$ ·
+<a href="conditional_poisson/sequential_numpy.py#_recurrence" title="ConditionalPoissonSequentialNumPy._recurrence, ConditionalPoissonSequentialNumPy.log_normalizer" class="verified" target="_blank">✓</a> DP $\mathcal{O}(Nn)$</p>
 <figure>
-<p><img src="../figures/timing_Z.svg" alt="Log-log plot: computing Z" style="width:100%"></p>
+<p><img src="../figures/timing_Z.svg" alt="Log-log plot of the time to compute Z against N, with n = 0.4N" style="width:100%"></p>
 </figure>
 
-<p>The DP approach is fastest at small $N$ (no overhead), but the FFT tree overtakes it by $N \approx 200$ and is $\sim\!100\times$ faster by $N = 5000$.</p>
-<h3 id="computing-math302">Computing $\bpip$</h3>
-<p>This is the main event.  The naive approach computes each $\pip_i$ independently via a leave-one-out forward pass; backpropagation replaces $N$ forward passes with a single backward pass, giving a factor-of-$N$ speedup:</p>
-<p><a href="bench/bench_timing.py#dp_loo_pi" title="dp_loo_pi" class="verified" target="_blank">✓</a> $N \times$ DP leave-one-out $\mathcal{O}(N^2 n)$ ·
-<a href="bench/bench_timing.py#tree_loo_pi" title="tree_loo_pi" class="verified" target="_blank">✓</a> $N \times$ Tree leave-one-out $\mathcal{O}(N^2 \log^2 n)$ ·
-<a href="bench/bench_samplers.py#sequential_pi" title="sequential_pi" class="verified" target="_blank">✓</a> Forward-backward DP $\mathcal{O}(Nn)$ ·
-<a href="bench/bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R <code>sampling</code> package ·
-<a href="conditional_poisson/tree_numpy.py" title="ConditionalPoissonNumPy.incl_prob" class="verified" target="_blank">✓</a> NumPy tree + backprop $\mathcal{O}(N \log^2 N)$ ·
-<a href="conditional_poisson/tree_torch.py#incl_prob" title="ConditionalPoissonTorch.incl_prob" class="verified" target="_blank">✓</a> PyTorch FFT + autograd $\mathcal{O}(N \log^2 n)$</p>
+<p>The DP is faster for small $N$.  The tree's PyTorch implementation has a fixed cost of about 2 ms per call (it dispatches about a hundred small tensor operations), and that cost dominates until $N \approx 500$.  Beyond that the tree wins, and its lead grows with $N$: at $N = 20{,}000$ it takes 61 ms, versus 397 ms for the DP.  (When it computes $\Z$ alone, the DP keeps only one row of its table, so it is not slowed down by memory it does not need.)</p>
+<h3 id="computing-math317">Computing $\bpip$</h3>
+<p>This is the main event.  Without backpropagation, the natural way to get $\bpip$ is leave-one-out, $\pip_i = \w_i \llbracket \prod_{j \neq i}(1 + \w_j \z) \rrbracket(\z^{n-1}) / \Zw{\bw}{n}$,<a href="tests/test_identities.py#test_pi_leave_one_out" title="test_pi_leave_one_out" class="verified" target="_blank">✓</a> which takes one forward pass per item.<a href="bench/bench_timing.py#loo_incl_prob" title="loo_incl_prob" class="verified" target="_blank">✓</a>  Backpropagation replaces those $N$ forward passes with a single backward pass.</p>
+<p><a href="conditional_poisson/_base_torch.py#incl_prob" title="ConditionalPoissonTorchBase.incl_prob" class="verified" target="_blank">✓</a> product tree + autograd $\mathcal{O}(N \log^2 n)$ ·
+<a href="conditional_poisson/sequential_numpy.py#incl_prob" title="ConditionalPoissonSequentialNumPy.incl_prob" class="verified" target="_blank">✓</a> DP + reverse pass $\mathcal{O}(Nn)$ ·
+<a href="bench/bench_timing.py#loo_incl_prob" title="loo_incl_prob" class="verified" target="_blank">✓</a> leave-one-out with either ·
+<a href="bench/bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R <code>sampling</code> package</p>
 <figure>
-<p><img src="../figures/timing_pi.svg" alt="Log-log plot: computing inclusion probabilities" style="width:100%"></p>
+<p><img src="../figures/timing_pi.svg" alt="Log-log plot of the time to compute inclusion probabilities against N, with n = 0.4N" style="width:100%"></p>
 </figure>
 
-<p>The leave-one-out methods (gray, dashed) are $\sim\!N\times$ slower than their backprop counterparts—this is the Baur-Strassen theorem in action.  The PyTorch FFT implementation is the fastest overall, combining FFT-based polynomial multiplication ($\mathcal{O}(d \log d)$ per multiply), batched execution ($\mathcal{O}(\log N)$ torch calls), and autograd.</p>
-<h3 id="fitting">Fitting</h3>
-<p>Given target inclusion probabilities $\bpiptgt$, find weights $\bw$ such that $\bpip(\bw) = \bpiptgt$:</p>
-<p><a href="conditional_poisson/tree_numpy.py#fit" title="ConditionalPoissonNumPy.fit" class="verified" target="_blank">✓</a> Product tree + L-BFGS ·
-<a href="bench/bench_timing_r.R" title="UPMEpiktildefrompik" class="verified" target="_blank">✓</a> R <code>sampling::UPMEpiktildefrompik</code> (fixed-point iteration)</p>
-<figure>
-<p><img src="../figures/timing_fit.svg" alt="Log-log plot: fitting target pi to weights" style="width:100%"></p>
-</figure>
-
-<p>Our L-BFGS optimizer uses the gradient $\bpip(\btheta) - \bpiptgt$ (computed via reverse-mode AD on the product tree) to fit weights to target inclusion probabilities.  R's <a href="https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R"><code>UPMEpiktildefrompik</code></a> uses $J = I$ rather than the true Jacobian, making it a fixed-point iteration ($\tilde{p} \mathrel{+}= \bpiptgt - \bpip(\tilde{p})$) despite the <a href="https://cran.r-project.org/web/packages/sampling/sampling.pdf">docs</a> calling it Newton's method.  Each R iteration requires a full $\mathcal{O}(Nn)$ DP pass to recompute $\bpip$.</p>
+<p>Backpropagation costs a small constant factor more than the forward pass, as the Baur-Strassen theorem promises: computing $\bpip$ takes 2.1 to 2.7 times as long as computing $\Z$ with the tree, and 2.5 to 3.9 times as long with the DP.  Leave-one-out costs a factor of about $N$ more instead.  At $N = 2000$, it takes 12 s with the tree (840 times as long as backpropagation) and 39 s with the DP (740 times as long).  Between the two backpropagation methods, the tree overtakes the DP by $N = 500$ and is 12 times faster at $N = 20{,}000$ (130 ms versus 1.6 s).</p>
+<p>The R package also uses an $\mathcal{O}(Nn)$ DP, but it runs as interpreted R code: at $N = 1000$ it takes 519 ms, 55 times as long as the tree.  Its <a href="https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R">DP recurrence</a> also works in linear space without rescaling, so at $N = 2000$ ($n = 800$) the table overflows and it returns NaN.  (Our DP avoids this by dividing each step by $1 + \w_i r$, which keeps every entry of its table a probability.)  The R package does not expose $\Z$.</p>
 <h3 id="drawing-samples_1">Drawing Samples</h3>
-<p><a href="bench/bench_timing_r.R" title="UPMEqfromw + UPMEsfromq" class="verified" target="_blank">✓</a> R <code>sampling</code> (1 sample, with and without DP rebuild) ·
-<a href="conditional_poisson/tree_numpy.py" title="ConditionalPoissonNumPy.sample" class="verified" target="_blank">✓</a> Product tree quota splitting $\mathcal{O}(n \log N)$/sample (with and without tree build)</p>
+<p><a href="conditional_poisson/tree_torch.py#sample" title="ConditionalPoissonTorch.sample" class="verified" target="_blank">✓</a> product tree $\mathcal{O}(n \log N)$ per sample ·
+<a href="conditional_poisson/sequential_numpy.py#sample" title="ConditionalPoissonSequentialNumPy.sample" class="verified" target="_blank">✓</a> DP table $\mathcal{O}(N)$ per sample ·
+<a href="bench/bench_timing_r.R" title="UPMEsfromq" class="verified" target="_blank">✓</a> R <code>sampling</code> package $\mathcal{O}(N)$ per sample</p>
 <figure>
-<p><img src="../figures/timing_samples.svg" alt="Log-log plot: drawing samples" style="width:100%"></p>
+<p><img src="../figures/timing_samples.svg" alt="Log-log plot of the time to draw one sample against N, with n = 0.4N" style="width:100%"></p>
 </figure>
 
-<p>For fair comparison, the plot shows both "including setup" and "excluding setup" variants.  R's <a href="https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R"><code>UPMEqfromw</code></a> computes the $\mathcal{O}(Nn)$ DP table; <a href="https://github.com/cran/sampling/blob/master/R/UPMEsfromq.R"><code>UPMEsfromq</code></a> draws one $\mathcal{O}(N)$ sequential sample from it.  Our product tree costs $\mathcal{O}(N \log^2 n)$ to build plus $\mathcal{O}(Nn)$ to precompute the CDF tables, then $\mathcal{O}(n \log N)$ per sample via quota splitting with binary search on the cached CDFs.  The "incl. build/DP" lines give apples-to-apples single-sample cost; the "excl." lines show the marginal cost of additional samples from a precomputed structure.</p>
-<p>The R <code>sampling</code> package does not expose the normalizing constant $\Z$, and has numerical stability limitations: its <a href="https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R#L11">DP recurrence</a> operates in linear space without log-scaling, producing NaN at moderate sizes or when weights span several orders of magnitude.  Our FFT implementation maintains machine-epsilon accuracy at all tested sizes and weight ranges.<a href="bench_accuracy.py#r_accuracy" title="R vs tree vs FFT accuracy comparison" class="verified" target="_blank">✓</a></p>
-<h3 id="scaling-in-math331-and-math332">Scaling in $N$ and $n$</h3>
-<p>The static plots above fix $n = 0.4N$.  The interactive 3D plots below sweep $N$ and $n$ independently, confirming the claimed complexities.  Drag to rotate, scroll to zoom, hover for values.  Use the dropdown to switch between operations.</p>
-<div id="timing-3d">
+<p>Both samplers first build a data structure, which costs about one forward pass: the tree reuses its product tree, and the DP fills its $(N+1) \times (n+1)$ table.  The plot shows the cost of each sample after that.  With $n = 0.4N$, the DP's sampler is faster: its $\mathcal{O}(N)$ scan beats the tree's $\mathcal{O}(n \log N)$ walk when $n$ is a constant fraction of $N$ (at $N = 20{,}000$, 14 ms versus 102 ms per sample).  The tree's sampler wins when the sample is a small fraction of the population: in the grid below, it is faster whenever $n$ is at most about 2% of $N$, for example 0.25 ms versus 12 ms at $N = 20{,}000$ and $n = 5$.  R's sampler is also an $\mathcal{O}(N)$ scan, 1.3 to 2.7 times slower than ours.</p>
+<h3 id="scaling-in-math350-and-math351">Scaling in $N$ and $n$</h3>
+<p>The 3D plots below vary $N$ from 100 to 20,000 and $n$ from 5 to $N/2$.  Drag to rotate, scroll to zoom, and hover for values.  For $\Z$ and $\bpip$, the DP is faster at every $n$ when $N \le 200$, and the tree is faster at every $n$ when $N \ge 1000$.  The crossover depends on $N$ more than on $n$ because of constant factors: the DP pays a few microseconds of NumPy overhead per item, and the tree pays about 2 ms per call.  For sampling, the crossover is the one described above.</p>
+<div class="widget" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+<div class="timing-legend"><span style="color:#c0504d">&#9632;</span> product tree &nbsp;&nbsp; <span style="color:#5b9bd5">&#9632;</span> DP
+</div>
+<div class="timing-3d-title">
+<p><b>Computing $\Z$</b></p>
+</div>
+<div id="timing-3d-Z" class="timing-3d">
 
 </div>
+<div class="timing-3d-title">
+<p><b>Computing $\bpip$</b></p>
+</div>
+<div id="timing-3d-pi" class="timing-3d">
+
+</div>
+<div class="timing-3d-title">
+<p><b>Drawing One Sample</b> (after setup)</p>
+</div>
+<div id="timing-3d-sample" class="timing-3d">
+
+</div>
+</div>
+
+<p>To check the claimed complexities, the table below fits the log-log slope of time against $N$ (at fixed $n$) and against $n$ (at fixed $N$), each over the four largest sizes, and compares it with the slope of the complexity bound over the same points.  It is computed in your browser from <a href="../figures/timing.json">timing.json</a>.  Cells where the two differ by more than 0.2 are flagged in red.</p>
+<div id="timing-slopes">
+<table>
+<tr><th>operation</th><th>method</th><th>bound</th><th>slope in $N$ at $n = 1000$<br>measured / bound</th><th>slope in $n$ at $N = 20{,}000$<br>measured / bound</th></tr>
+<tr><td>$\Z$</td><td style="color:#c0504d">product tree</td><td>$\mathcal{O}(N \log^2 n)$</td><td data-slope="Z tree N 1000"></td><td data-slope="Z tree n 20000"></td></tr>
+<tr><td>$\Z$</td><td style="color:#5b9bd5">DP</td><td>$\mathcal{O}(Nn)$</td><td data-slope="Z dp N 1000"></td><td data-slope="Z dp n 20000"></td></tr>
+<tr><td>$\bpip$</td><td style="color:#c0504d">product tree</td><td>$\mathcal{O}(N \log^2 n)$</td><td data-slope="pi tree N 1000"></td><td data-slope="pi tree n 20000"></td></tr>
+<tr><td>$\bpip$</td><td style="color:#5b9bd5">DP</td><td>$\mathcal{O}(Nn)$</td><td data-slope="pi dp N 1000"></td><td data-slope="pi dp n 20000"></td></tr>
+<tr><td>one sample</td><td style="color:#c0504d">product tree</td><td>$\mathcal{O}(n \log N)$</td><td data-slope="sample tree N 1000"></td><td data-slope="sample tree n 20000"></td></tr>
+<tr><td>one sample</td><td style="color:#5b9bd5">DP</td><td>$\mathcal{O}(N)$</td><td data-slope="sample dp N 1000"></td><td data-slope="sample dp n 20000"></td></tr>
+</table>
+</div>
+
+<p>In this run the flags have three causes, none of which contradicts the bounds.  First, the tree's fixed cost of about 2 ms per call is still a sizable part of its time at $N = 2000$, which flattens its slope in $N$.  Second, each step of the DP is a few NumPy calls on vectors of length $n$, and until $n$ reaches the thousands, their fixed overhead outweighs the $n$ multiply-adds, so the DP's time grows more slowly than $n$.  Third, the tree's sampler visits about $n \log_2(N/n) + 2n$ nodes, which is $\mathcal{O}(n \log N)$ but has different local slopes than $n \log N$.  Away from these effects, the measurements follow the bounds: the tree's time grows like $\log^2 n$ in $n$, and the DP's grows linearly in $N$.</p>
+<p>The tree's accuracy depends on the contour scaling described in the next section.  With it, the tree matches the DP at every size timed here, and it matches exact rational arithmetic for weights spanning $e^{\pm 300}$.<a href="tests/test_all_implementations.py#test_extreme_weights_exact" title="TestStability.test_extreme_weights_exact" class="verified" target="_blank">✓</a></p>
+<style>
+.timing-3d { height: 400px; }
+.timing-3d-title { margin-top: 12px; text-align: center; }
+.timing-legend { text-align: center; }
+#timing-slopes { overflow-x: auto; }
+#timing-slopes table { border-collapse: collapse; margin: 0 auto; font-size: 0.9em; }
+#timing-slopes th, #timing-slopes td { padding: 3px 10px; border-bottom: 1px solid #ddd; text-align: center; }
+#timing-slopes td[data-slope] { white-space: nowrap; }
+#timing-slopes td.flag { color: #c0504d; font-weight: bold; }
+</style>
 <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
 <script>
 (function() {
-var raw = [["DP forward", "Z", 50, 5, 0.2137], ["NumPy tree", "Z", 50, 5, 3.5566], ["PyTorch FFT", "Z", 50, 5, 1.8522], ["DP forward", "pi", 50, 5, 0.6744], ["NumPy tree", "pi", 50, 5, 21.4044], ["PyTorch FFT + autograd", "pi", 50, 5, 8.9727], ["NumPy tree (L-BFGS)", "fit", 50, 5, 1115.4894], ["R:sampling (pi)", "pi", 50, 5, 0.4692], ["R:sampling (fit)", "fit", 50, 5, 2.0], ["R:sampling (1 sample, incl. DP)", "samples", 50, 5, 0.3532], ["R:sampling (1 sample, excl. DP)", "samples", 50, 5, 0.0752], ["NumPy tree (1 sample)", "samples", 50, 5, 0.0245], ["PyTorch tree (1 sample)", "samples", 50, 5, 0.0349], ["Sequential (1 sample)", "samples", 50, 5, 0.036], ["DP forward", "Z", 50, 10, 0.2029], ["NumPy tree", "Z", 50, 10, 3.0838], ["PyTorch FFT", "Z", 50, 10, 2.407], ["DP forward", "pi", 50, 10, 1.6584], ["NumPy tree", "pi", 50, 10, 11.8119], ["PyTorch FFT + autograd", "pi", 50, 10, 6.8692], ["NumPy tree (L-BFGS)", "fit", 50, 10, 678.3815], ["R:sampling (pi)", "pi", 50, 10, 1.0], ["R:sampling (fit)", "fit", 50, 10, 5.0], ["R:sampling (1 sample, incl. DP)", "samples", 50, 10, 0.5], ["R:sampling (1 sample, excl. DP)", "samples", 50, 10, 0.091], ["NumPy tree (1 sample)", "samples", 50, 10, 0.0882], ["PyTorch tree (1 sample)", "samples", 50, 10, 0.0872], ["Sequential (1 sample)", "samples", 50, 10, 0.0451], ["DP forward", "Z", 50, 20, 0.2098], ["NumPy tree", "Z", 50, 20, 3.7427], ["PyTorch FFT", "Z", 50, 20, 2.3288], ["DP forward", "pi", 50, 20, 2.6822], ["NumPy tree", "pi", 50, 20, 8.7769], ["PyTorch FFT + autograd", "pi", 50, 20, 4.889], ["NumPy tree (L-BFGS)", "fit", 50, 20, 547.1085], ["R:sampling (pi)", "pi", 50, 20, 1.0], ["R:sampling (fit)", "fit", 50, 20, 8.0], ["R:sampling (1 sample, incl. DP)", "samples", 50, 20, 1.0], ["R:sampling (1 sample, excl. DP)", "samples", 50, 20, 0.081], ["NumPy tree (1 sample)", "samples", 50, 20, 0.1161], ["PyTorch tree (1 sample)", "samples", 50, 20, 0.1427], ["Sequential (1 sample)", "samples", 50, 20, 0.046], ["DP forward", "Z", 100, 5, 0.3283], ["NumPy tree", "Z", 100, 5, 6.7727], ["PyTorch FFT", "Z", 100, 5, 4.3903], ["DP forward", "pi", 100, 5, 1.163], ["NumPy tree", "pi", 100, 5, 18.409], ["PyTorch FFT + autograd", "pi", 100, 5, 8.5281], ["NumPy tree (L-BFGS)", "fit", 100, 5, 2501.9779], ["R:sampling (pi)", "pi", 100, 5, 1.0], ["R:sampling (fit)", "fit", 100, 5, 6.0], ["R:sampling (1 sample, incl. DP)", "samples", 100, 5, 1.0], ["R:sampling (1 sample, excl. DP)", "samples", 100, 5, 0.1348], ["NumPy tree (1 sample)", "samples", 100, 5, 0.075], ["PyTorch tree (1 sample)", "samples", 100, 5, 0.0474], ["Sequential (1 sample)", "samples", 100, 5, 0.0593], ["DP forward", "Z", 100, 10, 0.3629], ["NumPy tree", "Z", 100, 10, 4.2306], ["PyTorch FFT", "Z", 100, 10, 5.2191], ["DP forward", "pi", 100, 10, 3.6593], ["NumPy tree", "pi", 100, 10, 25.1636], ["PyTorch FFT + autograd", "pi", 100, 10, 8.4247], ["NumPy tree (L-BFGS)", "fit", 100, 10, 3198.3147], ["R:sampling (pi)", "pi", 100, 10, 1.0], ["R:sampling (fit)", "fit", 100, 10, 9.0], ["R:sampling (1 sample, incl. DP)", "samples", 100, 10, 1.0], ["R:sampling (1 sample, excl. DP)", "samples", 100, 10, 0.171], ["NumPy tree (1 sample)", "samples", 100, 10, 0.0511], ["PyTorch tree (1 sample)", "samples", 100, 10, 0.0642], ["Sequential (1 sample)", "samples", 100, 10, 0.0569], ["DP forward", "Z", 100, 20, 0.3077], ["NumPy tree", "Z", 100, 20, 5.8869], ["PyTorch FFT", "Z", 100, 20, 2.36], ["DP forward", "pi", 100, 20, 3.1028], ["NumPy tree", "pi", 100, 20, 17.9566], ["PyTorch FFT + autograd", "pi", 100, 20, 5.3383], ["NumPy tree (L-BFGS)", "fit", 100, 20, 1990.2996], ["R:sampling (pi)", "pi", 100, 20, 2.0], ["R:sampling (fit)", "fit", 100, 20, 6.0], ["R:sampling (1 sample, incl. DP)", "samples", 100, 20, 1.0], ["R:sampling (1 sample, excl. DP)", "samples", 100, 20, 0.0954], ["NumPy tree (1 sample)", "samples", 100, 20, 0.0919], ["PyTorch tree (1 sample)", "samples", 100, 20, 0.1086], ["Sequential (1 sample)", "samples", 100, 20, 0.0645], ["DP forward", "Z", 100, 50, 0.3549], ["NumPy tree", "Z", 100, 50, 4.2802], ["PyTorch FFT", "Z", 100, 50, 2.2628], ["DP forward", "pi", 100, 50, 7.8227], ["NumPy tree", "pi", 100, 50, 11.827], ["PyTorch FFT + autograd", "pi", 100, 50, 7.7421], ["NumPy tree (L-BFGS)", "fit", 100, 50, 1464.9001], ["R:sampling (pi)", "pi", 100, 50, 7.0], ["R:sampling (fit)", "fit", 100, 50, 28.0], ["R:sampling (1 sample, incl. DP)", "samples", 100, 50, 3.0], ["R:sampling (1 sample, excl. DP)", "samples", 100, 50, 0.178], ["NumPy tree (1 sample)", "samples", 100, 50, 0.3434], ["PyTorch tree (1 sample)", "samples", 100, 50, 0.3121], ["Sequential (1 sample)", "samples", 100, 50, 0.1045], ["DP forward", "Z", 200, 5, 0.8214], ["NumPy tree", "Z", 200, 5, 13.9527], ["PyTorch FFT", "Z", 200, 5, 7.3852], ["DP forward", "pi", 200, 5, 3.9692], ["NumPy tree", "pi", 200, 5, 38.0803], ["PyTorch FFT + autograd", "pi", 200, 5, 29.3787], ["NumPy tree (L-BFGS)", "fit", 200, 5, 6887.1283], ["R:sampling (pi)", "pi", 200, 5, 1.0], ["R:sampling (fit)", "fit", 200, 5, 6.0], ["R:sampling (1 sample, incl. DP)", "samples", 200, 5, 1.0], ["R:sampling (1 sample, excl. DP)", "samples", 200, 5, 0.2364], ["NumPy tree (1 sample)", "samples", 200, 5, 0.0869], ["PyTorch tree (1 sample)", "samples", 200, 5, 0.0422], ["Sequential (1 sample)", "samples", 200, 5, 0.0742], ["DP forward", "Z", 200, 10, 0.7748], ["NumPy tree", "Z", 200, 10, 14.0284], ["PyTorch FFT", "Z", 200, 10, 11.9972], ["DP forward", "pi", 200, 10, 12.7294], ["NumPy tree", "pi", 200, 10, 23.4555], ["PyTorch FFT + autograd", "pi", 200, 10, 8.364], ["NumPy tree (L-BFGS)", "fit", 200, 10, 5733.5787], ["R:sampling (pi)", "pi", 200, 10, 2.0], ["R:sampling (fit)", "fit", 200, 10, 8.0], ["R:sampling (1 sample, incl. DP)", "samples", 200, 10, 1.0], ["R:sampling (1 sample, excl. DP)", "samples", 200, 10, 0.1936], ["NumPy tree (1 sample)", "samples", 200, 10, 0.0693], ["PyTorch tree (1 sample)", "samples", 200, 10, 0.0838], ["Sequential (1 sample)", "samples", 200, 10, 0.111], ["DP forward", "Z", 200, 20, 0.461], ["NumPy tree", "Z", 200, 20, 7.8675], ["PyTorch FFT", "Z", 200, 20, 4.0048], ["DP forward", "pi", 200, 20, 5.9563], ["NumPy tree", "pi", 200, 20, 22.1174], ["PyTorch FFT + autograd", "pi", 200, 20, 10.8998], ["NumPy tree (L-BFGS)", "fit", 200, 20, 4490.867], ["R:sampling (pi)", "pi", 200, 20, 4.0], ["R:sampling (fit)", "fit", 200, 20, 24.0], ["R:sampling (1 sample, incl. DP)", "samples", 200, 20, 4.0], ["R:sampling (1 sample, excl. DP)", "samples", 200, 20, 0.2808], ["NumPy tree (1 sample)", "samples", 200, 20, 0.1002], ["PyTorch tree (1 sample)", "samples", 200, 20, 0.1114], ["Sequential (1 sample)", "samples", 200, 20, 0.0879], ["DP forward", "Z", 200, 50, 0.4285], ["NumPy tree", "Z", 200, 50, 7.431], ["PyTorch FFT", "Z", 200, 50, 4.0861], ["DP forward", "pi", 200, 50, 14.3637], ["NumPy tree", "pi", 200, 50, 20.9576], ["PyTorch FFT + autograd", "pi", 200, 50, 11.4638], ["NumPy tree (L-BFGS)", "fit", 200, 50, 2782.9883], ["R:sampling (pi)", "pi", 200, 50, 7.0], ["R:sampling (fit)", "fit", 200, 50, 26.0], ["R:sampling (1 sample, incl. DP)", "samples", 200, 50, 3.0], ["R:sampling (1 sample, excl. DP)", "samples", 200, 50, 0.1838], ["NumPy tree (1 sample)", "samples", 200, 50, 0.1968], ["PyTorch tree (1 sample)", "samples", 200, 50, 0.2479], ["Sequential (1 sample)", "samples", 200, 50, 0.1239], ["DP forward", "Z", 200, 100, 0.4373], ["NumPy tree", "Z", 200, 100, 7.8394], ["PyTorch FFT", "Z", 200, 100, 4.1363], ["DP forward", "pi", 200, 100, 27.9907], ["NumPy tree", "pi", 200, 100, 21.3661], ["PyTorch FFT + autograd", "pi", 200, 100, 11.2686], ["NumPy tree (L-BFGS)", "fit", 200, 100, 2013.2817], ["R:sampling (pi)", "pi", 200, 100, 13.0], ["R:sampling (fit)", "fit", 200, 100, 49.0], ["R:sampling (1 sample, incl. DP)", "samples", 200, 100, 5.0], ["R:sampling (1 sample, excl. DP)", "samples", 200, 100, 0.1916], ["NumPy tree (1 sample)", "samples", 200, 100, 0.2886], ["PyTorch tree (1 sample)", "samples", 200, 100, 0.311], ["Sequential (1 sample)", "samples", 200, 100, 0.102], ["DP forward", "Z", 500, 5, 0.968], ["NumPy tree", "Z", 500, 5, 15.9069], ["PyTorch FFT", "Z", 500, 5, 4.8652], ["DP forward", "pi", 500, 5, 4.6648], ["NumPy tree", "pi", 500, 5, 48.042], ["PyTorch FFT + autograd", "pi", 500, 5, 12.7491], ["NumPy tree (L-BFGS)", "fit", 500, 5, 9310.7465], ["R:sampling (pi)", "pi", 500, 5, 3.0], ["R:sampling (fit)", "fit", 500, 5, 11.0], ["R:sampling (1 sample, incl. DP)", "samples", 500, 5, 2.0], ["R:sampling (1 sample, excl. DP)", "samples", 500, 5, 0.3794], ["NumPy tree (1 sample)", "samples", 500, 5, 0.0388], ["PyTorch tree (1 sample)", "samples", 500, 5, 0.0472], ["Sequential (1 sample)", "samples", 500, 5, 0.1808], ["DP forward", "Z", 500, 10, 0.8246], ["NumPy tree", "Z", 500, 10, 14.1129], ["PyTorch FFT", "Z", 500, 10, 4.5231], ["DP forward", "pi", 500, 10, 7.4461], ["NumPy tree", "pi", 500, 10, 44.0294], ["PyTorch FFT + autograd", "pi", 500, 10, 11.7308], ["NumPy tree (L-BFGS)", "fit", 500, 10, 10909.6538], ["R:sampling (pi)", "pi", 500, 10, 5.0], ["R:sampling (fit)", "fit", 500, 10, 17.0], ["R:sampling (1 sample, incl. DP)", "samples", 500, 10, 3.0], ["R:sampling (1 sample, excl. DP)", "samples", 500, 10, 0.4], ["NumPy tree (1 sample)", "samples", 500, 10, 0.0668], ["PyTorch tree (1 sample)", "samples", 500, 10, 0.0751], ["Sequential (1 sample)", "samples", 500, 10, 0.2004], ["DP forward", "Z", 500, 20, 0.9933], ["NumPy tree", "Z", 500, 20, 16.1674], ["PyTorch FFT", "Z", 500, 20, 5.0006], ["DP forward", "pi", 500, 20, 15.7816], ["NumPy tree", "pi", 500, 20, 48.8788], ["PyTorch FFT + autograd", "pi", 500, 20, 12.9993], ["NumPy tree (L-BFGS)", "fit", 500, 20, 7710.9671], ["R:sampling (pi)", "pi", 500, 20, 9.0], ["R:sampling (fit)", "fit", 500, 20, 32.5], ["R:sampling (1 sample, incl. DP)", "samples", 500, 20, 5.0], ["R:sampling (1 sample, excl. DP)", "samples", 500, 20, 0.4545], ["NumPy tree (1 sample)", "samples", 500, 20, 0.1143], ["PyTorch tree (1 sample)", "samples", 500, 20, 0.1274], ["Sequential (1 sample)", "samples", 500, 20, 0.2023], ["DP forward", "Z", 500, 50, 0.9611], ["NumPy tree", "Z", 500, 50, 15.7036], ["PyTorch FFT", "Z", 500, 50, 5.1002], ["DP forward", "pi", 500, 50, 35.9888], ["NumPy tree", "pi", 500, 50, 47.565], ["PyTorch FFT + autograd", "pi", 500, 50, 13.7486], ["NumPy tree (L-BFGS)", "fit", 500, 50, 6120.3367], ["R:sampling (pi)", "pi", 500, 50, 18.5], ["R:sampling (fit)", "fit", 500, 50, 69.0], ["R:sampling (1 sample, incl. DP)", "samples", 500, 50, 9.0], ["R:sampling (1 sample, excl. DP)", "samples", 500, 50, 0.4432], ["NumPy tree (1 sample)", "samples", 500, 50, 0.237], ["PyTorch tree (1 sample)", "samples", 500, 50, 0.2965], ["Sequential (1 sample)", "samples", 500, 50, 0.2207], ["DP forward", "Z", 500, 100, 1.0872], ["NumPy tree", "Z", 500, 100, 15.9084], ["PyTorch FFT", "Z", 500, 100, 6.5057], ["DP forward", "pi", 500, 100, 72.3487], ["NumPy tree", "pi", 500, 100, 47.7589], ["PyTorch FFT + autograd", "pi", 500, 100, 12.5473], ["NumPy tree (L-BFGS)", "fit", 500, 100, 5750.0048], ["R:sampling (pi)", "pi", 500, 100, 32.0], ["R:sampling (fit)", "fit", 500, 100, 91.0], ["R:sampling (1 sample, incl. DP)", "samples", 500, 100, 14.0], ["R:sampling (1 sample, excl. DP)", "samples", 500, 100, 0.4236], ["NumPy tree (1 sample)", "samples", 500, 100, 0.4116], ["PyTorch tree (1 sample)", "samples", 500, 100, 0.4026], ["Sequential (1 sample)", "samples", 500, 100, 0.2211], ["DP forward", "Z", 500, 200, 1.2413], ["NumPy tree", "Z", 500, 200, 14.7462], ["PyTorch FFT", "Z", 500, 200, 4.77], ["DP forward", "pi", 500, 200, 129.2031], ["NumPy tree", "pi", 500, 200, 44.094], ["PyTorch FFT + autograd", "pi", 500, 200, 12.894], ["NumPy tree (L-BFGS)", "fit", 500, 200, 3809.7222], ["R:sampling (pi)", "pi", 500, 200, 64.5], ["R:sampling (fit)", "fit", 500, 200, 186.5], ["R:sampling (1 sample, incl. DP)", "samples", 500, 200, 26.0], ["R:sampling (1 sample, excl. DP)", "samples", 500, 200, 0.4545], ["NumPy tree (1 sample)", "samples", 500, 200, 0.6229], ["PyTorch tree (1 sample)", "samples", 500, 200, 0.6253], ["Sequential (1 sample)", "samples", 500, 200, 0.2267], ["DP forward", "Z", 500, 400, 1.5593], ["NumPy tree", "Z", 500, 400, 14.4686], ["PyTorch FFT", "Z", 500, 400, 4.7203], ["DP forward", "pi", 500, 400, 261.5121], ["NumPy tree", "pi", 500, 400, 44.2542], ["PyTorch FFT + autograd", "pi", 500, 400, 12.5885], ["NumPy tree (L-BFGS)", "fit", 500, 400, 1824.8383], ["R:sampling (pi)", "pi", 500, 400, 101.0], ["R:sampling (1 sample, incl. DP)", "samples", 500, 400, 36.0], ["R:sampling (1 sample, excl. DP)", "samples", 500, 400, 0.4334], ["NumPy tree (1 sample)", "samples", 500, 400, 0.9485], ["PyTorch tree (1 sample)", "samples", 500, 400, 0.9455], ["Sequential (1 sample)", "samples", 500, 400, 0.253], ["DP forward", "Z", 1000, 5, 1.7599], ["NumPy tree", "Z", 1000, 5, 29.4955], ["PyTorch FFT", "Z", 1000, 5, 8.0366], ["DP forward", "pi", 1000, 5, 8.8171], ["NumPy tree", "pi", 1000, 5, 104.0453], ["PyTorch FFT + autograd", "pi", 1000, 5, 20.6436], ["NumPy tree (L-BFGS)", "fit", 1000, 5, 1778.4147], ["R:sampling (pi)", "pi", 1000, 5, 7.0], ["R:sampling (fit)", "fit", 1000, 5, 19.0], ["R:sampling (1 sample, incl. DP)", "samples", 1000, 5, 5.0], ["R:sampling (1 sample, excl. DP)", "samples", 1000, 5, 1.0], ["NumPy tree (1 sample)", "samples", 1000, 5, 0.04], ["PyTorch tree (1 sample)", "samples", 1000, 5, 0.0501], ["Sequential (1 sample)", "samples", 1000, 5, 0.3333], ["DP forward", "Z", 1000, 10, 1.731], ["NumPy tree", "Z", 1000, 10, 28.4009], ["PyTorch FFT", "Z", 1000, 10, 7.9415], ["DP forward", "pi", 1000, 10, 14.8797], ["NumPy tree", "pi", 1000, 10, 98.2449], ["PyTorch FFT + autograd", "pi", 1000, 10, 20.4834], ["NumPy tree (L-BFGS)", "fit", 1000, 10, 1758.3823], ["R:sampling (pi)", "pi", 1000, 10, 10.0], ["R:sampling (fit)", "fit", 1000, 10, 29.0], ["R:sampling (1 sample, incl. DP)", "samples", 1000, 10, 7.0], ["R:sampling (1 sample, excl. DP)", "samples", 1000, 10, 0.8], ["NumPy tree (1 sample)", "samples", 1000, 10, 0.07], ["PyTorch tree (1 sample)", "samples", 1000, 10, 0.0858], ["Sequential (1 sample)", "samples", 1000, 10, 0.3809], ["DP forward", "Z", 1000, 20, 1.745], ["NumPy tree", "Z", 1000, 20, 28.3778], ["PyTorch FFT", "Z", 1000, 20, 7.905], ["DP forward", "pi", 1000, 20, 27.5195], ["NumPy tree", "pi", 1000, 20, 98.2721], ["PyTorch FFT + autograd", "pi", 1000, 20, 20.2101], ["NumPy tree (L-BFGS)", "fit", 1000, 20, 1846.7362], ["R:sampling (pi)", "pi", 1000, 20, 15.0], ["R:sampling (fit)", "fit", 1000, 20, 44.5], ["R:sampling (1 sample, incl. DP)", "samples", 1000, 20, 9.0], ["R:sampling (1 sample, excl. DP)", "samples", 1000, 20, 0.7], ["NumPy tree (1 sample)", "samples", 1000, 20, 0.1208], ["PyTorch tree (1 sample)", "samples", 1000, 20, 0.1487], ["Sequential (1 sample)", "samples", 1000, 20, 0.3899], ["DP forward", "Z", 1000, 50, 1.8611], ["NumPy tree", "Z", 1000, 50, 28.5913], ["PyTorch FFT", "Z", 1000, 50, 8.1125], ["DP forward", "pi", 1000, 50, 65.0406], ["NumPy tree", "pi", 1000, 50, 99.1488], ["PyTorch FFT + autograd", "pi", 1000, 50, 21.0208], ["NumPy tree (L-BFGS)", "fit", 1000, 50, 13915.2498], ["R:sampling (pi)", "pi", 1000, 50, 37.0], ["R:sampling (fit)", "fit", 1000, 50, 110.0], ["R:sampling (1 sample, incl. DP)", "samples", 1000, 50, 19.0], ["R:sampling (1 sample, excl. DP)", "samples", 1000, 50, 0.9], ["NumPy tree (1 sample)", "samples", 1000, 50, 0.3267], ["PyTorch tree (1 sample)", "samples", 1000, 50, 0.3453], ["Sequential (1 sample)", "samples", 1000, 50, 0.4811], ["DP forward", "Z", 1000, 100, 2.2453], ["NumPy tree", "Z", 1000, 100, 31.5853], ["PyTorch FFT", "Z", 1000, 100, 8.8324], ["DP forward", "pi", 1000, 100, 141.861], ["NumPy tree", "pi", 1000, 100, 106.8826], ["PyTorch FFT + autograd", "pi", 1000, 100, 22.4234], ["NumPy tree (L-BFGS)", "fit", 1000, 100, 11409.7555], ["R:sampling (pi)", "pi", 1000, 100, 65.0], ["R:sampling (fit)", "fit", 1000, 100, 191.0], ["R:sampling (1 sample, incl. DP)", "samples", 1000, 100, 31.0], ["R:sampling (1 sample, excl. DP)", "samples", 1000, 100, 1.0], ["NumPy tree (1 sample)", "samples", 1000, 100, 0.4927], ["PyTorch tree (1 sample)", "samples", 1000, 100, 0.4975], ["Sequential (1 sample)", "samples", 1000, 100, 0.4127], ["DP forward", "Z", 1000, 200, 2.3763], ["NumPy tree", "Z", 1000, 200, 28.7355], ["PyTorch FFT", "Z", 1000, 200, 8.2679], ["DP forward", "pi", 1000, 200, 258.7122], ["NumPy tree", "pi", 1000, 200, 99.7394], ["PyTorch FFT + autograd", "pi", 1000, 200, 21.0941], ["NumPy tree (L-BFGS)", "fit", 1000, 200, 11591.9656], ["R:sampling (pi)", "pi", 1000, 200, 115.0], ["R:sampling (fit)", "fit", 1000, 200, 342.0], ["R:sampling (1 sample, incl. DP)", "samples", 1000, 200, 52.0], ["R:sampling (1 sample, excl. DP)", "samples", 1000, 200, 0.8], ["NumPy tree (1 sample)", "samples", 1000, 200, 0.8863], ["PyTorch tree (1 sample)", "samples", 1000, 200, 0.8407], ["Sequential (1 sample)", "samples", 1000, 200, 0.473], ["DP forward", "Z", 1000, 400, 3.4032], ["NumPy tree", "Z", 1000, 400, 30.8499], ["PyTorch FFT", "Z", 1000, 400, 8.6692], ["DP forward", "pi", 1000, 400, 557.3375], ["NumPy tree", "pi", 1000, 400, 105.5471], ["PyTorch FFT + autograd", "pi", 1000, 400, 21.9332], ["NumPy tree (L-BFGS)", "fit", 1000, 400, 6682.717], ["R:sampling (pi)", "pi", 1000, 400, 253.0], ["R:sampling (fit)", "fit", 1000, 400, 716.5], ["R:sampling (1 sample, incl. DP)", "samples", 1000, 400, 97.0], ["R:sampling (1 sample, excl. DP)", "samples", 1000, 400, 1.0], ["NumPy tree (1 sample)", "samples", 1000, 400, 1.3233], ["PyTorch tree (1 sample)", "samples", 1000, 400, 1.2995], ["Sequential (1 sample)", "samples", 1000, 400, 0.4821]];
+  var STYLE = {tree: {name: 'product tree', color: '#c0504d'}, dp: {name: 'DP', color: '#5b9bd5'}};
+  // Complexity bound of each (operation, method), for the slope table.
+  var MODEL = {
+    Z:      {tree: function(N, n) { return N * Math.pow(Math.log(n), 2); }, dp: function(N, n) { return N * n; }},
+    pi:     {tree: function(N, n) { return N * Math.pow(Math.log(n), 2); }, dp: function(N, n) { return N * n; }},
+    sample: {tree: function(N, n) { return n * Math.log(N); },             dp: function(N, n) { return N; }}
+  };
 
-var COLORS = {
-  'DP forward': '#E91E63', 'NumPy tree': '#5b9bd5', 'PyTorch FFT': '#c0504d',
-  'Fwd-bwd DP': '#E91E63', 'PyTorch FFT + autograd': '#c0504d',
-  'N\u00d7DP loo': '#999', 'N\u00d7Tree loo': '#bbb', 'R:sampling (pi)': '#FF9800',
-  'NumPy tree (L-BFGS)': '#5b9bd5', 'R:sampling (fit)': '#FF9800',
-  'R:sampling (1 sample, incl. DP)': '#FF9800', 'R:sampling (1 sample, excl. DP)': '#FF9800',
-  'NumPy tree (1 sample, incl. build)': '#5b9bd5',
-  'NumPy tree (1 sample)': '#5b9bd5'
-};
-var COMPLEXITY = {
-  'DP forward': 'O(Nn)', 'NumPy tree': 'O(N log\u00b2 N)', 'PyTorch FFT': 'O(N log\u00b2 n)',
-  'Fwd-bwd DP': 'O(Nn)', 'PyTorch FFT + autograd': 'O(N log\u00b2 n)',
-  'N\u00d7DP loo': 'O(N\u00b2n)', 'N\u00d7Tree loo': 'O(N\u00b2 log\u00b2 n)',
-  'R:sampling (pi)': 'O(Nn)',
-  'NumPy tree (L-BFGS)': 'L-BFGS', 'R:sampling (fit)': 'fixed-point',
-  'R:sampling (1 sample, incl. DP)': 'incl. DP', 'R:sampling (1 sample, excl. DP)': 'excl. DP',
-  'NumPy tree (1 sample, incl. build)': 'incl. build',
-  'NumPy tree (1 sample)': 'O(n log N)'
-};
+  function uniq(xs) { return Array.from(new Set(xs)).sort(function(a, b) { return a - b; }); }
 
-// Parse into {experiment: {method: {Ns, ns, ts}}}
-var byExp = {};
-raw.forEach(function(r) {
-  var m = r[0], exp = r[1], N = r[2], n = r[3], t = r[4];
-  if (!byExp[exp]) byExp[exp] = {};
-  if (!byExp[exp][m]) byExp[exp][m] = {N:[], n:[], t:[]};
-  byExp[exp][m].N.push(N);
-  byExp[exp][m].n.push(n);
-  byExp[exp][m].t.push(t);
-});
-
-function makeTraces(exp) {
-  var methods = byExp[exp];
-  var traces = [];
-  Object.keys(methods).forEach(function(m) {
-    var d = methods[m];
-    var color = COLORS[m] || '#888';
-    var cplx = COMPLEXITY[m] || '';
-    traces.push({
-      type: 'scatter3d', mode: 'markers',
-      x: d.N.map(Math.log10), y: d.n.map(Math.log10),
-      z: d.t.map(Math.log10),
-      marker: {size: 3, color: color, opacity: 0.9},
-      name: m + '  ' + cplx,
-      hovertemplate: m + '<br>N=%{customdata[0]}, n=%{customdata[1]}<br>%{customdata[2]:.2f} ms<extra></extra>',
-      customdata: d.N.map(function(_,i){return [d.N[i], d.n[i], d.t[i]]})
-    });
-    // Add surface: build z-matrix on the (N, n) grid
-    var uN = Array.from(new Set(d.N)).sort(function(a,b){return a-b});
-    var un = Array.from(new Set(d.n)).sort(function(a,b){return a-b});
-    var lookup = {};
-    d.N.forEach(function(_,i){ lookup[d.N[i]+','+d.n[i]] = d.t[i]; });
-    // z_matrix[i][j] = log10(time) for uN[i], un[j]; null where missing
-    var z_matrix = uN.map(function(N) {
-      return un.map(function(n) {
-        var v = lookup[N+','+n];
-        return v !== undefined ? Math.log10(v) : null;
+  function traces(rows) {
+    var out = [];
+    ['dp', 'tree'].forEach(function(m) {
+      var pts = rows.filter(function(r) { return r.method === m; });
+      var Ns = uniq(pts.map(function(r) { return r.N; }));
+      var ns = uniq(pts.map(function(r) { return r.n; }));
+      var ms = {};
+      pts.forEach(function(r) { ms[r.N + ',' + r.n] = 1e3 * r.seconds; });
+      out.push({
+        type: 'surface', x: Ns, y: ns,
+        z: ns.map(function(n) { return Ns.map(function(N) { var t = ms[N + ',' + n]; return t === undefined ? null : t; }); }),
+        colorscale: [[0, STYLE[m].color], [1, STYLE[m].color]], showscale: false,
+        opacity: 0.4, hoverinfo: 'skip', showlegend: false
+      });
+      out.push({
+        type: 'scatter3d', mode: 'markers', name: STYLE[m].name,
+        x: pts.map(function(r) { return r.N; }), y: pts.map(function(r) { return r.n; }),
+        z: pts.map(function(r) { return 1e3 * r.seconds; }),
+        marker: {size: 3, color: STYLE[m].color},
+        hovertemplate: STYLE[m].name + '<br>N = %{x}, n = %{y}<br>%{z:.3g} ms<extra></extra>'
       });
     });
-    if (uN.length >= 2 && un.length >= 2) {
-      // surface: z[i][j] maps to (x[j], y[i]), so rows=N, cols=n
-      // but scatter3d has x=N, y=n — transpose so x=N (cols), y=n (rows)
-      var z_T = un.map(function(_,j) {
-        return uN.map(function(_,i) { return z_matrix[i][j]; });
-      });
-      traces.push({
-        type: 'surface',
-        x: uN.map(Math.log10),   // N axis (columns of z_T)
-        y: un.map(Math.log10),   // n axis (rows of z_T)
-        z: z_T,
-        colorscale: [[0, color], [1, color]],
-        opacity: 0.35, showscale: false,
-        name: m + ' (surface)', showlegend: false,
-        hoverinfo: 'skip', connectgaps: false
-      });
+    return out;
+  }
+
+  // Log axes labeled at powers of ten with explicit text.  (Plotly's own
+  // labels drop the tick at 1 in 3D scenes.)
+  function axis(title, values) {
+    var lo = Math.floor(Math.log10(Math.min.apply(null, values)));
+    var hi = Math.ceil(Math.log10(Math.max.apply(null, values)));
+    var vals = [], text = [];
+    for (var e = lo; e <= hi; e++) {
+      vals.push(Math.pow(10, e));
+      text.push(e < 0 ? Math.pow(10, e).toFixed(-e) : Math.pow(10, e).toLocaleString('en-US'));
     }
+    return {title: {text: title}, type: 'log', tickvals: vals, ticktext: text};
+  }
+
+  function layout(rows, width) {
+    var far = width < 500 ? 1.6 : 1;          // pull the camera back on phones
+    return {
+      scene: {xaxis: axis('N', rows.map(function(r) { return r.N; })),
+              yaxis: axis('n', rows.map(function(r) { return r.n; })),
+              zaxis: axis('time (ms)', rows.map(function(r) { return 1e3 * r.seconds; })),
+              camera: {eye: {x: 1.6 * far, y: -1.6 * far, z: 0.9 * far}}},
+      margin: {l: 0, r: 0, t: 0, b: 0}, showlegend: false,
+      paper_bgcolor: 'rgba(0,0,0,0)'
+    };
+  }
+
+  // Least-squares slope of log y against log x.
+  function slope(xs, ys) {
+    var lx = xs.map(Math.log), ly = ys.map(Math.log), k = lx.length;
+    var mx = lx.reduce(function(a, b) { return a + b; }, 0) / k;
+    var my = ly.reduce(function(a, b) { return a + b; }, 0) / k;
+    var sxy = 0, sxx = 0;
+    for (var i = 0; i < k; i++) { sxy += (lx[i] - mx) * (ly[i] - my); sxx += (lx[i] - mx) * (lx[i] - mx); }
+    return sxy / sxx;
+  }
+
+  // Fill each cell of the slope table, which is static HTML so that MathJax
+  // typesets it with the rest of the page.  A cell's data-slope attribute is
+  // "operation method direction fixed": e.g. "Z tree N 1000" is the slope in N
+  // at n = 1000.  Slopes are fit over the four largest sizes.
+  function slopeTable(grid) {
+    document.querySelectorAll('#timing-slopes td[data-slope]').forEach(function(td) {
+      var a = td.getAttribute('data-slope').split(' ');
+      var exp = a[0], m = a[1], x = a[2], fixed = +a[3];
+      var pts = grid.filter(function(r) {
+        return r.experiment === exp && r.method === m && (x === 'N' ? r.n : r.N) === fixed;
+      }).sort(function(p, q) { return p[x] - q[x]; }).slice(-4);
+      if (pts.length < 2) { td.textContent = '—'; return; }
+      var f = MODEL[exp][m];
+      var xs = pts.map(function(r) { return r[x]; });
+      var meas = slope(xs, pts.map(function(r) { return r.seconds; }));
+      var bound = slope(xs, pts.map(function(r) { return f(r.N, r.n); }));
+      td.textContent = meas.toFixed(2) + ' / ' + bound.toFixed(2);
+      if (Math.abs(meas - bound) > 0.2) td.className = 'flag';
+    });
+  }
+
+  fetch('../figures/timing.json').then(function(r) { return r.json(); }).then(function(data) {
+    var grid = data.results.filter(function(r) { return r.sweep === 'grid' && r.seconds != null; });
+    ['Z', 'pi', 'sample'].forEach(function(exp) {
+      var rows = grid.filter(function(r) { return r.experiment === exp; });
+      var el = document.getElementById('timing-3d-' + exp);
+      Plotly.newPlot(el, traces(rows), layout(rows, el.clientWidth), {responsive: true, displaylogo: false});
+    });
+    slopeTable(grid);
   });
-  return traces;
-}
-
-var layout = {
-  scene: {
-    xaxis: {title: 'log\u2081\u2080 N'},
-    yaxis: {title: 'log\u2081\u2080 n'},
-    zaxis: {title: 'log\u2081\u2080 time (ms)'},
-    camera: {eye: {x: 1.8, y: -1.8, z: 1.5}}
-  },
-  margin: {l: 0, r: 0, t: 30, b: 0},
-  height: 500,
-  paper_bgcolor: 'rgba(0,0,0,0)',
-  legend: {x: 0, y: 1, font: {size: 11}},
-  updatemenus: [{
-    type: 'dropdown', x: 0.0, y: 1.15, xanchor: 'left',
-    buttons: [
-      {label: 'Computing Z', method: 'restyle',
-       args: [makeTraces('Z').reduce(function(a,t,i){
-         Object.keys(t).forEach(function(k){ if(!a[k]) a[k]=[]; a[k].push(t[k]); });
-         return a;
-       }, {})]},
-      {label: 'Computing \u03c0', method: 'restyle',
-       args: [makeTraces('pi').reduce(function(a,t,i){
-         Object.keys(t).forEach(function(k){ if(!a[k]) a[k]=[]; a[k].push(t[k]); });
-         return a;
-       }, {})]},
-    ]
-  }]
-};
-
-// Start with pi (the main event)
-Plotly.newPlot('timing-3d', makeTraces('pi'), layout, {responsive: true});
-
-// Fix dropdown: simpler approach — just replace data on click
-var container = document.getElementById('timing-3d');
-var select = document.createElement('select');
-select.style.cssText = 'margin-bottom:8px; font-size:14px; padding:4px 8px;';
-['Z', 'pi', 'fit', 'samples'].forEach(function(exp) {
-  var opt = document.createElement('option');
-  opt.value = exp;
-  opt.text = exp === 'Z' ? 'Computing Z' : exp === 'pi' ? 'Computing \u03c0' : exp === 'fit' ? 'Fitting \u03c0 \u2192 weights' : 'Drawing samples';
-  if (exp === 'pi') opt.selected = true;
-  select.appendChild(opt);
-});
-container.parentNode.insertBefore(select, container);
-select.addEventListener('change', function() {
-  Plotly.react('timing-3d', makeTraces(this.value), layout);
-});
-
-// Remove the plotly dropdown since we have our own
-layout.updatemenus = [];
-Plotly.react('timing-3d', makeTraces('pi'), layout);
 })();
 </script>
 
-<p>The contour scaling (described below) is essential for the PyTorch FFT implementation: without it, FFT precision collapses at $N \gtrsim 1000$.  With it, the implementation achieves machine-epsilon accuracy at all tested sizes ($N$ up to 10,000) and handles extreme weight ranges ($r$ from $10^{-10}$ to $10^{8}$).</p>
 <h2 id="pytorch-implementation-with-contour-scaling">PyTorch Implementation with Contour Scaling</h2>
 <p>Can we use PyTorch's autograd to compute the gradient (inclusion probabilities) automatically, given only the forward pass?</p>
 <p>Yes—and it's both simpler and faster than a hand-coded downward pass.  The key insight is that <strong>computing $\bpip$ is just backpropagation</strong> applied to the upward pass.  The <a href="../evaluating-fx-is-as-fast-as-fx/">Baur-Strassen theorem</a> guarantees that the gradient costs at most a small constant factor more than the forward pass (<a href="https://doi.org/10.1016/0304-3975(83)90110-X">Baur &amp; Strassen, 1983</a> prove $3\times$ for nonscalar operations on polynomials; <a href="https://doi.org/10.1137/1.9780898717761">Griewank &amp; Walther, 2008</a> give $5\times$ for general reverse-mode AD).  <a href="https://doi.org/10.1137/1.9780898717761">Griewank &amp; Walther (2008)</a> show that the numerical stability of the derivatives is inherited from the forward pass—so if we make the forward pass stable, everything else follows.</p>
@@ -3188,7 +3191,7 @@ Plotly.react('timing-3d', makeTraces('pi'), layout);
 </div>
 
 <p>Code: <a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson/tree_torch.py"><code>conditional_poisson/tree_torch.py</code></a></p>
-<h2 id="identities-for-math434-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
+<h2 id="identities-for-math489-and-its-relatives">Identities for $\Z$ and Its Relatives</h2>
 <p>The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> <a href="https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial">elementary symmetric polynomial</a> $e_n(\bw)$.  Here are some useful identities.</p>
 <h3 id="differential-identities">Differential Identities</h3>
 <p>The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:</p>

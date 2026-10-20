@@ -1,90 +1,50 @@
 #!/usr/bin/env Rscript
-# Benchmark R packages for conditional Poisson sampling.
-# Called by bench_timing.py via subprocess.
+# Times the R `sampling` package on one weight vector.  Called by bench_timing.py.
 #
 # Usage:
-#   Rscript bench_timing_r.R <N> <n> <seed> <reps>
+#   Rscript bench_timing_r.R <weights.txt> <n> <pi_out.txt>
 #
-# Output: JSON lines to stdout, one per method/operation.
+# Prints one JSON line per operation and writes the inclusion probabilities
+# to <pi_out.txt> so the caller can check them.  Uses the same protocol as
+# bench_timing.py: one warm-up call, then the fastest of several repeats,
+# each repeat lasting at least 0.2 s.
 
-library(sampling)
+suppressMessages(library(sampling))
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) < 4) {
-    cat("Usage: Rscript bench_timing_r.R <N> <n> <seed> <reps>\n", file = stderr())
+if (length(args) != 3) {
+    cat("Usage: Rscript bench_timing_r.R <weights.txt> <n> <pi_out.txt>\n", file = stderr())
     quit(status = 1)
 }
+w <- scan(args[1], quiet = TRUE)
+n <- as.integer(args[2])
 
-N    <- as.integer(args[1])
-n    <- as.integer(args[2])
-seed <- as.integer(args[3])
-reps <- as.integer(args[4])
+now <- function() proc.time()[["elapsed"]]
 
-set.seed(seed)
-w <- rexp(N)
-
-# Helper: time a function over reps, return median ms.
-# Uses batch timing when individual calls are too fast.
-time_it <- function(fn, reps) {
-    # Warmup
-    tryCatch(fn(), error = function(e) NULL)
-
-    # First, try individual timing
-    times <- numeric(reps)
-    ok <- TRUE
-    for (i in seq_len(reps)) {
-        t0 <- proc.time()["elapsed"]
-        tryCatch(fn(), error = function(e) { ok <<- FALSE })
-        if (!ok) return(NA)
-        times[i] <- (proc.time()["elapsed"] - t0) * 1000
+time_it <- function(fn) {
+    t0 <- now(); fn(); first <- now() - t0
+    loops <- max(1, ceiling(0.2 / max(first, 1e-6)))
+    repeats <- if (first < 1) 5 else if (first < 10) 3 else 1
+    best <- Inf
+    for (r in seq_len(repeats)) {
+        t0 <- now()
+        for (i in seq_len(loops)) fn()
+        best <- min(best, (now() - t0) / loops)
     }
-    med <- median(times)
-
-    # If too fast for ms resolution, batch
-    if (med < 1.0) {
-        batch <- max(10, as.integer(ceiling(5.0 / max(med, 0.001))))
-        t0 <- proc.time()["elapsed"]
-        for (i in seq_len(batch)) fn()
-        med <- (proc.time()["elapsed"] - t0) * 1000 / batch
-    }
-    med
+    best
 }
 
-emit <- function(method, ms) {
-    if (!is.na(ms)) {
-        cat(sprintf('{"method":"%s","N":%d,"n":%d,"time_ms":%.4f}\n', method, N, n, ms))
-    }
+emit <- function(experiment, seconds) {
+    cat(sprintf('{"experiment": "%s", "seconds": %.9g}\n', experiment, seconds))
 }
 
-# --- Computing pi via sampling::UPMEqfromw + UPMEpikfromq ---
-ms <- time_it(function() {
-    q <- UPMEqfromw(w, n)
-    UPMEpikfromq(q)
-}, reps)
-emit("R:sampling (pi)", ms)
-
-# Save pik for fitting and sampling benchmarks
+# --- Inclusion probabilities: UPMEqfromw builds the O(Nn) table, UPMEpikfromq reads off pi ---
 q <- UPMEqfromw(w, n)
 pik <- UPMEpikfromq(q)
+write(format(pik, digits = 17), args[3], ncolumns = 1)
+if (!all(is.finite(pik))) quit(status = 0)      # overflow: the caller records the failure
 
-# --- Fitting: target pi -> weights via UPMEpiktildefrompik ---
-ms <- time_it(function() {
-    UPMEpiktildefrompik(pik)
-}, reps)
-emit("R:sampling (fit)", ms)
+emit("pi", time_it(function() UPMEpikfromq(UPMEqfromw(w, n))))
 
-# --- Drawing 1 sample (DP + sample, from weights) ---
-# Includes the O(Nn) DP rebuild every call.
-ms <- time_it(function() {
-    q2 <- UPMEqfromw(w, n)
-    UPMEsfromq(q2)
-}, reps)
-emit("R:sampling (1 sample, incl. DP)", ms)
-
-# --- Drawing 1 sample (sample step only, from precomputed DP) ---
-# Fair comparison against our tree sampler: pre-compute DP outside timing loop.
-q_pre <- UPMEqfromw(w, n)
-ms <- time_it(function() {
-    UPMEsfromq(q_pre)
-}, reps)
-emit("R:sampling (1 sample, excl. DP)", ms)
+# --- One sample: UPMEsfromq scans the precomputed table, O(N) ---
+emit("sample", time_it(function() UPMEsfromq(q)))

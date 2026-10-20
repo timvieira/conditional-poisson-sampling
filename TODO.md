@@ -5,7 +5,7 @@
 - [ ] $P(i \in S)$ is unclear notation
 - [x] Add a disclaimer that this post was written with extensive help from Claude Code, especially in the interactive widgets, which would not have been possible without Claude Code.
 
-- [ ] Widget contents spill out of containers on narrow screens (e.g., phone). Looks very bad.
+- [x] Widget contents spill out of containers on narrow screens (e.g., phone). Looks very bad.
 - [ ] Do we like the linear-gradient background on the widgets?
 - [ ] Sampling animation widget: visual language is inconsistent with the product tree widget, and some of the pop-up histograms are confusing. Consider highlighting the current step in the pseudocode to anchor the viewer.
 - [x] Review the sampling pseudocode
@@ -15,16 +15,16 @@
 
 ## Timing Section
 
-- [ ] Timing section is still a mess — results are mostly missing, and many results don't make sense yet.
-- [ ] Is the 3D plot using old data? It doesn't appear to be updated. Where is it getting its data from?
+- [x] Timing section is still a mess — results are mostly missing, and many results don't make sense yet.
+- [x] Is the 3D plot using old data? It doesn't appear to be updated. Where is it getting its data from?
 - [ ] Contour diagram needs work.
 - [ ] "Numerical validation" section — not sure this is the best way to present this information.
-- [ ] Hide all Python/plotting code—just show the plot. Link to relevant implementations using the checkmark/footnote pill system (e.g., each curve links to its implementation in the repo).
-- [ ] Add more baselines for computing $\pi$ — (1) backprop-on-DP at $O(Nn)$, (2) naive loop versions: $N \times O(Nn)$ DP and $N \times O(N \log^2 n)$ product tree. These show the value of backprop vs. leave-one-out recomputation.
-- [ ] Add a programmatically generated empirical slope table. For each method, fit log-log slopes (time vs $N$ at fixed $n$, and time vs $n$ at fixed $N$) from the grid sweep data and display alongside theoretical complexity bounds. Auto-flag rows where empirical slope deviates significantly from prediction.
-- [ ] Scrutinize timing experiments. R's `sampling` package functions (`UPMEqfromw`, `UPMEpikfromq`, `UPMEsfromq`, `UPMEpiktildefrompik`) are confirmed pure R (no compiled C). Subprocess overhead and measurement methodology still need investigation. Verify that all methods compute the same quantity.
+- [x] Hide all Python/plotting code—just show the plot. Link to relevant implementations using the checkmark/footnote pill system (e.g., each curve links to its implementation in the repo).
+- [x] Add more baselines for computing $\pi$ — (1) backprop-on-DP at $O(Nn)$, (2) naive loop versions: $N \times O(Nn)$ DP and $N \times O(N \log^2 n)$ product tree. These show the value of backprop vs. leave-one-out recomputation.
+- [x] Add a programmatically generated empirical slope table. For each method, fit log-log slopes (time vs $N$ at fixed $n$, and time vs $n$ at fixed $N$) from the grid sweep data and display alongside theoretical complexity bounds. Auto-flag rows where empirical slope deviates significantly from prediction.
+- [x] Scrutinize timing experiments. R's `sampling` package functions (`UPMEqfromw`, `UPMEpikfromq`, `UPMEsfromq`, `UPMEpiktildefrompik`) are confirmed pure R (no compiled C). Subprocess overhead and measurement methodology still need investigation. Verify that all methods compute the same quantity.
 - [ ] Explore the fitting algorithm in the R `sampling` package. It may be faster simply because its fixed-point iteration has less overhead than L-BFGS (e.g., no secant equations). Compare the number of iterations required by the R fixed-point method vs. our L-BFGS solver.
-- [ ] 3D timing plots: replace the single dropdown plot with three separate 3D plots (computing $Z$, computing $\pi$, drawing samples). Sampling timing is currently only a static 2D SVG—it has two variables ($N$, $n$) just like the others, so it should be 3D too.
+- [x] 3D timing plots: replace the single dropdown plot with three separate 3D plots (computing $Z$, computing $\pi$, drawing samples). Sampling timing is currently only a static 2D SVG—it has two variables ($N$, $n$) just like the others, so it should be 3D too.
 
 ## Implementation
 
@@ -33,10 +33,10 @@
 - [ ] L-BFGS fitting convergence is much slower than the old Newton-CG (24 iterations vs 5 for N=10, non-monotone). Consider restoring Newton-CG as the default optimizer (requires HVP internally, not as public API) or tuning L-BFGS parameters.
 
 ### Benchmarks
-- [ ] Rerun `bench_timing.py` and regenerate `timing_data.json` + SVG plots (sampling data is stale after sampler rewrite)
-- [ ] Rerun `bench_timing_grid.py` and update inline 3D widget data in the article (sampling rows are stale)
-- [ ] Update `plot_timing.py` to include new sampling methods (sequential, PyTorch tree) in the SVG
-- [ ] The static `timing_samples.svg` still shows old curves from the vectorized sampler — must be regenerated
+- [x] Rerun `bench_timing.py` and regenerate `timing_data.json` + SVG plots (sampling data is stale after sampler rewrite)
+- [x] Rerun `bench_timing_grid.py` and update inline 3D widget data in the article (sampling rows are stale)
+- [x] Update `plot_timing.py` to include new sampling methods (sequential, PyTorch tree) in the SVG
+- [x] The static `timing_samples.svg` still shows old curves from the vectorized sampler — must be regenerated
 
 ### Other
 - [ ] NumPy tree timing slopes (~1.15–1.45 in $N$) are higher than expected for $O(N \log^2 N)$. Investigate whether forcing FFT throughout gives cleaner scaling.
@@ -60,7 +60,7 @@
   - [ ] Move inclusion probabilities to the top (near the leaves they come from) rather than the bottom
 - [ ] Scrutinize the little histograms in the sampling animation. What are they supposed to be? Why do they appear to change after sampling?
 - [ ] Make sure the sampling animation widget is faithful to the implementation.
-- [ ] Several widgets overflow their containers on mobile. Fix the layout to fill viewport width on small screens, then add horizontal scroll for wide SVGs.
+- [x] Several widgets overflow their containers on mobile. Fix the layout to fill viewport width on small screens, then add horizontal scroll for wide SVGs.
 - [ ] Centralize widget/layout styles into the blog's CSS (`~/projects/blog/main/content/css/blog.css`) instead of inline styles in the .md file.
 
 ## Fidelity Audit

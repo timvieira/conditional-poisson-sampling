@@ -21,10 +21,11 @@ GITHUB_BASE = f"https://github.com/{REPO}/blob/{BRANCH}"
 
 PYTHON_FILES = [
     "tests/test_identities.py",
-    "bench/bench_one.py",
-    "bench/bench_samplers.py",
+    "tests/test_all_implementations.py",
+    "bench/bench_timing.py",
     "conditional_poisson/tree_torch.py",
-    "conditional_poisson/tree_numpy.py",
+    "conditional_poisson/_base_torch.py",
+    "conditional_poisson/sequential_numpy.py",
 ]
 
 R_FILES = ["bench/bench_timing_r.R"]
@@ -87,7 +88,7 @@ def extract_r_blocks(filepath):
     # Map pill title keywords to blocks
     targets = {
         "UPMEqfromw + UPMEpikfromq": ["UPMEqfromw", "UPMEpikfromq"],
-        "UPmaxentropy": ["UPmaxentropy"],
+        "UPMEsfromq": ["UPMEsfromq"],
     }
 
     for title, keywords in targets.items():
