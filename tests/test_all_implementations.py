@@ -4,6 +4,7 @@ Every test runs on all four implementations. No class-specific test files.
 """
 
 import math
+from fractions import Fraction
 import numpy as np
 import pytest
 from itertools import combinations
@@ -220,6 +221,33 @@ class TestStability:
         pi = to_numpy(cp.incl_prob)
         assert abs(pi.sum() - 20) < 1e-6
         np.testing.assert_allclose(pi, 0.2, atol=1e-8)
+
+    def test_no_overflow_large_N(self, cls):
+        # Z = C(N, n) c^n is far beyond the float64 range (about 10^1100 here).
+        N, n, c = 3000, 1200, 2.0
+        cp = cls.from_weights(n, np.full(N, c))
+        log_Z = math.lgamma(N + 1) - math.lgamma(n + 1) - math.lgamma(N - n + 1) + n * math.log(c)
+        assert abs(cp.log_normalizer - log_Z) < 1e-9 * abs(log_Z)
+        np.testing.assert_allclose(to_numpy(cp.incl_prob), n / N, atol=1e-10)
+
+    def test_extreme_weights_exact(self, cls):
+        # Weights spanning e^{\pm 300}, checked against exact rational arithmetic.
+        if cls is ConditionalPoissonNumPy:
+            pytest.xfail("NumPy tree normalizes by the geometric mean only; underflows here")
+        N, n = 200, 50
+        w = np.exp(np.random.default_rng(7).uniform(-300, 300, N))
+        E = [Fraction(1)] + [Fraction(0)] * n
+        for wi in w:
+            wi = Fraction(float(wi))
+            for k in range(n, 0, -1):
+                E[k] += wi * E[k - 1]
+        log_Z = math.log(E[n].numerator) - math.log(E[n].denominator)
+        cp = cls.from_weights(n, w)
+        assert abs(cp.log_normalizer - log_Z) < 1e-12 * abs(log_Z)
+        pi = to_numpy(cp.incl_prob)
+        assert np.isfinite(pi).all() and abs(pi.sum() - n) < 1e-9
+        S = to_numpy(cp.sample())
+        assert len(set(S.tolist())) == n
 
 
 # ── Input validation ─────────────────────────────────────────────────────────

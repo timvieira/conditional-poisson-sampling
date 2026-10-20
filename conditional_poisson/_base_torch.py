@@ -2,6 +2,7 @@
 
 from functools import cached_property
 import torch
+from conditional_poisson._contour import log_contour_radius
 
 
 def _to_tensor(x, dtype=torch.float64):
@@ -65,8 +66,13 @@ class ConditionalPoissonTorchBase:
 
     def clear(self):
         """Flush all cached computations."""
-        for attr in ('_forward', 'log_normalizer', 'incl_prob', '_sample_data'):
+        for attr in ('_forward', 'log_normalizer', 'incl_prob', '_sample_data', '_log_r'):
             self.__dict__.pop(attr, None)
+
+    @cached_property
+    def _log_r(self) -> float:
+        """Log of the contour radius (see conditional_poisson._contour)."""
+        return log_contour_radius(self.theta.detach().cpu().numpy(), self.n)
 
     def _circuit(self, theta):
         """Override: return (log_Z, aux) where log_Z is differentiable."""
