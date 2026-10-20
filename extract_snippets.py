@@ -349,10 +349,9 @@ POPOVER_JS = r"""
         var href = pill.getAttribute('href') || '';
         var title = pill.getAttribute('title') || '';
 
-        // Extract filename from href
+        // Repo-relative path from href (snippet keys are "dir/file.py::name")
         var file = href.split('#')[0];
-        // Remove any URL prefix if present
-        file = file.split('/').pop();
+        if (file.indexOf(GITHUB_BASE + '/') === 0) file = file.slice(GITHUB_BASE.length + 1);
 
         if (!title && !href.includes('#')) {
             // File-level link: show module docstring

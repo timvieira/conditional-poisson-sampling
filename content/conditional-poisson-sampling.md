@@ -72,6 +72,15 @@ it simply establishes what the distribution *is*.  We will derive sampling algor
 
 
 <style>
+/* Narrow screens: wide widgets and display equations scroll inside their own box instead of widening the page. */
+@media (max-width: 800px) {
+  .widget, .sa-widget-box { width: auto !important; min-width: 0 !important; max-width: 100% !important; overflow-x: auto; box-sizing: border-box; }
+  mjx-container[display="true"] { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+  mjx-container mjx-assistive-mml { max-width: 100% !important; }
+}
+</style>
+
+<style>
 #cps table { border-collapse: collapse; width: auto; margin: 0; }
 #cps th, #cps td { padding: 1px 2px; font-family: inherit; font-size: 0.85em; line-height: 1.3; }
 #cps th { border: none; font-weight: normal; color: #666; }
@@ -102,7 +111,7 @@ small { font-size: smaller; }
 
 </style>
 
-<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+<div class="widget" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
 **Interactive explorer.** Drag the weight bars to see how changing $\w_i$ affects the subset probabilities $\Ps(S)$ and inclusion probabilities $\pip_i$. Drag the $\pip_i$ bars to solve the inverse problem: find weights that produce given inclusion probabilities. Use the $N$ and $n$ controls to change the problem size.
 
@@ -364,7 +373,7 @@ svg text { font-family: 'EB Garamond', serif; }
 #tw-status { font-size: 0.75em; color: #999; margin-top: 4px; }
 </style>
 
-<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0; width: fit-content; min-width: 100%; max-width: none;">
+<div class="widget" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0; width: fit-content; min-width: 100%; max-width: none;">
 
 **Interactive product tree.** Drag the weight sliders to see how changing $\w_i$ affects the polynomial coefficients at every node. The tree builds the product $\prod_{i=1}^{N}(1 + \w_i \z)$ bottom-up; the $n$<sup>th</sup> coefficient at the root (highlighted in red) is the normalizing constant $\Z$. Use the $N$ and $n$ controls to change the problem size.
 
@@ -894,8 +903,8 @@ svg text { font-family: 'EB Garamond', serif; }
 
 $$T(N) = 2\,T(N/2) + \mathcal{O}(N \log N)$$
 
-which solves to $T(N) = \mathcal{O}(N \log^2 n)$.
-The complexity is $\mathcal{O}(N \log^2 n)$ rather than $\mathcal{O}(N \log^2 N)$ because we only need the coefficient at $\z^n$: intermediate polynomials can be **truncated to degree $n$** without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  This reduces both the polynomial sizes and the FFT costs throughout the tree.
+which solves to $T(N) = \mathcal{O}(N \log^2 N)$.
+We can do better, because we only need the coefficient at $\z^n$: intermediate polynomials can be **truncated to degree $n$** without affecting the result.  (Convolution of two polynomials truncated to degree $n$ still gives the correct coefficients up to degree $n$.)  With truncation, the bottom $\log_2 n$ levels of the tree each cost $\mathcal{O}(N \log n)$, for $\mathcal{O}(N \log^2 n)$ in total.  Above those levels, every polynomial has degree $n$ and the number of nodes halves at each level, so the remaining levels add only $\mathcal{O}(N \log n)$.  The total is $\mathcal{O}(N \log^2 n)$.
 
 
 ### Computing Inclusion Probabilities $\bpip$
@@ -927,7 +936,7 @@ $S \leftarrow \text{sample}(\text{root}, n)$
 
 This is exact, not approximate—it follows from the **weighted Vandermonde identity**: $\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$, which says the number of ways to choose $k$ items from $A \cup B$ is the convolution of the two groups' counts.  Each term $p_j$ is proportional to the conditional probability of assigning $j$ items to the left child and $k - j$ to the right.  At the leaves, quota 1 means "include this item"; quota 0 means "exclude."
 
-The tree is built once ($\mathcal{O}(N \log^2 N)$) and reused across samples.  Each sample costs $\mathcal{O}(n \log N)$: at each of the $\mathcal{O}(\log N)$ levels, only nodes with nonzero quota are visited, and the total quota per level is $n$.
+The tree is built once ($\mathcal{O}(N \log^2 n)$) and reused across samples.  Each sample costs $\mathcal{O}(n \log N)$: at each of the $\mathcal{O}(\log N)$ levels, only nodes with nonzero quota are visited, and the total quota per level is $n$.
 
 <style>
 #sampling-anim .sa-widget-box {
@@ -2272,26 +2281,27 @@ All computations are verified against brute-force enumeration in the test suite.
 Now that we've seen how the product tree works under the hood, here's the library interface.
 
 ```python
->>> from conditional_poisson_torch import ConditionalPoissonTorch
+>>> import torch
+>>> from conditional_poisson import ConditionalPoissonTorch
 >>> cp = ConditionalPoissonTorch.from_weights(n=3, w=[0.68, 1.02, 0.55, 1.63, 0.67, 2.82])
 
 >>> cp.log_normalizer
-3.362122
+3.3621224365508637
 
 >>> cp.incl_prob
-tensor([0.3813, 0.5038, 0.3236, 0.6424, 0.3771, 0.7718])
+tensor([0.3813, 0.5038, 0.3236, 0.6424, 0.3771, 0.7718], dtype=torch.float64)
 
 >>> torch.stack([cp.sample() for _ in range(5)])
-tensor([[0, 3, 5],
-        [1, 3, 5],
-        [0, 1, 5],
+tensor([[1, 3, 5],
+        [0, 3, 5],
         [1, 3, 4],
-        [0, 3, 5]])
+        [0, 1, 3],
+        [1, 2, 5]])
 
 >>> # Inverse problem: find weights from target inclusion probabilities
 >>> cp_fit = ConditionalPoissonTorch.fit(cp.incl_prob, n=3)
 >>> (cp_fit.incl_prob - cp.incl_prob).abs().max()
-tensor(6.53e-08)
+tensor(6.5330e-08, dtype=torch.float64)
 ```
 
 ## The Poisson Approximation
@@ -2304,7 +2314,7 @@ $$\pip_i \;\approx\; \frac{\w_i \, r}{1 + \w_i \, r}.$$
 
 <a id="Hájek's-approximation"></a>The actual inclusion probabilities are close but not identical—[Hájek (1964, Theorem 5.2)](https://doi.org/10.1214/aoms/1177700375) showed that $\pip_i = p_i + \mathcal{O}(1/N)$.  This means initializing $\theta_i^{(0)} = \text{logit}(\piptgt_i)$ gives a warm start that is off by at most $\mathcal{O}(1/N)$ for the [fitting](#Fitting-Weights-to-Target-Probabilities) optimizer.
 
-<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+<div class="widget" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
 **Weights vs. inclusion probabilities.** The curve shows the Poisson approximation $p_i = \w_i r/(1+\w_i r)$; the dots show the exact $\pip_i$ (computed via the product tree).  Drag any dot horizontally to change its weight and see both update.  Use the controls to change $N$ and $n$ or resample weights.
 
@@ -2594,20 +2604,24 @@ $$
 **Optimizer.**  L-BFGS uses only the gradient $\bpip(\btheta) - \bpiptgt$ (no second-order machinery needed).  The [Poisson approximation](#The-Poisson-Approximation) provides a warm start: $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.
 
 ```python
+from conditional_poisson import ConditionalPoissonNumPy
+
 # Target: the inclusion probabilities from our earlier example
-pi_star = cp.incl_prob.copy()
+pi_star = cp.incl_prob.numpy()
 
 # Fit from scratch
-cp_fit = ConditionalPoissonNumPy.fit(pi_star, n, verbose=True)
+cp_fit = ConditionalPoissonNumPy.fit(pi_star, n=3, verbose=True)
 ```
 
-<pre class="output">  iter   0:  max|pi*-pi| = 3.332e-02
-  iter   1:  max|pi*-pi| = 1.020e-01
-  iter   2:  max|pi*-pi| = 1.153e-02
-  ...
-  iter  17:  max|pi*-pi| = 4.370e-06
-  ...
-  iter  23:  max|pi*-pi| = 3.588e-10</pre>
+<pre class="output">  max|pi-pi*| = 3.890e-02
+  max|pi-pi*| = 1.150e-01
+  max|pi-pi*| = 8.364e-03
+  max|pi-pi*| = 1.136e-03
+  max|pi-pi*| = 1.849e-04
+  max|pi-pi*| = 1.498e-05
+  max|pi-pi*| = 2.241e-07
+  max|pi-pi*| = 2.082e-08
+  max|pi-pi*| = 9.085e-11</pre>
 
 ## Timing
 
@@ -2842,7 +2856,7 @@ In other words, the $r$ that makes the Poisson approximation $\pip_i \approx p_i
 
 This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's method converges in a few iterations.  A simpler heuristic, $r = n / \W$ (where $\W \defeq \sum_{i=1}^{N} \w_i$), linearizes $\w_i r / (1 + \w_i r) \approx \w_i r$ and works for mild weights but breaks down with heavy tails.
 
-<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+<div class="widget" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
 **Contour diagram.** The generating function $f(\z) = \prod_{i=1}^{N}(1 + \w_i \z)$ has zeros at $\z = -1/\w_i$ on the negative real axis.  Extracting the $n$<sup>th</sup> coefficient via FFT is equivalent to sampling $f$ at equally-spaced points on the circle $|\z| = r$.  Drag the weight sliders or the circle to explore.
 
@@ -3081,7 +3095,7 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
 **Autograd compatibility.** The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).
 
 
-<div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+<div class="widget" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
 **Numerical validation.** The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$).  With $r=1$ the dynamic range is $\approx 10^{16}$, destroying all precision.  The optimal $r^*$ brings it to $\approx 1$.<a href="tests/test_identities.py#test_rescaling_dynamic_range" title="test_rescaling_dynamic_range" class="verified" target="_blank">✓</a>
 
@@ -3299,4 +3313,4 @@ Found an error or have a suggestion? Please [open an issue](https://github.com/t
 }
 ```
 
-<script src="figures/popover.js"></script>
+<script src="../figures/popover.js"></script>
