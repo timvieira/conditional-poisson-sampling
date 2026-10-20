@@ -2631,16 +2631,17 @@ Do the asymptotic claims hold up on a real machine?  This section times the prod
 
 **Setup.**  The product tree is `ConditionalPoissonTorch` (PyTorch, FFT, $\bpip$ by autograd).  The DP is `ConditionalPoissonSequentialNumPy`: a loop over the $N$ items whose steps are vectorized over $k$, with $\bpip$ computed by a hand-written reverse pass.  The R baseline is the [sampling](https://cran.r-project.org/web/packages/sampling/) package (version 2.11).  Weights are drawn from $\text{Exp}(1)$, and every method gets the same weights.  Measurements run one at a time on a single thread of an Intel Core i7-8650U laptop CPU, and each time is the fastest of up to five repeats after a warm-up call.<a href="bench/bench_timing.py#measure" title="measure" class="verified" target="_blank">✓</a>  Every method computes exact quantities, and the benchmark checks each output against an independent method:<a href="bench/bench_timing.py#check" title="check, Reference.__call__" class="verified" target="_blank">✓</a> the tree and the DP agree on $\bpip$ to within $4 \times 10^{-15}$ and on $\log \Z$ to within a relative $10^{-15}$ at every size, and R agrees with both wherever it runs.  The raw data is in [timing.json](../figures/timing.json), and the benchmark script is <a href="bench/bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.
 
-The first three plots fix $n = 0.4N$; the 3D plots at the end vary $N$ and $n$ separately.
+The first three plots fix $n = 0.4N$; the 3D plots at the end vary $N$ and $n$ separately.  Hover over a plot for exact times, drag to zoom, double-click to zoom back out, and click a legend entry to hide or show that method.
 
 ### Computing $\Z$
 
 <a href="conditional_poisson/tree_torch.py#_circuit" title="ConditionalPoissonTorch._circuit" class="verified" target="_blank">✓</a> product tree $\mathcal{O}(N \log^2 n)$ ·
 <a href="conditional_poisson/sequential_numpy.py#_recurrence" title="ConditionalPoissonSequentialNumPy._recurrence, ConditionalPoissonSequentialNumPy.log_normalizer" class="verified" target="_blank">✓</a> DP $\mathcal{O}(Nn)$
 
-<figure>
-<img src="../figures/timing_Z.svg" alt="Log-log plot of the time to compute Z against N, with n = 0.4N" style="width:100%">
-</figure>
+<div class="widget timing-card">
+<div id="timing-Z" class="timing-line" data-timing-plot="Z" role="img" aria-label="Log-log plot of the time to compute Z against N, with n = 0.4N"></div>
+<div class="timing-xlabel">$N$, with $n = 0.4N$</div>
+</div>
 
 The DP is faster for small $N$.  The tree's PyTorch implementation has a fixed cost of about 2 ms per call (it dispatches about a hundred small tensor operations), and that cost dominates until $N \approx 500$.  Beyond that the tree wins, and its lead grows with $N$: at $N = 20{,}000$ it takes 61 ms, versus 397 ms for the DP.  (When it computes $\Z$ alone, the DP keeps only one row of its table, so it is not slowed down by memory it does not need.)
 
@@ -2653,9 +2654,10 @@ This is the main event.  Without backpropagation, the natural way to get $\bpip$
 <a href="bench/bench_timing.py#loo_incl_prob" title="loo_incl_prob" class="verified" target="_blank">✓</a> leave-one-out with either ·
 <a href="bench/bench_timing_r.R" title="UPMEqfromw + UPMEpikfromq" class="verified" target="_blank">✓</a> R `sampling` package
 
-<figure>
-<img src="../figures/timing_pi.svg" alt="Log-log plot of the time to compute inclusion probabilities against N, with n = 0.4N" style="width:100%">
-</figure>
+<div class="widget timing-card">
+<div id="timing-pi" class="timing-line" data-timing-plot="pi" role="img" aria-label="Log-log plot of the time to compute inclusion probabilities against N, with n = 0.4N"></div>
+<div class="timing-xlabel">$N$, with $n = 0.4N$</div>
+</div>
 
 Backpropagation costs a small constant factor more than the forward pass, as the Baur-Strassen theorem promises: computing $\bpip$ takes 2.1 to 2.7 times as long as computing $\Z$ with the tree, and 2.5 to 3.9 times as long with the DP.  Leave-one-out costs a factor of about $N$ more instead.  At $N = 2000$, it takes 12 s with the tree (840 times as long as backpropagation) and 39 s with the DP (740 times as long).  Between the two backpropagation methods, the tree overtakes the DP by $N = 500$ and is 12 times faster at $N = 20{,}000$ (130 ms versus 1.6 s).
 
@@ -2667,9 +2669,10 @@ The R package also uses an $\mathcal{O}(Nn)$ DP, but it runs as interpreted R co
 <a href="conditional_poisson/sequential_numpy.py#sample" title="ConditionalPoissonSequentialNumPy.sample" class="verified" target="_blank">✓</a> DP table $\mathcal{O}(N)$ per sample ·
 <a href="bench/bench_timing_r.R" title="UPMEsfromq" class="verified" target="_blank">✓</a> R `sampling` package $\mathcal{O}(N)$ per sample
 
-<figure>
-<img src="../figures/timing_samples.svg" alt="Log-log plot of the time to draw one sample against N, with n = 0.4N" style="width:100%">
-</figure>
+<div class="widget timing-card">
+<div id="timing-sample" class="timing-line" data-timing-plot="sample" role="img" aria-label="Log-log plot of the time to draw one sample against N, with n = 0.4N"></div>
+<div class="timing-xlabel">$N$, with $n = 0.4N$</div>
+</div>
 
 Both samplers first build a data structure, which costs about one forward pass: the tree reuses its product tree, and the DP fills its $(N+1) \times (n+1)$ table.  The plot shows the cost of each sample after that.  With $n = 0.4N$, the DP's sampler is faster: its $\mathcal{O}(N)$ scan beats the tree's $\mathcal{O}(n \log N)$ walk when $n$ is a constant fraction of $N$ (at $N = 20{,}000$, 14 ms versus 102 ms per sample).  The tree's sampler wins when the sample is a small fraction of the population: in the grid below, it is faster whenever $n$ is at most about 2% of $N$, for example 0.25 ms versus 12 ms at $N = 20{,}000$ and $n = 5$.  R's sampler is also an $\mathcal{O}(N)$ scan, 1.3 to 2.7 times slower than ours.
 
@@ -2677,17 +2680,17 @@ Both samplers first build a data structure, which costs about one forward pass: 
 
 The 3D plots below vary $N$ from 100 to 20,000 and $n$ from 5 to $N/2$.  Drag to rotate, scroll to zoom, and hover for values.  For $\Z$ and $\bpip$, the DP is faster at every $n$ when $N \le 200$, and the tree is faster at every $n$ when $N \ge 1000$.  The crossover depends on $N$ more than on $n$ because of constant factors: the DP pays a few microseconds of NumPy overhead per item, and the tree pays about 2 ms per call.  For sampling, the crossover is the one described above.
 
-<div class="widget" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+<div class="widget timing-card">
 <div class="timing-legend"><span style="color:#c0504d">&#9632;</span> product tree &nbsp;&nbsp; <span style="color:#5b9bd5">&#9632;</span> DP</div>
 <div class="timing-3d-title"><b>Computing $\Z$</b></div>
-<div id="timing-3d-Z" class="timing-3d"></div>
+<div id="timing-3d-Z" class="timing-3d" data-timing-plot="Z_grid"></div>
 <div class="timing-3d-title"><b>Computing $\bpip$</b></div>
-<div id="timing-3d-pi" class="timing-3d"></div>
+<div id="timing-3d-pi" class="timing-3d" data-timing-plot="pi_grid"></div>
 <div class="timing-3d-title"><b>Drawing One Sample</b> (after setup)</div>
-<div id="timing-3d-sample" class="timing-3d"></div>
+<div id="timing-3d-sample" class="timing-3d" data-timing-plot="sample_grid"></div>
 </div>
 
-To check the claimed complexities, the table below fits the log-log slope of time against $N$ (at fixed $n$) and against $n$ (at fixed $N$), each over the four largest sizes, and compares it with the slope of the complexity bound over the same points.  It is computed in your browser from [timing.json](../figures/timing.json).  Cells where the two differ by more than 0.2 are flagged in red.
+To check the claimed complexities, the table below fits the log-log slope of time against $N$ (at fixed $n$) and against $n$ (at fixed $N$), each over the four largest sizes, and compares it with the slope of the complexity bound over the same points.  It is computed from [timing.json](../figures/timing.json) by the script that draws the plots.<a href="bench/plot_timing.py#slopes" title="slopes, loglog_slope" class="verified" target="_blank">✓</a>  Cells where the two differ by more than 0.2 are flagged in red.
 
 <div id="timing-slopes">
 <table>
@@ -2706,6 +2709,10 @@ In this run the flags have three causes, none of which contradicts the bounds.  
 The tree's accuracy depends on the contour scaling described in the next section.  With it, the tree matches the DP at every size timed here, and it matches exact rational arithmetic for weights spanning $e^{\pm 300}$.<a href="tests/test_all_implementations.py#test_extreme_weights_exact" title="TestStability.test_extreme_weights_exact" class="verified" target="_blank">✓</a>
 
 <style>
+.timing-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin: 16px 0; }
+.timing-line { height: 380px; }
+@media (max-width: 500px) { .timing-line { height: 460px; } }
+.timing-xlabel { text-align: center; padding-left: 64px; font-size: 0.9em; }
 .timing-3d { height: 400px; }
 .timing-3d-title { margin-top: 12px; text-align: center; }
 .timing-legend { text-align: center; }
@@ -2716,107 +2723,30 @@ The tree's accuracy depends on the contour scaling described in the next section
 #timing-slopes td.flag { color: #c0504d; font-weight: bold; }
 </style>
 <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<script src="../figures/timing_plots.js"></script>
 <script>
+// Draw the timing figures that bench/plot_timing.py builds from timing.json.
 (function() {
-  var STYLE = {tree: {name: 'product tree', color: '#c0504d'}, dp: {name: 'DP', color: '#5b9bd5'}};
-  // Complexity bound of each (operation, method), for the slope table.
-  var MODEL = {
-    Z:      {tree: function(N, n) { return N * Math.pow(Math.log(n), 2); }, dp: function(N, n) { return N * n; }},
-    pi:     {tree: function(N, n) { return N * Math.pow(Math.log(n), 2); }, dp: function(N, n) { return N * n; }},
-    sample: {tree: function(N, n) { return n * Math.log(N); },             dp: function(N, n) { return N; }}
-  };
-
-  function uniq(xs) { return Array.from(new Set(xs)).sort(function(a, b) { return a - b; }); }
-
-  function traces(rows) {
-    var out = [];
-    ['dp', 'tree'].forEach(function(m) {
-      var pts = rows.filter(function(r) { return r.method === m; });
-      var Ns = uniq(pts.map(function(r) { return r.N; }));
-      var ns = uniq(pts.map(function(r) { return r.n; }));
-      var ms = {};
-      pts.forEach(function(r) { ms[r.N + ',' + r.n] = 1e3 * r.seconds; });
-      out.push({
-        type: 'surface', x: Ns, y: ns,
-        z: ns.map(function(n) { return Ns.map(function(N) { var t = ms[N + ',' + n]; return t === undefined ? null : t; }); }),
-        colorscale: [[0, STYLE[m].color], [1, STYLE[m].color]], showscale: false,
-        opacity: 0.4, hoverinfo: 'skip', showlegend: false
-      });
-      out.push({
-        type: 'scatter3d', mode: 'markers', name: STYLE[m].name,
-        x: pts.map(function(r) { return r.N; }), y: pts.map(function(r) { return r.n; }),
-        z: pts.map(function(r) { return 1e3 * r.seconds; }),
-        marker: {size: 3, color: STYLE[m].color},
-        hovertemplate: STYLE[m].name + '<br>N = %{x}, n = %{y}<br>%{z:.3g} ms<extra></extra>'
-      });
-    });
-    return out;
-  }
-
-  // Log axes labeled at powers of ten with explicit text.  (Plotly's own
-  // labels drop the tick at 1 in 3D scenes.)
-  function axis(title, values) {
-    var lo = Math.floor(Math.log10(Math.min.apply(null, values)));
-    var hi = Math.ceil(Math.log10(Math.max.apply(null, values)));
-    var vals = [], text = [];
-    for (var e = lo; e <= hi; e++) {
-      vals.push(Math.pow(10, e));
-      text.push(e < 0 ? Math.pow(10, e).toFixed(-e) : Math.pow(10, e).toLocaleString('en-US'));
+  var T = window.TIMING_PLOTS;
+  document.querySelectorAll('[data-timing-plot]').forEach(function(el) {
+    var fig = T.figures[el.getAttribute('data-timing-plot')];
+    var layout = fig.layout, phone = el.clientWidth < 500;
+    if (layout.scene && phone) {               // pull the 3D camera back
+      var eye = layout.scene.camera.eye;
+      layout.scene.camera.eye = {x: 1.6 * eye.x, y: 1.6 * eye.y, z: 1.6 * eye.z};
     }
-    return {title: {text: title}, type: 'log', tickvals: vals, ticktext: text};
-  }
-
-  function layout(rows, width) {
-    var far = width < 500 ? 1.6 : 1;          // pull the camera back on phones
-    return {
-      scene: {xaxis: axis('N', rows.map(function(r) { return r.N; })),
-              yaxis: axis('n', rows.map(function(r) { return r.n; })),
-              zaxis: axis('time (ms)', rows.map(function(r) { return 1e3 * r.seconds; })),
-              camera: {eye: {x: 1.6 * far, y: -1.6 * far, z: 0.9 * far}}},
-      margin: {l: 0, r: 0, t: 0, b: 0}, showlegend: false,
-      paper_bgcolor: 'rgba(0,0,0,0)'
-    };
-  }
-
-  // Least-squares slope of log y against log x.
-  function slope(xs, ys) {
-    var lx = xs.map(Math.log), ly = ys.map(Math.log), k = lx.length;
-    var mx = lx.reduce(function(a, b) { return a + b; }, 0) / k;
-    var my = ly.reduce(function(a, b) { return a + b; }, 0) / k;
-    var sxy = 0, sxx = 0;
-    for (var i = 0; i < k; i++) { sxy += (lx[i] - mx) * (ly[i] - my); sxx += (lx[i] - mx) * (lx[i] - mx); }
-    return sxy / sxx;
-  }
-
-  // Fill each cell of the slope table, which is static HTML so that MathJax
-  // typesets it with the rest of the page.  A cell's data-slope attribute is
-  // "operation method direction fixed": e.g. "Z tree N 1000" is the slope in N
-  // at n = 1000.  Slopes are fit over the four largest sizes.
-  function slopeTable(grid) {
-    document.querySelectorAll('#timing-slopes td[data-slope]').forEach(function(td) {
-      var a = td.getAttribute('data-slope').split(' ');
-      var exp = a[0], m = a[1], x = a[2], fixed = +a[3];
-      var pts = grid.filter(function(r) {
-        return r.experiment === exp && r.method === m && (x === 'N' ? r.n : r.N) === fixed;
-      }).sort(function(p, q) { return p[x] - q[x]; }).slice(-4);
-      if (pts.length < 2) { td.textContent = '—'; return; }
-      var f = MODEL[exp][m];
-      var xs = pts.map(function(r) { return r[x]; });
-      var meas = slope(xs, pts.map(function(r) { return r.seconds; }));
-      var bound = slope(xs, pts.map(function(r) { return f(r.N, r.n); }));
-      td.textContent = meas.toFixed(2) + ' / ' + bound.toFixed(2);
-      if (Math.abs(meas - bound) > 0.2) td.className = 'flag';
-    });
-  }
-
-  fetch('../figures/timing.json').then(function(r) { return r.json(); }).then(function(data) {
-    var grid = data.results.filter(function(r) { return r.sweep === 'grid' && r.seconds != null; });
-    ['Z', 'pi', 'sample'].forEach(function(exp) {
-      var rows = grid.filter(function(r) { return r.experiment === exp; });
-      var el = document.getElementById('timing-3d-' + exp);
-      Plotly.newPlot(el, traces(rows), layout(rows, el.clientWidth), {responsive: true, displaylogo: false});
-    });
-    slopeTable(grid);
+    if (!layout.scene && phone) layout.dragmode = false;   // let touch scroll the page
+    // The line plots hide the toolbar, which would cover their legends;
+    // drag zooms and double-click resets without it.
+    Plotly.newPlot(el, fig.data, layout, {responsive: true, displaylogo: false,
+                                          displayModeBar: layout.scene ? 'hover' : false});
+  });
+  // The slope table is static HTML, so MathJax typesets it with the rest of
+  // the page; only its numbers are filled in here.
+  document.querySelectorAll('#timing-slopes td[data-slope]').forEach(function(td) {
+    var cell = T.slopes[td.getAttribute('data-slope')];
+    td.textContent = cell ? cell.text : '\u2014';
+    if (cell && cell.flag) td.className = 'flag';
   });
 })();
 </script>

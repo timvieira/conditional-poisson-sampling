@@ -76,8 +76,8 @@ The build system (`~/projects/blog/main/build.py`) renders the .md file using Py
 ## Build System
 
 - **`make test`** — run all Python tests
-- **`make bench`** — run the timing benchmarks (`bench/bench_timing.py`, serial and single-threaded, ~30 min) → `content/figures/timing.json`, the single data file behind every timing figure (the 3D plots load it in the browser)
-- **`make figures`** — regenerate the SVG plots from `timing.json`
+- **`make bench`** — run the timing benchmarks (`bench/bench_timing.py`, serial and single-threaded, ~30 min) → `content/figures/timing.json`, the single data file behind every timing figure
+- **`make figures`** — rebuild the Plotly timing figures and the slope table from `timing.json` (`bench/plot_timing.py` → `content/figures/timing_plots.js`, which the article loads with a `<script>` tag)
 - **`make data`** — `make bench` then `make figures`
 - **`make snippets`** — regenerate popover.js code snippets
 - **`make deploy`** — run tests, regenerate snippets, build and deploy to GitHub Pages
@@ -94,5 +94,5 @@ The build system (`~/projects/blog/main/build.py`) renders the .md file using Py
 - Commit and push after every logical change
 - Run `make deploy` to publish changes to the live site
 - Run `make test` before committing
-- **Deploy after any change to snippet source files.** The blog's popover code snippets are extracted from Python and R source files listed in `extract_snippets.py` (`tests/test_identities.py`, `tests/test_all_implementations.py`, `bench/bench_timing.py`, `conditional_poisson/tree_torch.py`, `conditional_poisson/_base_torch.py`, `conditional_poisson/sequential_numpy.py`, `bench/bench_timing_r.R`). Any change to these files changes the deployed snippets and requires `blog deploy`.
+- **Deploy after any change to snippet source files.** The blog's popover code snippets are extracted from Python and R source files listed in `extract_snippets.py` (`tests/test_identities.py`, `tests/test_all_implementations.py`, `bench/bench_timing.py`, `bench/plot_timing.py`, `conditional_poisson/tree_torch.py`, `conditional_poisson/_base_torch.py`, `conditional_poisson/sequential_numpy.py`, `bench/bench_timing_r.R`). Any change to these files changes the deployed snippets and requires `blog deploy`.
 - **Never write citations without verifying them** — check title, authors, year, venue, and URL against the actual publication. Hallucinated references are unacceptable.

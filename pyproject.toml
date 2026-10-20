@@ -12,7 +12,7 @@ dependencies = ["numpy", "scipy"]
 
 [project.optional-dependencies]
 torch = ["torch"]
-dev = ["pytest", "scipy", "torch", "matplotlib", "cvxpy"]
+dev = ["pytest", "scipy", "torch", "plotly", "cvxpy"]
 
 [tool.setuptools.packages.find]
 include = ["conditional_poisson*"]

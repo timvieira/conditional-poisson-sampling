@@ -14,6 +14,7 @@ test:
 
 # Timing benchmarks: serial and single-threaded, so runs do not compete for CPU.
 # Writes content/figures/timing.json, the data behind every timing figure.
+# `make figures` builds the article's Plotly figures from it (timing_plots.js).
 bench:
 	python bench/bench_timing.py
 

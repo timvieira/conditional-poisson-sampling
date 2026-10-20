@@ -2,8 +2,8 @@
 """Timing experiments for the article's Timing section.
 
 Writes content/figures/timing.json, the single data file behind every timing
-figure: bench/plot_timing.py draws the static plots from it, and the article's
-3D plots load it in the browser.
+figure: bench/plot_timing.py builds the article's Plotly figures and slope
+table from it.
 
 Methods (all compute exact conditional Poisson quantities):
   tree      ConditionalPoissonTorch: FFT product tree; pi by autograd
