@@ -52,6 +52,26 @@ def pi_bf(w, n):
     return pi
 
 
+def log_contour_radius_ref(theta, n):
+    """log r solving sum_i p_i(r) = n, where p_i(r) = w_i r / (1 + w_i r) and
+    theta = log w, by root bracketing (independent of the library's Newton
+    solver).  Requires 0 < n < N."""
+    from scipy.optimize import brentq
+    from scipy.special import expit
+    theta = np.asarray(theta, dtype=float)
+    return brentq(lambda t: expit(theta + t).sum() - n,
+                  -theta.max() - 50, -theta.min() + 50, xtol=1e-14)
+
+
+def poisson_binomial_pmf(p, q):
+    """Distribution of the number of heads among coins with heads probabilities
+    p (and tails probabilities q = 1 - p), by convolving one coin at a time."""
+    pmf = np.array([1.0])
+    for pi, qi in zip(p, q):
+        pmf = poly_mul(pmf, [qi, pi])
+    return pmf
+
+
 # ---------------------------------------------------------------------------
 # Shared test fixtures
 # ---------------------------------------------------------------------------
@@ -331,6 +351,27 @@ def test_weighted_pascal_recurrence():
                 f"m={m}, k={k}: recurrence={z_total}, direct={z_direct}"
 
 
+def test_pascal_dp_is_sequential_product():
+    """Multiplying in the factors (1 + w_m z) one at a time, keeping only the
+    coefficients up to degree n, is the weighted Pascal recurrence: after m
+    factors the coefficients are Z(w_1..w_m, k) for k <= n, and the last row's
+    coefficient at degree n is Z(w, n)."""
+    w, n = W_MED, N_MED
+    poly = np.array([1.0])
+    row = np.zeros(n + 1)
+    row[0] = 1.0                                   # base case: m = 0
+    for m in range(1, len(w) + 1):
+        poly = poly_mul(poly, [1.0, w[m - 1]])[:n + 1]
+        new = row.copy()
+        new[1:] += w[m - 1] * row[:-1]             # weighted Pascal recurrence
+        row = new
+        assert np.allclose(row[:len(poly)], poly, rtol=1e-12)
+        assert np.all(row[len(poly):] == 0)        # Z(w_1..w_m, k) = 0 for k > m
+        for k in range(n + 1):
+            assert np.isclose(row[k], Z_bf(w[:m], k), rtol=1e-10), f"m={m}, k={k}"
+    assert np.isclose(row[n], Z_bf(w, n), rtol=1e-10)
+
+
 # ===========================================================================
 # 11. Weighted Vandermonde identity (Cell 32)
 # ===========================================================================
@@ -346,6 +387,27 @@ def test_weighted_vandermonde():
         rhs = sum(Z_bf(a, j) * Z_bf(b, k - j) for j in range(k + 1))
         assert np.isclose(lhs, rhs, rtol=1e-10), \
             f"k={k}: lhs={lhs}, rhs={rhs}"
+
+
+def test_pascal_is_vandermonde_with_one_leaf():
+    """With B a single item m, the weighted Vandermonde sum has two nonzero
+    terms, j = k (item m excluded) and j = k - 1 (included), and they are the
+    two terms of the weighted Pascal recurrence.  So the DP's sampler, which
+    includes item m with probability w_m Z(w_1..w_{m-1}, k-1) / Z(w_1..w_m, k),
+    is the tree sampler's quota split at a node whose right child is leaf m."""
+    w, n = W_SMALL, N_SMALL
+    for m in range(1, len(w) + 1):
+        a, b = w[:m - 1], w[m - 1:m]
+        for k in range(n + 1):
+            terms = [Z_bf(a, j) * Z_bf(b, k - j) for j in range(k + 1)]
+            assert all(t == 0 for t in terms[:k - 1])     # item m cannot take 2+
+            assert np.isclose(terms[k], Z_bf(a, k), rtol=1e-12)
+            if k > 0:
+                assert np.isclose(terms[k - 1], w[m - 1] * Z_bf(a, k - 1), rtol=1e-12)
+            Z_mk = Z_bf(w[:m], k)
+            if k > 0 and Z_mk > 0:
+                p_incl = w[m - 1] * Z_bf(a, k - 1) / Z_mk
+                assert np.isclose(p_incl, terms[k - 1] / sum(terms), rtol=1e-12)
 
 
 # ===========================================================================
@@ -646,10 +708,121 @@ def test_rescaling_dynamic_range():
                 # r=n/W and r=r* should give small error
                 assert err < 1e-6, \
                     f"{regime} r={r:.2g}: err={err:.1e} too large"
-            # r=r* should have DR close to 1
+            # At r = r*, c_n is the mode (see test_contour_radius_puts_mode_at_n),
+            # so it is the largest coefficient kept: DR = 1.
             if r == r_star:
-                assert dr < 100, \
+                assert dr <= 1 + 1e-9, \
                     f"{regime} r=r*: DR={dr:.1e} too large"
+
+
+# ===========================================================================
+# 19b. Rescaled coefficients are probabilities; the scaled DP
+# ===========================================================================
+
+def test_scaled_coefficients_are_poisson_binomial():
+    """[z^k] prod_i (1 + w_i r z) = Pr[K = k] * prod_i (1 + w_i r), where K is
+    the number of heads among coins with probabilities p_i(r) = w_i r / (1 + w_i r)."""
+    w, n = W_MED, N_MED
+    r_star = np.exp(log_contour_radius_ref(np.log(w), n))
+    for r in [0.3, 1.0, 2.5, r_star]:
+        coef = np.array([1.0])
+        for wi in w:
+            coef = poly_mul(coef, [1.0, wi * r])
+        p = w * r / (1 + w * r)
+        pmf = poisson_binomial_pmf(p, 1 - p)
+        assert np.allclose(coef / np.prod(1 + w * r), pmf, rtol=1e-10, atol=0)
+
+
+def test_contour_radius_puts_mode_at_n():
+    """With r chosen so that E[K] = sum_i p_i(r) = n, the mode of K is n
+    (Darroch, 1964, Theorem 4: an integer mean is the mode).  So Pr[K = n] is
+    the largest of the N + 1 probabilities Pr[K = 0..N], hence >= 1/(N + 1)."""
+    from scipy.special import expit
+    rng = np.random.default_rng(1)
+    for _ in range(300):
+        N = int(rng.integers(2, 80))
+        n = int(rng.integers(1, N))
+        theta = rng.normal(0, rng.choice([0.5, 3.0, 30.0]), N)
+        t = log_contour_radius_ref(theta, n)
+        pmf = poisson_binomial_pmf(expit(theta + t), expit(-(theta + t)))
+        assert pmf[n] >= pmf.max() * (1 - 1e-9), f"N={N}, n={n}: mode is {pmf.argmax()}"
+        assert pmf[n] >= 1 / (N + 1)
+
+
+def test_scaled_pascal_recurrence():
+    """Dividing row m of the weighted Pascal recurrence (with weights r w) by
+    prod_{i<=m} (1 + w_i r) gives Pr[K_m = k], the distribution of the number
+    of heads among the first m coins, and the recurrence becomes
+        Pr[K_m = k] = (1 - p_m(r)) Pr[K_{m-1} = k] + p_m(r) Pr[K_{m-1} = k-1],
+    every entry of which is in [0, 1].  Then
+        log Z(w, n) = log Pr[K_N = n] + sum_i log(1 + w_i r) - n log r.
+    The library's DP table is exactly this table."""
+    from scipy.special import expit
+    from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNumPy
+    w, n = W_MED, N_MED
+    theta = np.log(w)
+    t = log_contour_radius_ref(theta, n)
+    r = np.exp(t)
+    p, q = expit(theta + t), expit(-(theta + t))
+    rows = [np.eye(1, n + 1)[0]]                   # base case: Pr[K_0 = 0] = 1
+    for m in range(1, len(w) + 1):
+        prev = rows[-1]
+        row = q[m - 1] * prev
+        row[1:] += p[m - 1] * prev[:-1]
+        rows.append(row)
+        assert np.all((row >= 0) & (row <= 1))
+        scale = np.prod(1 + w[:m] * r)
+        for k in range(n + 1):
+            assert np.isclose(row[k], Z_bf(r * w[:m], k) / scale, rtol=1e-10), f"m={m}, k={k}"
+    log_Z = np.log(rows[-1][n]) + np.log1p(w * r).sum() - n * np.log(r)
+    assert np.isclose(log_Z, np.log(Z_bf(w, n)), rtol=1e-12)
+    E = ConditionalPoissonSequentialNumPy.from_weights(n, w)._forward[0]
+    assert np.allclose(E, np.array(rows), rtol=1e-10, atol=1e-300)
+
+
+def test_scaled_dp_extreme_weights():
+    """With weights spanning e^{+-300}, the unscaled Pascal recurrence
+    overflows.  The scaled DP keeps every entry in [0, 1], many entries
+    underflow to zero, its answer Pr[K_N = n] is at least 1/(N + 1), and its
+    log Z and pi agree with 50-digit arithmetic."""
+    import mpmath
+    from conditional_poisson.sequential_numpy import ConditionalPoissonSequentialNumPy
+    rng = np.random.default_rng(7)
+    N, n = 200, 80
+    w = np.exp(rng.uniform(-300, 300, N))
+
+    # Unscaled recurrence in float64: overflows.
+    row = np.eye(1, n + 1)[0]
+    with np.errstate(over='ignore', invalid='ignore'):
+        for wi in w:
+            row = row + np.concatenate([[0.0], wi * row[:-1]])
+    assert not np.isfinite(row[n])
+
+    # Scaled DP.
+    cp = ConditionalPoissonSequentialNumPy.from_weights(n, w)
+    E = cp._forward[0]
+    assert np.all((E >= 0) & (E <= 1))
+    assert np.mean(E == 0) > 0.25                  # underflow, harmlessly
+    assert E[N, n] >= 1 / (N + 1)
+
+    # Reference: prefix and suffix Pascal tables in 50-digit arithmetic.
+    with mpmath.workdps(50):
+        W = [mpmath.mpf(float(x)) for x in w]      # the same float weights, exactly
+        F = [[mpmath.mpf(1)] + [mpmath.mpf(0)] * n]
+        for x in W:
+            prev = F[-1]
+            F.append([prev[0]] + [prev[k] + x * prev[k - 1] for k in range(1, n + 1)])
+        B = [[mpmath.mpf(1)] + [mpmath.mpf(0)] * n]
+        for x in reversed(W):
+            prev = B[-1]
+            B.append([prev[0]] + [prev[k] + x * prev[k - 1] for k in range(1, n + 1)])
+        B.reverse()                                # B[i] = table for items i..N-1
+        Z = F[N][n]
+        log_Z = float(mpmath.log(Z))
+        pi = [float(W[i] * mpmath.fsum(F[i][k] * B[i + 1][n - 1 - k] for k in range(n)) / Z)
+              for i in range(N)]
+    assert abs(cp.log_normalizer - log_Z) <= 1e-13 * abs(log_Z)
+    assert np.max(np.abs(cp.incl_prob - np.array(pi))) <= 1e-13
 
 
 # ===========================================================================

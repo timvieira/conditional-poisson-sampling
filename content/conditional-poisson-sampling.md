@@ -66,7 +66,7 @@ This rejection sampler is not a practical sampling algorithm;<footnote>The accep
 it simply establishes what the distribution *is*.  We will derive sampling algorithms that sample from $\Ps(S)$ efficiently.
 
 
-**What this post covers.** The computational challenges are: computing $\Zw{\bw}{n}$ and $\Ps(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim \Ps$, and the inverse problem of finding $\bw$ from target $\bpip$.  This post gives efficient algorithms for all four—in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree.
+**What this post covers.** The computational challenges are: computing $\Zw{\bw}{n}$ and $\Ps(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim \Ps$, and the inverse problem of finding $\bw$ from target $\bpip$.  This post gives efficient algorithms for all four—in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree—and times them against the $\mathcal{O}(Nn)$ dynamic program used by existing software.  The appendices cover numerical stability, timings over a wider range of sizes, and further identities.
 
 **Software.** The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).  As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python (or any language outside of R's survey-sampling packages).  The existing R implementation—`UPmaxentropy` in the [sampling](https://cran.r-project.org/web/packages/sampling/) package—uses $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I could find.
 
@@ -348,7 +348,7 @@ $$
 
 **Why does this work?** When you expand the product, each factor $(1 + \w_i \z)$ contributes either $1$ (item $i$ excluded) or $\w_i \z$ (item $i$ included).  A single term in the expansion picks one choice per factor, giving $\prod_{i \in S} \w_i \cdot \z^{|S|}$ for some subset $S$.  The exponent of $\z$ counts how many items were included.  Summing over all $2^N$ terms and collecting by powers of $\z$, the coefficient of $\z^k$ is exactly $\sum_{|S|=k} \prod_{i \in S} \w_i = \Zw{\bw}{k}$.
 
-So the $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="tests/test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  This product can be computed in $\mathcal{O}(N \log^2 n)$ time using a divide-and-conquer strategy on a binary tree—a standard technique from computer algebra known as the *subproduct tree* (see [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065), Chapter 10).
+So the $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="tests/test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  Below, we compute it in two ways: by multiplying in the factors one at a time, in $\mathcal{O}(Nn)$ time, and by multiplying them in a balanced binary tree, in $\mathcal{O}(N \log^2 n)$ time.  The second is a standard technique from computer algebra known as the *subproduct tree* (see [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065), Chapter 10).
 
 **Polynomials as arrays.** In code, a polynomial like $1 + 3\z + 2\z^2$ is just the array `[1, 3, 2]`.  The $\z$ is a *formal* variable—we never substitute a number into it; it just tracks which coefficient is which.  Multiplying two polynomials corresponds to *convolving* their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ convolves `[1, 2]` with `[1, 3]` to get `[1, 5, 6]`.  It turns out that convolution can be done efficiently using the [fast Fourier transform](https://en.wikipedia.org/wiki/Fast_Fourier_transform) (FFT), costing $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.
 
@@ -356,7 +356,13 @@ So the $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing co
 
 ### Computing the Normalizing Constant $\Z$
 
-Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$.  Internal nodes multiply their children's polynomials.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.
+<a id="pascal-dp"></a>**One factor at a time.** The simplest way to expand the product is to multiply in one factor at a time, discarding coefficients above degree $n$, which never affect the coefficient of $\z^n$.  After $m$ factors, the coefficient of $\z^k$ is $\Zw{\w_1, \ldots, \w_m}{k}$, and multiplying by the next factor gives the **weighted Pascal recurrence**:
+
+$$\Zw{\w_1, \ldots, \w_m}{k} = \Zw{\w_1, \ldots, \w_{m-1}}{k} + \w_m \cdot \Zw{\w_1, \ldots, \w_{m-1}}{k-1}$$
+
+with base cases $\Zw{\cdot}{0} = 1$ and $\Zw{\cdot}{k} = 0$ for $k < 0$ or $k > m$.  This is a weighted generalization of Pascal's identity $\binom{m}{k} = \binom{m-1}{k} + \binom{m-1}{k-1}$: item $m$ is either excluded (first term) or included (second term).<a href="tests/test_identities.py#test_weighted_pascal_recurrence" title="test_weighted_pascal_recurrence, test_pascal_dp_is_sequential_product" class="verified" target="_blank">✓</a>  Each step updates $n + 1$ coefficients, so this dynamic program (DP) computes $\Z$ in $\mathcal{O}(Nn)$ time.
+
+**The product tree.** Multiplying by one degree-1 factor at a time gives FFT nothing to speed up.  The product tree multiplies the same factors in a balanced order, so that most of the work is in multiplying large polynomials, where FFT pays off.  Each leaf of a complete binary tree holds one degree-1 polynomial $(1 + \w_i \z)$, and each internal node multiplies its children's polynomials: the polynomial at node $a$, which we write $P_a(\z)$, is the product of $(1 + \w_i \z)$ over the leaves $i$ below $a$.  The root holds the full product, whose $n$<sup>th</sup> coefficient is $\Zw{\bw}{n}$.
 
 <style>
 #content { overflow: visible !important; }
@@ -913,11 +919,9 @@ The inclusion probability is the gradient of the log-normalizer (an exponential 
 
 $$\pip_i = \frac{\partial \log \Zw{\bw}{n}}{\partial \theta_i}$$
 
-Since the product tree already computes $\log \Zw{\bw}{n}$, we get $\bpip$ by running [backpropagation](https://timvieira.github.io/blog/evaluating-fx-is-as-fast-as-fx/) on the same tree—no new algorithm needed.  By the Baur-Strassen theorem ([1983](https://doi.org/10.1016/0304-3975(83)90110-X)), the gradient costs at most a constant factor more than the forward computation.
+So any program that computes $\log \Zw{\bw}{n}$ gives $\bpip$ by running [backpropagation](https://timvieira.github.io/blog/evaluating-fx-is-as-fast-as-fx/) on it—no new algorithm needed.  By the Baur-Strassen theorem ([1983](https://doi.org/10.1016/0304-3975(83)90110-X)), the gradient costs at most a small constant factor more than the forward computation.<footnote>[Baur & Strassen (1983)](https://doi.org/10.1016/0304-3975(83)90110-X) prove a factor of 3 for nonscalar operations on polynomials; [Griewank & Walther (2008)](https://doi.org/10.1137/1.9780898717761) give 5 for general reverse-mode automatic differentiation.</footnote>  Backpropagation through the Pascal DP gives $\bpip$ in $\mathcal{O}(Nn)$ time, and backpropagation through the product tree gives it in $\mathcal{O}(N \log^2 n)$.
 
-**The key insight: forward + backprop.**  Computing $\pip_i$ requires the "leave-one-out" product $\prod_{j \neq i}(1 + \w_j \z)$—a single item removed from the full product.  A naive approach recomputes this from scratch for each $i$, giving $\mathcal{O}(N^2 n)$ total.  But any differentiable forward pass that computes $\log \Z$—whether the $\mathcal{O}(Nn)$ Pascal dynamic programming (DP) or the $\mathcal{O}(N \log^2 n)$ product tree—gives all $N$ inclusion probabilities via a single backpropagation pass at the same asymptotic cost.  This is a general principle: backprop computes the gradient of any scalar output for free (up to a small constant factor).  The product tree is just the fastest known forward pass; the gradient follows mechanically.
-
-In the PyTorch implementation, the gradient comes for free via `torch.autograd`—no hand-coded tree traversal needed.
+**Why backpropagation matters.**  Written out directly, $\pip_i$ requires the "leave-one-out" product $\prod_{j \neq i}(1 + \w_j \z)$—the full product with item $i$ removed.  Recomputing it from scratch for each $i$ takes $N$ forward passes, $\mathcal{O}(N^2 n)$ with the DP.  Backpropagation shares the work among the items, so all $N$ inclusion probabilities cost about as much as one forward pass.  The product tree is just the fastest forward pass we know of; the gradient follows mechanically.  In the PyTorch implementation, it comes from `torch.autograd`—no hand-coded tree traversal needed.
 
 ### Drawing Samples
 
@@ -927,16 +931,18 @@ Sampling reuses the product tree (no gradient computation needed).  Walk the tre
 <b>def</b> $\text{sample}(a, k)$: <span style="color:#888; font-size:0.85em">// sample $k$ items from subtree $a$</span><br>
 $\quad$ <b>if</b> $a$ is a leaf: <b>return</b> $\{a\text{.item}\}$ if $k = 1$, else $\emptyset$<br>
 $\quad$ Let $b, c$ be the children of $a$<br>
-$\quad$ $p_j \leftarrow \llbracket P_b \rrbracket(\z^j) \cdot \llbracket P_c \rrbracket(\z^{k-j})$ <b>for</b> $j = 0, \ldots, k$<br>
-$\quad$ Draw $j \sim \text{Categorical}(\boldsymbol{p})$<br>
+$\quad$ $q_j \leftarrow \llbracket P_b \rrbracket(\z^j) \cdot \llbracket P_c \rrbracket(\z^{k-j})$ <b>for</b> $j = 0, \ldots, k$<br>
+$\quad$ Draw $j \sim \text{Categorical}(\boldsymbol{q})$<br>
 $\quad$ <b>return</b> $\text{sample}(b, j) \cup \text{sample}(c, k{-}j)$<br>
 <br>
 $S \leftarrow \text{sample}(\text{root}, n)$
 </div>
 
-This is exact, not approximate—it follows from the **weighted Vandermonde identity**: $\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$, which says the number of ways to choose $k$ items from $A \cup B$ is the convolution of the two groups' counts.  Each term $p_j$ is proportional to the conditional probability of assigning $j$ items to the left child and $k - j$ to the right.  At the leaves, quota 1 means "include this item"; quota 0 means "exclude."
+This is exact, not approximate—it follows from the **weighted Vandermonde identity**: $\Zw{(\ba;\, \bb)}{k} = \sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$, which says the number of ways to choose $k$ items from $A \cup B$ is the convolution of the two groups' counts.  Each term $q_j$ is proportional to the conditional probability of assigning $j$ items to the left child and $k - j$ to the right.  At the leaves, quota 1 means "include this item"; quota 0 means "exclude."
 
 The tree is built once ($\mathcal{O}(N \log^2 n)$) and reused across samples.  Each sample costs $\mathcal{O}(n \log N)$: at each of the $\mathcal{O}(\log N)$ levels, only nodes with nonzero quota are visited, and the total quota per level is $n$.
+
+**The DP's sampler.** The Pascal DP multiplies the factors in a tree too, a lopsided one: node $m$ joins the product of the first $m - 1$ factors (its left child) with the leaf $(1 + \w_m \z)$.  At such a node, a quota of $k$ can be split only two ways: all $k$ to the left (item $m$ excluded), or $k - 1$ to the left and $1$ to item $m$ (included).  The two Vandermonde terms are the two terms of the Pascal recurrence, so item $m$ is included with probability $\w_m \Zw{\w_1, \ldots, \w_{m-1}}{k-1} / \Zw{\w_1, \ldots, \w_m}{k}$.<a href="tests/test_identities.py#test_pascal_is_vandermonde_with_one_leaf" title="test_pascal_is_vandermonde_with_one_leaf" class="verified" target="_blank">✓</a>  The walk down this tree decides one item per level, reading these numbers from the DP's table, so each sample costs $\mathcal{O}(N)$.
 
 <style>
 #sampling-anim .sa-widget-box {
@@ -2308,15 +2314,19 @@ tensor(6.5330e-08, dtype=torch.float64)
 
 The inclusion probabilities $\pip_i = P(i \in S)$ always sum to $n$,<a href="tests/test_identities.py#test_pi_sums_to_n" title="test_pi_sums_to_n" class="verified" target="_blank">✓</a> and each $\pip_i \in [0, 1]$.<a href="tests/test_identities.py#test_pi_in_unit_interval" title="test_pi_in_unit_interval" class="verified" target="_blank">✓</a>  Items with larger weights get higher inclusion probabilities, but the relationship is nonlinear—the other weights push back through the size constraint $|S| = n$.
 
-**Poisson approximation.**  If each item were included independently with probability $p_i = \w_i r/(1+\w_i r)$, where $r$ is the **tilting parameter** that makes $\sum_{i=1}^{N} p_i = n$, we would get
+**Poisson approximation.**  Scaling every weight by the same factor $r > 0$ does not change the distribution: it multiplies the weight of every size-$n$ subset by $r^n$, which cancels in the normalization.<a href="tests/test_identities.py#test_scaling_invariance" title="test_scaling_invariance" class="verified" target="_blank">✓</a>  It does change the Poisson sampling design behind the weights.  With weights $r\bw$, the coins have probabilities
 
-$$\pip_i \;\approx\; \frac{\w_i \, r}{1 + \w_i \, r}.$$
+$$p_i(r) \defeq \frac{\w_i r}{1 + \w_i r},$$
 
-<a id="Hájek's-approximation"></a>The actual inclusion probabilities are close but not identical—[Hájek (1964, Theorem 5.2)](https://doi.org/10.1214/aoms/1177700375) showed that $\pip_i = p_i + \mathcal{O}(1/N)$.  This means initializing $\theta_i^{(0)} = \text{logit}(\piptgt_i)$ gives a warm start that is off by at most $\mathcal{O}(1/N)$ for the [fitting](#Fitting-Weights-to-Target-Probabilities) optimizer.
+so the coins of the introduction are $p_i = p_i(1)$.  We choose $r$ so that the Poisson sample has the right expected size, $\sum_{i=1}^{N} p_i(r) = n$, and call this $r$ the **contour radius**, for a reason explained in [Appendix A](#appendix-a).  If each item were included independently with probability $p_i(r)$, we would get
+
+$$\pip_i \;\approx\; p_i(r) = \frac{\w_i \, r}{1 + \w_i \, r}.$$
+
+<a id="Hájek's-approximation"></a>The actual inclusion probabilities are close but not identical—[Hájek (1964, Theorem 5.2)](https://doi.org/10.1214/aoms/1177700375) showed that $\pip_i = p_i(r) + \mathcal{O}(1/N)$.  This means initializing $\theta_i^{(0)} = \text{logit}(\piptgt_i)$ gives a warm start that is off by at most $\mathcal{O}(1/N)$ for the [fitting](#fitting-weights-to-target-probabilities) optimizer.
 
 <div class="widget" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
-**Weights vs. inclusion probabilities.** The curve shows the Poisson approximation $p_i = \w_i r/(1+\w_i r)$; the dots show the exact $\pip_i$ (computed via the product tree).  Drag any dot horizontally to change its weight and see both update.  Use the controls to change $N$ and $n$ or resample weights.
+**Weights vs. inclusion probabilities.** The curve shows the Poisson approximation $p_i(r) = \w_i r/(1+\w_i r)$; the dots show the exact $\pip_i$ (computed via the product tree).  Drag any dot horizontally to change its weight and see both update.  Use the controls to change $N$ and $n$ or resample weights.
 
 <div id="pi-scatter"></div>
 <script>
@@ -2517,6 +2527,8 @@ $$\pip_i \;\approx\; \frac{\w_i \, r}{1 + \w_i \, r}.$$
 
 </div>
 
+**The contour radius in computation.**  The same $r$ keeps both algorithms numerically stable.  The coefficients of $\prod_{i=1}^{N}(1 + \w_i \z)$ can be too large or too small for floating-point numbers, and their sizes can differ by hundreds of orders of magnitude: the DP's table can overflow, and the FFT, which rounds every coefficient relative to the largest one, can lose $\Z$ in the rounding error.  Rescaling the weights by $r$ turns the coefficients, up to a common factor, into the distribution of the size of a Poisson sample with coins $p_i(r)$, and puts the coefficient we need, at $\z^n$, at the peak of that distribution.<a href="tests/test_identities.py#test_scaled_coefficients_are_poisson_binomial" title="test_scaled_coefficients_are_poisson_binomial, test_contour_radius_puts_mode_at_n" class="verified" target="_blank">✓</a>  Both of our implementations do this; [Appendix A](#appendix-a) explains how, and why it works.
+
 
 ## Fitting Weights to Target Probabilities
 
@@ -2601,7 +2613,7 @@ $$
 
 **Gradient.**  $\nabla_{\btheta} \ell(\btheta) = \bpiptgt - \bpip(\btheta)$.<a href="tests/test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpiptgt$ exactly, so the gradient is zero.  Each evaluation of $\ell(\btheta)$ and $\nabla \ell(\btheta)$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
 
-**Optimizer.**  L-BFGS uses only the gradient $\bpip(\btheta) - \bpiptgt$ (no second-order machinery needed).  The [Poisson approximation](#The-Poisson-Approximation) provides a warm start: $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.
+**Optimizer.**  L-BFGS uses only the gradient $\bpip(\btheta) - \bpiptgt$ (no second-order machinery needed).  The [Poisson approximation](#the-poisson-approximation) provides a warm start: $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.
 
 ```python
 from conditional_poisson import ConditionalPoissonNumPy
@@ -2627,11 +2639,11 @@ cp_fit = ConditionalPoissonNumPy.fit(pi_star, n=3, verbose=True)
 
 ## Timing
 
-Do the asymptotic claims hold up on a real machine?  This section times the product tree against the $\mathcal{O}(Nn)$ dynamic program (DP) and against the existing R implementation.
+Do the asymptotic claims hold up on a real machine?  This section times the product tree against the $\mathcal{O}(Nn)$ [Pascal DP](#pascal-dp) and against the existing R implementation.
 
-**Setup.**  The product tree is `ConditionalPoissonTorch` (PyTorch, FFT, $\bpip$ by autograd).  The DP is `ConditionalPoissonSequentialNumPy`: a loop over the $N$ items whose steps are vectorized over $k$, with $\bpip$ computed by a hand-written reverse pass.  The R baseline is the [sampling](https://cran.r-project.org/web/packages/sampling/) package (version 2.11).  Weights are drawn from $\text{Exp}(1)$, and every method gets the same weights.  Measurements run one at a time on a single thread of an Intel Core i7-8650U laptop CPU, and each time is the fastest of up to five repeats after a warm-up call.<a href="bench/bench_timing.py#measure" title="measure" class="verified" target="_blank">✓</a>  Every method computes exact quantities, and the benchmark checks each output against an independent method:<a href="bench/bench_timing.py#check" title="check, Reference.__call__" class="verified" target="_blank">✓</a> the tree and the DP agree on $\bpip$ to within $4 \times 10^{-15}$ and on $\log \Z$ to within a relative $10^{-15}$ at every size, and R agrees with both wherever it runs.  The raw data is in [timing.json](../figures/timing.json), and the benchmark script is <a href="bench/bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.
+**Setup.**  The product tree is `ConditionalPoissonTorch` (PyTorch, FFT, $\bpip$ by autograd).  It batches the multiplications at each level of the tree into one operation, so a call makes $\mathcal{O}(\log N)$ tensor operations rather than $\mathcal{O}(N)$.  The DP is `ConditionalPoissonSequentialNumPy`: a loop over the $N$ items whose steps are vectorized over $k$, with $\bpip$ computed by a hand-written reverse pass.  Both rescale the weights by the contour radius ([Appendix A](#appendix-a)).  The R baseline is the [sampling](https://cran.r-project.org/web/packages/sampling/) package (version 2.11).  Weights are drawn from $\text{Exp}(1)$, and every method gets the same weights.  Measurements run one at a time on a single thread of an Intel Core i7-8650U laptop CPU, and each time is the fastest of up to five repeats after a warm-up call.<a href="bench/bench_timing.py#measure" title="measure" class="verified" target="_blank">✓</a>  Every method computes exact quantities, and the benchmark checks each output against an independent method:<a href="bench/bench_timing.py#check" title="check, Reference.__call__" class="verified" target="_blank">✓</a> the tree and the DP agree on $\bpip$ to within $4 \times 10^{-15}$ and on $\log \Z$ to within a relative $10^{-15}$ at every size, and R agrees with both wherever it runs.  The raw data is in [timing.json](../figures/timing.json), and the benchmark script is <a href="bench/bench_timing.py" class="verified" target="_blank">bench_timing.py</a>.
 
-The first three plots fix $n = 0.4N$; the 3D plots at the end vary $N$ and $n$ separately.  Hover over a plot for exact times, drag to zoom, double-click to zoom back out, and click a legend entry to hide or show that method.
+The plots below fix $n = 0.4N$; [Appendix B](#appendix-b) varies $N$ and $n$ separately.  Hover over a plot for exact times, drag to zoom, double-click to zoom back out, and click a legend entry to hide or show that method.
 
 ### Computing $\Z$
 
@@ -2661,7 +2673,7 @@ This is the main event.  Without backpropagation, the natural way to get $\bpip$
 
 Backpropagation costs a small constant factor more than the forward pass, as the Baur-Strassen theorem promises: computing $\bpip$ takes 2.1 to 2.7 times as long as computing $\Z$ with the tree, and 2.5 to 3.9 times as long with the DP.  Leave-one-out costs a factor of about $N$ more instead.  At $N = 2000$, it takes 12 s with the tree (840 times as long as backpropagation) and 39 s with the DP (740 times as long).  Between the two backpropagation methods, the tree overtakes the DP by $N = 500$ and is 12 times faster at $N = 20{,}000$ (130 ms versus 1.6 s).
 
-The R package also uses an $\mathcal{O}(Nn)$ DP, but it runs as interpreted R code: at $N = 1000$ it takes 519 ms, 55 times as long as the tree.  Its [DP recurrence](https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R) also works in linear space without rescaling, so at $N = 2000$ ($n = 800$) the table overflows and it returns NaN.  (Our DP avoids this by dividing each step by $1 + \w_i r$, which keeps every entry of its table a probability.)  The R package does not expose $\Z$.
+The R package also uses an $\mathcal{O}(Nn)$ DP, but it runs as interpreted R code: at $N = 1000$ it takes 519 ms, 55 times as long as the tree.  Its [DP recurrence](https://github.com/cran/sampling/blob/master/R/UPMEqfromw.R) also works in linear space without rescaling, so at $N = 2000$ ($n = 800$) the table overflows and it returns NaN.  (Our DP rescales by the contour radius, which keeps every entry of its table a probability; see [Appendix A](#appendix-a).)  The R package does not expose $\Z$.
 
 ### Drawing Samples
 
@@ -2674,110 +2686,64 @@ The R package also uses an $\mathcal{O}(Nn)$ DP, but it runs as interpreted R co
 <div class="timing-xlabel">$N$, with $n = 0.4N$</div>
 </div>
 
-Both samplers first build a data structure, which costs about one forward pass: the tree reuses its product tree, and the DP fills its $(N+1) \times (n+1)$ table.  The plot shows the cost of each sample after that.  With $n = 0.4N$, the DP's sampler is faster: its $\mathcal{O}(N)$ scan beats the tree's $\mathcal{O}(n \log N)$ walk when $n$ is a constant fraction of $N$ (at $N = 20{,}000$, 14 ms versus 102 ms per sample).  The tree's sampler wins when the sample is a small fraction of the population: in the grid below, it is faster whenever $n$ is at most about 2% of $N$, for example 0.25 ms versus 12 ms at $N = 20{,}000$ and $n = 5$.  R's sampler is also an $\mathcal{O}(N)$ scan, 1.3 to 2.7 times slower than ours.
+Both samplers first build a data structure, which costs about one forward pass: the tree reuses its product tree, and the DP fills its $(N+1) \times (n+1)$ table.  The plot shows the cost of each sample after that.  With $n = 0.4N$, the DP's sampler is faster: its $\mathcal{O}(N)$ scan beats the tree's $\mathcal{O}(n \log N)$ walk when $n$ is a constant fraction of $N$ (at $N = 20{,}000$, 14 ms versus 102 ms per sample).  The tree's sampler wins when the sample is a small fraction of the population: in the grid of [Appendix B](#appendix-b), it is faster whenever $n$ is at most about 2% of $N$, for example 0.25 ms versus 12 ms at $N = 20{,}000$ and $n = 5$.  R's sampler is also an $\mathcal{O}(N)$ scan, 1.3 to 2.7 times slower than ours.
 
-### Scaling in $N$ and $n$
+**In short.**  For $\Z$ and $\bpip$, the product tree is faster than the DP once $N$ reaches a few hundred, and its lead grows with $N$.  For sampling, the DP's scan is faster unless the sample is a small fraction of the population.  [Appendix B](#appendix-b) varies $N$ and $n$ separately and checks the measured growth rates against the complexity bounds.
 
-The 3D plots below vary $N$ from 100 to 20,000 and $n$ from 5 to $N/2$.  Drag to rotate, scroll to zoom, and hover for values.  For $\Z$ and $\bpip$, the DP is faster at every $n$ when $N \le 200$, and the tree is faster at every $n$ when $N \ge 1000$.  The crossover depends on $N$ more than on $n$ because of constant factors: the DP pays a few microseconds of NumPy overhead per item, and the tree pays about 2 ms per call.  For sampling, the crossover is the one described above.
+## Summary
 
-<div class="widget timing-card">
-<div class="timing-legend"><span style="color:#c0504d">&#9632;</span> product tree &nbsp;&nbsp; <span style="color:#5b9bd5">&#9632;</span> DP</div>
-<div class="timing-3d-title"><b>Computing $\Z$</b></div>
-<div id="timing-3d-Z" class="timing-3d" data-timing-plot="Z_grid"></div>
-<div class="timing-3d-title"><b>Computing $\bpip$</b></div>
-<div id="timing-3d-pi" class="timing-3d" data-timing-plot="pi_grid"></div>
-<div class="timing-3d-title"><b>Drawing One Sample</b> (after setup)</div>
-<div id="timing-3d-sample" class="timing-3d" data-timing-plot="sample_grid"></div>
-</div>
+**The takeaway.** A single data structure—the polynomial product tree—unifies normalizing constant computation, marginal inference, sampling, and parameter fitting for the conditional Poisson distribution.  Each capability is a mechanical program transformation of the previous one:
 
-To check the claimed complexities, the table below fits the log-log slope of time against $N$ (at fixed $n$) and against $n$ (at fixed $N$), each over the four largest sizes, and compares it with the slope of the complexity bound over the same points.  It is computed from [timing.json](../figures/timing.json) by the script that draws the plots.<a href="bench/plot_timing.py#slopes" title="slopes, loglog_slope" class="verified" target="_blank">✓</a>  Cells where the two differ by more than 0.2 are flagged in red.
+| | What | How | Cost |
+|---|---|---|---|
+| $\Z$ | normalizing constant | forward pass (polynomial multiply) | $\mathcal{O}(N \log^2 n)$ |
+| $\bpip$ | inclusion probabilities | backward pass (reverse-mode AD) | $\mathcal{O}(N \log^2 n)$ |
+| $S$ | exact samples | top-down quota splitting (Vandermonde) | $\mathcal{O}(n \log N)$ per sample |
+| $\btheta^*$ | fitted parameters | L-BFGS (gradient only) | $\mathcal{O}(N \log^2 n)$ per iteration |
 
-<div id="timing-slopes">
-<table>
-<tr><th>operation</th><th>method</th><th>bound</th><th>slope in $N$ at $n = 1000$<br>measured / bound</th><th>slope in $n$ at $N = 20{,}000$<br>measured / bound</th></tr>
-<tr><td>$\Z$</td><td style="color:#c0504d">product tree</td><td>$\mathcal{O}(N \log^2 n)$</td><td data-slope="Z tree N 1000"></td><td data-slope="Z tree n 20000"></td></tr>
-<tr><td>$\Z$</td><td style="color:#5b9bd5">DP</td><td>$\mathcal{O}(Nn)$</td><td data-slope="Z dp N 1000"></td><td data-slope="Z dp n 20000"></td></tr>
-<tr><td>$\bpip$</td><td style="color:#c0504d">product tree</td><td>$\mathcal{O}(N \log^2 n)$</td><td data-slope="pi tree N 1000"></td><td data-slope="pi tree n 20000"></td></tr>
-<tr><td>$\bpip$</td><td style="color:#5b9bd5">DP</td><td>$\mathcal{O}(Nn)$</td><td data-slope="pi dp N 1000"></td><td data-slope="pi dp n 20000"></td></tr>
-<tr><td>one sample</td><td style="color:#c0504d">product tree</td><td>$\mathcal{O}(n \log N)$</td><td data-slope="sample tree N 1000"></td><td data-slope="sample tree n 20000"></td></tr>
-<tr><td>one sample</td><td style="color:#5b9bd5">DP</td><td>$\mathcal{O}(N)$</td><td data-slope="sample dp N 1000"></td><td data-slope="sample dp n 20000"></td></tr>
-</table>
-</div>
+There are no problem-specific derivations here—each row follows from a general theorem in automatic differentiation or computer algebra.
 
-In this run the flags have three causes, none of which contradicts the bounds.  First, the tree's fixed cost of about 2 ms per call is still a sizable part of its time at $N = 2000$, which flattens its slope in $N$.  Second, each step of the DP is a few NumPy calls on vectors of length $n$, and until $n$ reaches the thousands, their fixed overhead outweighs the $n$ multiply-adds, so the DP's time grows more slowly than $n$.  Third, the tree's sampler visits about $n \log_2(N/n) + 2n$ nodes, which is $\mathcal{O}(n \log N)$ but has different local slopes than $n \log N$.  Away from these effects, the measurements follow the bounds: the tree's time grows like $\log^2 n$ in $n$, and the DP's grows linearly in $N$.
+**Acknowledgment.** This post was written with extensive help from [Claude Code](https://claude.ai/claude-code)—especially the interactive widgets, which would not have been possible without it.
 
-The tree's accuracy depends on the contour scaling described in the next section.  With it, the tree matches the DP at every size timed here, and it matches exact rational arithmetic for weights spanning $e^{\pm 300}$.<a href="tests/test_all_implementations.py#test_extreme_weights_exact" title="TestStability.test_extreme_weights_exact" class="verified" target="_blank">✓</a>
+Found an error or have a suggestion? Please [open an issue](https://github.com/timvieira/conditional-poisson-sampling/issues) on GitHub.
 
-<style>
-.timing-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin: 16px 0; }
-.timing-line { height: 380px; }
-@media (max-width: 500px) { .timing-line { height: 460px; } }
-.timing-xlabel { text-align: center; padding-left: 64px; font-size: 0.9em; }
-.timing-3d { height: 400px; }
-.timing-3d-title { margin-top: 12px; text-align: center; }
-.timing-legend { text-align: center; }
-#timing-slopes { overflow-x: auto; }
-#timing-slopes table { border-collapse: collapse; margin: 0 auto; font-size: 0.9em; }
-#timing-slopes th, #timing-slopes td { padding: 3px 10px; border-bottom: 1px solid #ddd; text-align: center; }
-#timing-slopes td[data-slope] { white-space: nowrap; }
-#timing-slopes td.flag { color: #c0504d; font-weight: bold; }
-</style>
-<script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
-<script src="../figures/timing_plots.js"></script>
-<script>
-// Draw the timing figures that bench/plot_timing.py builds from timing.json.
-(function() {
-  var T = window.TIMING_PLOTS;
-  document.querySelectorAll('[data-timing-plot]').forEach(function(el) {
-    var fig = T.figures[el.getAttribute('data-timing-plot')];
-    var layout = fig.layout, phone = el.clientWidth < 500;
-    if (layout.scene && phone) {               // pull the 3D camera back
-      var eye = layout.scene.camera.eye;
-      layout.scene.camera.eye = {x: 1.6 * eye.x, y: 1.6 * eye.y, z: 1.6 * eye.z};
-    }
-    if (!layout.scene && phone) layout.dragmode = false;   // let touch scroll the page
-    // The line plots hide the toolbar, which would cover their legends;
-    // drag zooms and double-click resets without it.
-    Plotly.newPlot(el, fig.data, layout, {responsive: true, displaylogo: false,
-                                          displayModeBar: layout.scene ? 'hover' : false});
-  });
-  // The slope table is static HTML, so MathJax typesets it with the rest of
-  // the page; only its numbers are filled in here.
-  document.querySelectorAll('#timing-slopes td[data-slope]').forEach(function(td) {
-    var cell = T.slopes[td.getAttribute('data-slope')];
-    td.textContent = cell ? cell.text : '\u2014';
-    if (cell && cell.flag) td.className = 'flag';
-  });
-})();
-</script>
+<a id="appendix-a"></a>
 
-## PyTorch Implementation with Contour Scaling
+## Appendix A: Numerical Stability
 
-Can we use PyTorch's autograd to compute the gradient (inclusion probabilities) automatically, given only the forward pass?
+Floating-point numbers carry about 16 significant digits and range from about $10^{-308}$ to $10^{308}$.  Both algorithms compute coefficients of $\prod_{i=1}^{N}(1 + \w_i \z)$, which can fall outside that range and whose sizes can differ by hundreds of orders of magnitude.  This appendix shows how one rescaling, by the contour radius, keeps both algorithms accurate.
 
-Yes—and it's both simpler and faster than a hand-coded downward pass.  The key insight is that **computing $\bpip$ is just backpropagation** applied to the upward pass.  The [Baur-Strassen theorem](https://timvieira.github.io/blog/evaluating-fx-is-as-fast-as-fx/) guarantees that the gradient costs at most a small constant factor more than the forward pass ([Baur & Strassen, 1983](https://doi.org/10.1016/0304-3975(83)90110-X) prove $3\times$ for nonscalar operations on polynomials; [Griewank & Walther, 2008](https://doi.org/10.1137/1.9780898717761) give $5\times$ for general reverse-mode AD).  [Griewank & Walther (2008)](https://doi.org/10.1137/1.9780898717761) show that the numerical stability of the derivatives is inherited from the forward pass—so if we make the forward pass stable, everything else follows.
-
-The computation is just the product tree: build $\prod_{i=1}^{N} (1 + \w_i \z)$ bottom-up using polynomial multiplication, then extract $\llbracket \cdot \rrbracket(\z^n)$ and take the log.  In PyTorch, we batch all multiplications at each tree level into a single operation—$\mathcal{O}(\log N)$ torch calls instead of $\mathcal{O}(N)$.
-
-### The FFT Precision Problem and Weight Rescaling
-
-Using FFT for the polynomial multiplications gives $\mathcal{O}(N \log^2 n)$ complexity (with truncation to degree $n$).  But naively, FFT introduces rounding errors $\approx \varepsilon \cdot \max_k|c_k|$ per coefficient, where $c_k$ denotes the $k$<sup>th</sup> coefficient of the product polynomial $\prod_{i=1}^{N}(1 + \w_i \z) = \sum_{k=0}^{N} c_k \z^k$.  The largest coefficient (near degree $N/2$) can be $\approx 10^{300}$ times larger than $c_n$, the coefficient we need—so FFT noise drowns the signal.
+### Rescaling by the Contour Radius
 
 **The key identity.**  For any $r > 0$:<a href="tests/test_identities.py#test_contour_scaling" title="test_contour_scaling" class="verified" target="_blank">✓</a>
 
 $$\Zw{\bw}{n} = r^{-n} \cdot \llbracket \textstyle\prod_{i=1}^{N}(1 + \w_i r\, \z) \rrbracket(\z^n)$$
 
-This is immediate: each $\z^n$ term in the product picks up a factor of $r$ per item, giving $r^n \cdot \Zw{\bw}{n}$.  The identity says we can rescale all weights by any $r > 0$ and recover the same answer.  In exact arithmetic, $r$ doesn't matter.  In floating-point, it matters enormously: different values of $r$ shift which coefficient is largest, changing the dynamic range and thus the FFT rounding error relative to $c_n$.
+This is immediate: each $\z^n$ term in the product picks up a factor of $r$ per item, giving $r^n \cdot \Zw{\bw}{n}$.  In exact arithmetic, $r$ doesn't matter.  In floating point, it matters enormously, because it changes which coefficient is the largest.
 
-**Choosing $r$.**  The FFT error in $c_n$ is $\mathcal{O}(\varepsilon \cdot \max_k |c_k|)$, so the relative error is $\max_k |c_k| / |c_n|$ times machine epsilon.  If $c_n$ is the largest coefficient, the relative error is just $\mathcal{O}(\varepsilon)$.  After rescaling by $r$, the $k$<sup>th</sup> coefficient becomes $c_k(r) = \Zw{\bw}{k} \cdot r^k$.  We want $r$ such that $c_n(r) \approx \max_k c_k(r)$.
+**The coefficients are probabilities.**  Let $K$ be the number of heads when each coin $i$ comes up heads, independently, with probability $p_i(r) = \w_i r / (1 + \w_i r)$.  Since $(1 + \w_i r \z)/(1 + \w_i r) = (1 - p_i(r)) + p_i(r)\, \z$ is the generating function of coin $i$,
 
-This is where the [Poisson approximation](#The-Poisson-Approximation) reappears.  Define $p_i \defeq \w_i r/(1 + \w_i r)$—the same Poisson inclusion probabilities from earlier.  Then $c_k(r) = \Pr[K = k] \cdot \prod_{i=1}^{N}(1+\w_i r)$ where $K \defeq \sum_{i=1}^{N} \text{Bernoulli}(p_i)$ and $\prod_{i=1}^{N}(1+\w_i r)$ is independent of $k$.  So $\arg\max_k c_k(r) = \text{mode}(K)$.  For a sum of independent Bernoullis, $|\text{mode}(K) - \mathbb{E}[K]| \le 1$ ([Darroch, 1964](https://doi.org/10.1214/aoms/1177703287)).  Setting $\mathbb{E}[K] = n$ places the mode at degree $n \pm 1$, which means the optimal contour radius is exactly the tilting parameter from the Poisson approximation:<a href="tests/test_identities.py#test_contour_r_solves_expected_size" title="test_contour_r_solves_expected_size" class="verified" target="_blank">✓</a>
+$$\llbracket \textstyle\prod_{i=1}^{N}(1 + \w_i r\, \z) \rrbracket(\z^k) = \Pr[K = k] \cdot \prod_{i=1}^{N}(1 + \w_i r)$$
 
-$$\sum_{i=1}^{N} \frac{\w_i \cdot r}{1 + \w_i \cdot r} = \sum_{i=1}^{N} p_i = n$$
+for every $k$.<a href="tests/test_identities.py#test_scaled_coefficients_are_poisson_binomial" title="test_scaled_coefficients_are_poisson_binomial" class="verified" target="_blank">✓</a>  So, up to a factor that does not depend on $k$, the rescaled coefficients are the distribution of $K$.
 
-In other words, the $r$ that makes the Poisson approximation $\pip_i \approx p_i$ satisfy $\sum_{i=1}^{N} p_i = n$ is the same $r$ that minimizes FFT rounding error.  This is not a coincidence: both are asking for the rescaling that centers the Poisson Binomial distribution at degree $n$.
+**Choosing $r$.**  The contour radius sets the mean of $K$ to $n$:
 
-This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's method converges in a few iterations.  A simpler heuristic, $r = n / \W$ (where $\W \defeq \sum_{i=1}^{N} \w_i$), linearizes $\w_i r / (1 + \w_i r) \approx \w_i r$ and works for mild weights but breaks down with heavy tails.
+$$\mathbb{E}[K] = \sum_{i=1}^{N} \frac{\w_i r}{1 + \w_i r} = \sum_{i=1}^{N} p_i(r) = n$$
+
+For a sum of independent Bernoullis, the mode is within 1 of the mean, and when the mean is an integer, the mode equals it ([Darroch, 1964](https://doi.org/10.1214/aoms/1177703287), Theorem 4).  So $\Pr[K = n]$ is the largest of the $N + 1$ probabilities $\Pr[K = 0], \ldots, \Pr[K = N]$, and in particular $\Pr[K = n] \ge 1/(N+1)$.<a href="tests/test_identities.py#test_contour_radius_puts_mode_at_n" title="test_contour_radius_puts_mode_at_n, test_contour_r_solves_expected_size" class="verified" target="_blank">✓</a>  The coefficient we need is never small next to the others, and both algorithms below rely on this.  It is also why the contour radius is the $r$ of the [Poisson approximation](#the-poisson-approximation): both ask for the rescaling that centers the distribution of $K$ at $n$.
+
+The left side increases with $r$, from 0 to $N$, so Newton's method in $\log r$, safeguarded by bisection, finds the root in a few iterations.  A simpler heuristic, $r = n / \W$ (where $\W \defeq \sum_{i=1}^{N} \w_i$), linearizes $\w_i r / (1 + \w_i r) \approx \w_i r$; it works for mild weights but loses accuracy with heavy tails.
+
+### The Product Tree
+
+An FFT rounds every coefficient of a product to within about $\varepsilon \cdot \max_k|c_k|$, where $c_k$ denotes the $k$<sup>th</sup> coefficient of the product and $\varepsilon \approx 10^{-16}$ is machine epsilon.  For $\prod_{i=1}^{N}(1 + \w_i \z) = \sum_{k=0}^{N} c_k \z^k$ without rescaling, the largest coefficient can be $\approx 10^{300}$ times larger than $c_n$, the coefficient we need—so FFT noise drowns the signal.
+
+After rescaling by $r$, the $k$<sup>th</sup> coefficient becomes $c_k(r) = \Zw{\bw}{k} \cdot r^k$, which is proportional to $\Pr[K = k]$.  With the contour radius, the mode of $K$ is $n$, so among the coefficients the tree keeps (degrees up to $n$), $c_n(r)$ is the largest: the dynamic range $\max_{k \le n} c_k(r) / c_n(r)$ is exactly 1,<a href="tests/test_identities.py#test_rescaling_dynamic_range" title="test_rescaling_dynamic_range" class="verified" target="_blank">✓</a> and the rounding error of the FFT at the root is relative to $c_n(r)$ itself.
+
+Rescaling does not prevent overflow: $\prod_{i=1}^{N}(1 + \w_i r)$ can still exceed $10^{308}$.  So the tree also divides each node's polynomial by its largest coefficient and adds up the logs of the divisors.<a href="conditional_poisson/tree_torch.py#_circuit" title="ConditionalPoissonTorch._circuit" class="verified" target="_blank">✓</a>
+
+**Why the name.**  An FFT of the rescaled coefficients evaluates $f(\z) = \prod_{i=1}^{N}(1 + \w_i \z)$ at equally spaced points on the circle $|\z| = r$, so $r$ is the radius of the circle—the contour—on which the tree's multiplications happen.
 
 <div class="widget" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
@@ -3012,15 +2978,11 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
 
 </div>
 
-**Guarantee.** With this choice of $r$, the coefficients $c_k(r)$ are proportional to the probability mass function (PMF) of $K$, whose mode is at $n \pm 1$.  The PMF of a sum of Bernoullis is log-concave, so it decays exponentially away from the mode.  In practice, this makes the dynamic range $\max_k c_k / c_n$ a modest constant (typically $\approx 1$), ensuring the relative FFT error in $c_n$ is $\mathcal{O}(\varepsilon)$.
-
-
-**Autograd compatibility.** The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).
-
+**Autograd compatibility.** The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).  The per-node divisors are treated the same way.  [Griewank & Walther (2008)](https://doi.org/10.1137/1.9780898717761) show that the numerical stability of the derivatives is inherited from the forward pass—so if we make the forward pass stable, everything else follows.
 
 <div class="widget" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
 
-**Numerical validation.** The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$).  With $r=1$ the dynamic range is $\approx 10^{16}$, destroying all precision.  The optimal $r^*$ brings it to $\approx 1$.<a href="tests/test_identities.py#test_rescaling_dynamic_range" title="test_rescaling_dynamic_range" class="verified" target="_blank">✓</a>
+**Numerical validation.** The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$), writing $r^\star$ for the contour radius.  With $r=1$ the dynamic range is $\approx 10^{16}$, destroying all precision.  The contour radius brings it to 1.<a href="tests/test_identities.py#test_rescaling_dynamic_range" title="test_rescaling_dynamic_range" class="verified" target="_blank">✓</a>
 
 <div id="r-comparison"></div>
 <script>
@@ -3116,9 +3078,112 @@ This is monotone in $\log r$ (the LHS increases from 0 to $N$), so Newton's meth
 
 </div>
 
-Code: [`conditional_poisson/tree_torch.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson/tree_torch.py)
+With the contour radius, the tree matches exact rational arithmetic for weights spanning $e^{\pm 300}$.<a href="tests/test_all_implementations.py#test_extreme_weights_exact" title="TestStability.test_extreme_weights_exact" class="verified" target="_blank">✓</a>  Code: [`conditional_poisson/tree_torch.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson/tree_torch.py)
 
-## Identities for $\Z$ and Its Relatives
+### The Dynamic Program
+
+The DP needs no FFT, but its table holds $\Zw{\w_1, \ldots, \w_m}{k}$, which can be too large or too small for floating-point numbers: R's sampling package runs an unscaled $\mathcal{O}(Nn)$ recurrence and returns NaN at $N = 2000$, $n = 800$ in the [Timing](#timing) section.  Our DP rescales the weights by the contour radius and divides row $m$ by $\prod_{i=1}^{m}(1 + \w_i r)$.  Row $m$ then holds the distribution of $K_m$, the number of heads among the first $m$ coins, for $k \le n$:
+
+$$\Pr[K_m = k] = \frac{\Zw{\w_1 r, \ldots, \w_m r}{k}}{\prod_{i=1}^{m}(1 + \w_i r)}$$
+
+and the [weighted Pascal recurrence](#pascal-dp) becomes
+
+$$\Pr[K_m = k] = \big(1 - p_m(r)\big) \Pr[K_{m-1} = k] + p_m(r) \Pr[K_{m-1} = k-1]$$
+
+with base cases $\Pr[K_0 = 0] = 1$, $\Pr[K_0 = k] = 0$ for $k > 0$, and $\Pr[K_{m-1} = -1] = 0$: coin $m$ comes up tails (first term) or heads (second term).<a href="tests/test_identities.py#test_scaled_pascal_recurrence" title="test_scaled_pascal_recurrence" class="verified" target="_blank">✓</a>  At the end,
+
+$$\log \Zw{\bw}{n} = \log \Pr[K_N = n] + \sum_{i=1}^{N} \log(1 + \w_i r) - n \log r.$$
+
+This form of the recurrence is safe in three ways:<a href="conditional_poisson/sequential_numpy.py#_recurrence" title="ConditionalPoissonSequentialNumPy._recurrence" class="verified" target="_blank">✓</a>
+
+- **No overflow.**  Each entry is a weighted average of two entries of the previous row, so every entry is a probability, between 0 and 1.
+- **No harmful underflow.**  The answer, $\Pr[K_N = n]$, is the mode of $K_N$, so it is at least $1/(N+1)$.  Entries far from the mean can underflow, but each one loses less than $10^{-307}$, and it reaches the answer only through multiplications by probabilities, so it changes the answer by less than that.
+- **No cancellation.**  The recurrence only adds nonnegative numbers, and $1 - p_m(r)$ is computed as $1/(1 + \w_m r)$ rather than by subtraction, so rounding errors stay small relative to each entry.
+
+The sampler and the reverse pass that computes $\bpip$ read the same table.  Both use only ratios of entries, in which the rescaling cancels.  For example, the sampler includes item $m$ with probability $p_m(r) \Pr[K_{m-1} = k-1] / \Pr[K_m = k]$, which equals the probability in [the DP's sampler](#drawing-samples).  The reverse pass also carries a second vector, the distribution of the number of heads among the remaining coins, which stays between 0 and 1 for the same reason.<a href="conditional_poisson/sequential_numpy.py#incl_prob" title="ConditionalPoissonSequentialNumPy.incl_prob, ConditionalPoissonSequentialNumPy.sample" class="verified" target="_blank">✓</a>
+
+With weights spanning $e^{\pm 300}$, the unscaled recurrence overflows, while the scaled DP agrees with 50-digit arithmetic on $\log \Z$ and $\bpip$ to within $10^{-13}$, even though more than a quarter of its table underflows to zero.<a href="tests/test_identities.py#test_scaled_dp_extreme_weights" title="test_scaled_dp_extreme_weights" class="verified" target="_blank">✓</a>
+
+The same trick—dividing each step of a recurrence by a scale factor and adding up the logs—keeps the forward algorithm for hidden Markov models from underflowing ([Rabiner, 1989](https://doi.org/10.1109/5.18626), Section V.A).  There, each row is divided by its sum, which must be computed along the way; here, the divisors $1 + \w_m r$ are known in advance, and the contour radius guarantees that the entry we need is the largest in the last row.
+
+<a id="appendix-b"></a>
+
+## Appendix B: Timing in $N$ and $n$
+
+The [Timing](#timing) section fixes $n = 0.4N$.  The 3D plots below vary $N$ from 100 to 20,000 and $n$ from 5 to $N/2$, with the same setup.  Drag to rotate, scroll to zoom, and hover for values.  For $\Z$ and $\bpip$, the DP is faster at every $n$ when $N \le 200$, and the tree is faster at every $n$ when $N \ge 1000$.  The crossover depends on $N$ more than on $n$ because of constant factors: the DP pays a few microseconds of NumPy overhead per item, and the tree pays about 2 ms per call.  For sampling, the tree's sampler is faster only when $n$ is at most about 2% of $N$.
+
+<div class="widget timing-card">
+<div class="timing-legend"><span style="color:#c0504d">&#9632;</span> product tree &nbsp;&nbsp; <span style="color:#5b9bd5">&#9632;</span> DP</div>
+<div class="timing-3d-title"><b>Computing $\Z$</b></div>
+<div id="timing-3d-Z" class="timing-3d" data-timing-plot="Z_grid"></div>
+<div class="timing-3d-title"><b>Computing $\bpip$</b></div>
+<div id="timing-3d-pi" class="timing-3d" data-timing-plot="pi_grid"></div>
+<div class="timing-3d-title"><b>Drawing One Sample</b> (after setup)</div>
+<div id="timing-3d-sample" class="timing-3d" data-timing-plot="sample_grid"></div>
+</div>
+
+To check the claimed complexities, the table below fits the log-log slope of time against $N$ (at fixed $n$) and against $n$ (at fixed $N$), each over the four largest sizes, and compares it with the slope of the complexity bound over the same points.  It is computed from [timing.json](../figures/timing.json) by the script that draws the plots.<a href="bench/plot_timing.py#slopes" title="slopes, loglog_slope" class="verified" target="_blank">✓</a>  Cells where the two differ by more than 0.2 are flagged in red.
+
+<div id="timing-slopes">
+<table>
+<tr><th>operation</th><th>method</th><th>bound</th><th>slope in $N$ at $n = 1000$<br>measured / bound</th><th>slope in $n$ at $N = 20{,}000$<br>measured / bound</th></tr>
+<tr><td>$\Z$</td><td style="color:#c0504d">product tree</td><td>$\mathcal{O}(N \log^2 n)$</td><td data-slope="Z tree N 1000"></td><td data-slope="Z tree n 20000"></td></tr>
+<tr><td>$\Z$</td><td style="color:#5b9bd5">DP</td><td>$\mathcal{O}(Nn)$</td><td data-slope="Z dp N 1000"></td><td data-slope="Z dp n 20000"></td></tr>
+<tr><td>$\bpip$</td><td style="color:#c0504d">product tree</td><td>$\mathcal{O}(N \log^2 n)$</td><td data-slope="pi tree N 1000"></td><td data-slope="pi tree n 20000"></td></tr>
+<tr><td>$\bpip$</td><td style="color:#5b9bd5">DP</td><td>$\mathcal{O}(Nn)$</td><td data-slope="pi dp N 1000"></td><td data-slope="pi dp n 20000"></td></tr>
+<tr><td>one sample</td><td style="color:#c0504d">product tree</td><td>$\mathcal{O}(n \log N)$</td><td data-slope="sample tree N 1000"></td><td data-slope="sample tree n 20000"></td></tr>
+<tr><td>one sample</td><td style="color:#5b9bd5">DP</td><td>$\mathcal{O}(N)$</td><td data-slope="sample dp N 1000"></td><td data-slope="sample dp n 20000"></td></tr>
+</table>
+</div>
+
+In this run the flags have three causes, none of which contradicts the bounds.  First, the tree's fixed cost of about 2 ms per call is still a sizable part of its time at $N = 2000$, which flattens its slope in $N$.  Second, each step of the DP is a few NumPy calls on vectors of length $n$, and until $n$ reaches the thousands, their fixed overhead outweighs the $n$ multiply-adds, so the DP's time grows more slowly than $n$.  Third, the tree's sampler visits about $n \log_2(N/n) + 2n$ nodes, which is $\mathcal{O}(n \log N)$ but has different local slopes than $n \log N$.  Away from these effects, the measurements follow the bounds: the tree's time grows like $\log^2 n$ in $n$, and the DP's grows linearly in $N$.
+
+<style>
+.timing-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin: 16px 0; }
+.timing-line { height: 380px; }
+@media (max-width: 500px) { .timing-line { height: 460px; } }
+.timing-xlabel { text-align: center; padding-left: 64px; font-size: 0.9em; }
+.timing-3d { height: 400px; }
+.timing-3d-title { margin-top: 12px; text-align: center; }
+.timing-legend { text-align: center; }
+#timing-slopes { overflow-x: auto; }
+#timing-slopes table { border-collapse: collapse; margin: 0 auto; font-size: 0.9em; }
+#timing-slopes th, #timing-slopes td { padding: 3px 10px; border-bottom: 1px solid #ddd; text-align: center; }
+#timing-slopes td[data-slope] { white-space: nowrap; }
+#timing-slopes td.flag { color: #c0504d; font-weight: bold; }
+</style>
+<script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<script src="../figures/timing_plots.js"></script>
+<script>
+// Draw the timing figures that bench/plot_timing.py builds from timing.json.
+(function() {
+  var T = window.TIMING_PLOTS;
+  document.querySelectorAll('[data-timing-plot]').forEach(function(el) {
+    var fig = T.figures[el.getAttribute('data-timing-plot')];
+    var layout = fig.layout, phone = el.clientWidth < 500;
+    if (layout.scene && phone) {               // pull the 3D camera back
+      var eye = layout.scene.camera.eye;
+      layout.scene.camera.eye = {x: 1.6 * eye.x, y: 1.6 * eye.y, z: 1.6 * eye.z};
+    }
+    if (!layout.scene && phone) layout.dragmode = false;   // let touch scroll the page
+    // The line plots hide the toolbar, which would cover their legends;
+    // drag zooms and double-click resets without it.
+    Plotly.newPlot(el, fig.data, layout, {responsive: true, displaylogo: false,
+                                          displayModeBar: layout.scene ? 'hover' : false});
+  });
+  // The slope table is static HTML, so MathJax typesets it with the rest of
+  // the page; only its numbers are filled in here.
+  document.querySelectorAll('#timing-slopes td[data-slope]').forEach(function(td) {
+    var cell = T.slopes[td.getAttribute('data-slope')];
+    td.textContent = cell ? cell.text : '\u2014';
+    if (cell && cell.flag) td.className = 'flag';
+  });
+})();
+</script>
+
+<a id="appendix-c"></a>
+
+## Appendix C: Identities for $\Z$ and Its Relatives
 
 The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> [elementary symmetric polynomial](https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial) $e_n(\bw)$.  Here are some useful identities.
 
@@ -3133,15 +3198,6 @@ $$\pip_i = \frac{\partial \log \Z}{\partial \theta_i} = \frac{\w_i \cdot \Zw{\bw
 The leave-one-out formula generalizes to **higher-order inclusion probabilities**: $\pip(X) = P(X \subseteq S) = \prod_{i \in X} \w_i \cdot \Zw{\bw^{(-X)}}{n-|X|} / \Zw{\bw}{n}$.<a href="tests/test_identities.py#test_higher_order_inclusion" title="test_higher_order_inclusion" class="verified" target="_blank">✓</a>
 
 ### Recurrences and Algorithms
-
-**Weighted Pascal recurrence.** The $\mathcal{O}(Nn)$ dynamic programming algorithm for $\Z$:
-
-$$\Zw{\w_1, \ldots, \w_m}{k} = \Zw{\w_1, \ldots, \w_{m-1}}{k} + \w_m \cdot \Zw{\w_1, \ldots, \w_{m-1}}{k-1}$$
-
-with base cases $\Zw{\cdot}{0} = 1$ and $\Zw{\cdot}{k} = 0$ for $k < 0$ or $k > m$.  This is a weighted generalization of Pascal's identity $\binom{m}{k} = \binom{m-1}{k} + \binom{m-1}{k-1}$.  Include item $m$ (second term) or exclude it (first term).<a href="tests/test_identities.py#test_weighted_pascal_recurrence" title="test_weighted_pascal_recurrence" class="verified" target="_blank">✓</a>
-
-
-Running this DP forward gives $\Z$; running backpropagation on it gives $\bpip$—all in $\mathcal{O}(Nn)$.  This is simpler than the product tree for moderate $N$, and illustrates the same principle: the gradient comes for free via automatic differentiation.
 
 **Proposition (Weighted Vandermonde identity).** For disjoint groups $A, B$ with weight vectors $\ba$ and $\bb$:
 
@@ -3160,7 +3216,7 @@ The left side is $\sum_k \Zw{(\ba;\,\bb)}{k}\, \z^k$.  The right side is a produ
 
 </details>
 
-This is why polynomial multiplication computes $\Z$: the product tree exploits this identity at every node.  It is also what makes the sampling algorithm correct—splitting a quota of $k$ items between two subtrees according to $\Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$ produces the exact conditional distribution.
+With $B$ a single item, the sum has only two nonzero terms, and the identity reduces to the [weighted Pascal recurrence](#pascal-dp).<a href="tests/test_identities.py#test_pascal_is_vandermonde_with_one_leaf" title="test_pascal_is_vandermonde_with_one_leaf" class="verified" target="_blank">✓</a>  This is why polynomial multiplication computes $\Z$: the product tree exploits this identity at every node.  It is also what makes the sampling algorithm correct—splitting a quota of $k$ items between two subtrees according to $\Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$ produces the exact conditional distribution.
 
 
 **Newton's identities.** The elementary symmetric polynomials can be computed from **power sums** $g_k \defeq \sum_{i=1}^{N} \w_i^k$ (see [Stanley (1999)](https://doi.org/10.1017/CBO9780511609589), Chapter 7):
@@ -3169,41 +3225,22 @@ $$\Zw{\bw}{k} = \sum_{i=1}^{k} \frac{(-1)^{i-1}}{k}\, \Zw{\bw}{k-i} \cdot g_i$$
 
 <a href="tests/test_identities.py#test_newtons_identities" title="test_newtons_identities" class="verified" target="_blank">✓</a> This is an $\mathcal{O}(Nn)$ algorithm that only needs the power sums, not the individual weights—useful when the universe is implicitly defined (e.g., paths in a weighted finite-state automaton, where $g_k$ can be computed via matrix methods).
 
-### Connection to K-DPPs
+### Connection to $k$-DPPs
 
 <details class="derivation">
-<summary>A diagonal K-DPP is exactly a conditional Poisson distribution</summary>
+<summary>A diagonal $k$-DPP is exactly a conditional Poisson distribution</summary>
 
-A $K$-DPP (fixed-size determinantal point process) on $\{1, \ldots, N\}$ with a **diagonal** kernel matrix $L = \text{diag}(\w_1, \ldots, \w_N)$ is exactly the conditional Poisson distribution:
+A $k$-DPP (a determinantal point process restricted to subsets of size $k$; here $k = n$) on $\{1, \ldots, N\}$ with a **diagonal** kernel matrix $L = \text{diag}(\w_1, \ldots, \w_N)$ is exactly the conditional Poisson distribution:
 
-$$\mathcal{P}_L^K(S) = \frac{\det(L_S)}{\sum_{|S'|=K} \det(L_{S'})} = \frac{\prod_{i \in S} \w_i}{\Zw{\bw}{K}}$$
+$$\mathcal{P}_L^n(S) = \frac{\det(L_S)}{\sum_{|S'|=n} \det(L_{S'})} = \frac{\prod_{i \in S} \w_i}{\Zw{\bw}{n}}$$
 
-since the determinant of a diagonal submatrix is the product of its diagonal entries.<a href="tests/test_identities.py#test_kdpp_diagonal" title="test_kdpp_diagonal" class="verified" target="_blank">✓</a>  The normalizer $\sum_{|S|=K} \det(L_S) = e_K(\lambda_1, \ldots, \lambda_N)$ is an elementary symmetric polynomial of the eigenvalues—which for a diagonal matrix are just the weights.  Newton's identities connect the two: compute $e_K$ from the power sums $g_k = \text{tr}(L^k)$.
+since the determinant of a diagonal submatrix is the product of its diagonal entries.<a href="tests/test_identities.py#test_kdpp_diagonal" title="test_kdpp_diagonal" class="verified" target="_blank">✓</a>  The normalizer $\sum_{|S|=n} \det(L_S) = e_n(\lambda_1, \ldots, \lambda_N)$ is an elementary symmetric polynomial of the eigenvalues—which for a diagonal matrix are just the weights.  Newton's identities connect the two: compute $e_n$ from the power sums $g_k = \text{tr}(L^k)$.
 
-For non-diagonal $L$, the K-DPP introduces correlations between items (repulsion), while the conditional Poisson distribution has only the size constraint.  See [Kulesza & Taskar (2012)](https://arxiv.org/abs/1207.6083) for details.
+For non-diagonal $L$, the $k$-DPP introduces correlations between items (repulsion), while the conditional Poisson distribution has only the size constraint.  See [Kulesza & Taskar (2012)](https://arxiv.org/abs/1207.6083) for details.
 
 </details>
 
-## Summary
-
-**The takeaway.** A single data structure—the polynomial product tree—unifies normalizing constant computation, marginal inference, sampling, and parameter fitting for the conditional Poisson distribution.  Each capability is a mechanical program transformation of the previous one:
-
-| | What | How | Cost |
-|---|---|---|---|
-| $\Z$ | normalizing constant | forward pass (polynomial multiply) | $\mathcal{O}(N \log^2 n)$ |
-| $\bpip$ | inclusion probabilities | backward pass (reverse-mode AD) | $\mathcal{O}(N \log^2 n)$ |
-| $S$ | exact samples | top-down quota splitting (Vandermonde) | $\mathcal{O}(n \log N)$ per sample |
-| $\btheta^*$ | fitted parameters | L-BFGS (gradient only) | $\mathcal{O}(N \log^2 n)$ per iteration |
-
-There are no problem-specific derivations here—each row follows from a general theorem in automatic differentiation or computer algebra.
-
-The PyTorch implementation ([`conditional_poisson/tree_torch.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson/tree_torch.py)) uses FFT-based polynomial multiplication with **contour radius scaling**—rescaling weights to shift the product polynomial's peak to degree $n$, making FFT numerically stable—achieving $\mathcal{O}(N \log^2 n)$ with full autograd support.
-
-**Acknowledgment.** This post was written with extensive help from [Claude Code](https://claude.ai/claude-code)—especially the interactive widgets, which would not have been possible without it.
-
-Found an error or have a suggestion? Please [open an issue](https://github.com/timvieira/conditional-poisson-sampling/issues) on GitHub.
-
-**References:**
+## References
 
 - [Hájek (1964)](https://doi.org/10.1214/aoms/1177700375). "Asymptotic Theory of Rejective Sampling with Varying Probabilities from a Finite Population." *The Annals of Mathematical Statistics*, 35(4), 1491–1523.
 
@@ -3212,6 +3249,9 @@ Found an error or have a suggestion? Please [open an issue](https://github.com/t
 - [Chen, Dempster & Liu (1994)](https://academic.oup.com/biomet/article-abstract/81/3/457/256956). "Weighted Finite Population Sampling to Maximize Entropy." *Biometrika*, 81(3), 457–469.
 
 - [Darroch (1964)](https://doi.org/10.1214/aoms/1177703287). "On the Distribution of the Number of Successes in Independent Trials." *The Annals of Mathematical Statistics*, 35(3), 1317–1321.
+
+- [Rabiner (1989)](https://doi.org/10.1109/5.18626). "A Tutorial on Hidden Markov Models and Selected Applications in Speech Recognition." *Proceedings of the IEEE*, 77(2), 257–286.
+
 - [Baur & Strassen (1983)](https://doi.org/10.1016/0304-3975(83)90110-X). "The Complexity of Partial Derivatives." *Theoretical Computer Science*, 22(3), 317–330.
 
 
