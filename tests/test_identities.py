@@ -627,6 +627,21 @@ def test_fitting_recovers_target():
         f"max err = {np.max(np.abs(cp.incl_prob - pi_star))}"
 
 
+def test_fixed_point_keeps_contour_radius_one():
+    """R's update p~ <- p~ + pi* - pi keeps sum(p~) = n, so with weights
+    w_i = p~_i / (1 - p~_i) the contour radius stays 1 and p_i(r) = p~_i."""
+    from scipy.special import logit
+    from conditional_poisson._contour import log_contour_radius
+    w, n = W_SMALL, N_SMALL
+    pi_star = ConditionalPoissonNumPy.from_weights(n, w).incl_prob
+    pt = pi_star.copy()
+    for _ in range(3):
+        pi = ConditionalPoissonNumPy(n, logit(pt)).incl_prob
+        pt = pt + pi_star - pi
+        assert np.isclose(pt.sum(), n, rtol=1e-13)
+        assert abs(log_contour_radius(logit(pt), n)) < 1e-12
+
+
 def test_poisson_hessian_at_warm_start():
     """With independent inclusion, log of the normalizer prod(1 + w_i) has
     Hessian diag(pi* (1 - pi*)) at theta = logit(pi*)."""

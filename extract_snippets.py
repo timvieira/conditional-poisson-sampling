@@ -23,6 +23,7 @@ PYTHON_FILES = [
     "tests/test_identities.py",
     "tests/test_all_implementations.py",
     "bench/bench_timing.py",
+    "bench/bench_fit.py",
     "bench/plot_timing.py",
     "conditional_poisson/tree_torch.py",
     "conditional_poisson/_base_torch.py",

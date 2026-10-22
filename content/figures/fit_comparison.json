@@ -1,0 +1,156 @@
+{
+ "date": "2026-10-22",
+ "tol": 1e-10,
+ "max_evals": 2000,
+ "r_check": [
+  {
+   "label": "article example",
+   "N": 6,
+   "n": 3,
+   "r": 15,
+   "copy": 15
+  },
+  {
+   "label": "Exp(1), N=10",
+   "N": 10,
+   "n": 4,
+   "r": 12,
+   "copy": 12
+  },
+  {
+   "label": "lognormal sigma=2, N=50",
+   "N": 50,
+   "n": 20,
+   "r": 7,
+   "copy": 7
+  },
+  {
+   "label": "lognormal sigma=10, N=8",
+   "N": 8,
+   "n": 3,
+   "r": 56,
+   "copy": 56
+  }
+ ],
+ "typical": [
+  {
+   "label": "article example",
+   "N": 6,
+   "n": 3,
+   "lbfgs": 9,
+   "fixed_point": 15
+  },
+  {
+   "label": "Exp(1), N=10",
+   "N": 10,
+   "n": 4,
+   "lbfgs": 9,
+   "fixed_point": 12
+  },
+  {
+   "label": "Exp(1), N=50",
+   "N": 50,
+   "n": 20,
+   "lbfgs": 6,
+   "fixed_point": 6
+  },
+  {
+   "label": "Exp(1), N=200",
+   "N": 200,
+   "n": 80,
+   "lbfgs": 4,
+   "fixed_point": 5
+  },
+  {
+   "label": "Exp(1), N=1000",
+   "N": 1000,
+   "n": 400,
+   "lbfgs": 3,
+   "fixed_point": 4
+  }
+ ],
+ "uneven": {
+  "0.5": {
+   "targets": 100,
+   "skipped": 0,
+   "lbfgs": {
+    "median": 7.0,
+    "max": 10,
+    "not_converged": 0
+   },
+   "fixed_point": {
+    "median": 11.0,
+    "max": 67,
+    "not_converged": 0
+   },
+   "fixed_point_unfinished": []
+  },
+  "2": {
+   "targets": 100,
+   "skipped": 0,
+   "lbfgs": {
+    "median": 8.0,
+    "max": 13,
+    "not_converged": 0
+   },
+   "fixed_point": {
+    "median": 14.0,
+    "max": 606,
+    "not_converged": 0
+   },
+   "fixed_point_unfinished": []
+  },
+  "5": {
+   "targets": 100,
+   "skipped": 0,
+   "lbfgs": {
+    "median": 8.5,
+    "max": 19,
+    "not_converged": 0
+   },
+   "fixed_point": {
+    "median": 20.0,
+    "max": 369,
+    "not_converged": 2
+   },
+   "fixed_point_unfinished": [
+    {
+     "N": 3,
+     "n": 2
+    },
+    {
+     "N": 3,
+     "n": 1
+    }
+   ]
+  },
+  "10": {
+   "targets": 100,
+   "skipped": 11,
+   "lbfgs": {
+    "median": 9.0,
+    "max": 23,
+    "not_converged": 0
+   },
+   "fixed_point": {
+    "median": 32.5,
+    "max": 1570,
+    "not_converged": 3
+   },
+   "fixed_point_unfinished": [
+    {
+     "N": 3,
+     "n": 2
+    },
+    {
+     "N": 3,
+     "n": 1
+    },
+    {
+     "N": 3,
+     "n": 2
+    }
+   ]
+  }
+ }
+}

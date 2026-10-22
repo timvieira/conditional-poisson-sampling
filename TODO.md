@@ -23,13 +23,13 @@
 - [x] Add more baselines for computing $\pi$ — (1) backprop-on-DP at $O(Nn)$, (2) naive loop versions: $N \times O(Nn)$ DP and $N \times O(N \log^2 n)$ product tree. These show the value of backprop vs. leave-one-out recomputation.
 - [x] Add a programmatically generated empirical slope table. For each method, fit log-log slopes (time vs $N$ at fixed $n$, and time vs $n$ at fixed $N$) from the grid sweep data and display alongside theoretical complexity bounds. Auto-flag rows where empirical slope deviates significantly from prediction.
 - [x] Scrutinize timing experiments. R's `sampling` package functions (`UPMEqfromw`, `UPMEpikfromq`, `UPMEsfromq`, `UPMEpiktildefrompik`) are confirmed pure R (no compiled C). Subprocess overhead and measurement methodology still need investigation. Verify that all methods compute the same quantity.
-- [ ] Explore the fitting algorithm in the R `sampling` package. It may be faster simply because its fixed-point iteration has less overhead than L-BFGS (e.g., no secant equations). Compare the number of iterations required by the R fixed-point method vs. our L-BFGS solver.
+- [x] ~~Explore the fitting algorithm in the R `sampling` package. Compare the number of iterations required by the R fixed-point method vs. our L-BFGS solver.~~ — done (`bench/bench_fit.py`, article's "Comparison with R"): about the same counts on typical targets (3–9 vs 4–15 evaluations to 1e-10); with very uneven weights the fixed-point iteration slows down (median 32.5 vs 9 at sigma = 10, 3 of 100 targets unfinished after 2000).
 - [x] 3D timing plots: replace the single dropdown plot with three separate 3D plots (computing $Z$, computing $\pi$, drawing samples). Sampling timing is currently only a static 2D SVG—it has two variables ($N$, $n$) just like the others, so it should be 3D too.
 
 ## Implementation
 
 ### Code cleanup
-- [ ] Add fixed-point iteration `fit` method (matching R's `UPMEpiktildefrompik`: `theta += pi_star - pi(theta)`) as an alternative to L-BFGS. Compare running time of L-BFGS vs fixed-point iteration.
+- [ ] Add fixed-point iteration `fit` method (matching R's `UPMEpiktildefrompik`: `theta += pi_star - pi(theta)`) as an alternative to L-BFGS. Compare running time of L-BFGS vs fixed-point iteration. — comparison done (`bench/bench_fit.py`): the fixed-point iteration never needed fewer evaluations than L-BFGS on the typical targets, and needed more at the median for every weight spread tested, so an alternative method may not be worth adding.
 - [x] ~~L-BFGS fitting convergence is much slower than the old Newton-CG (24 iterations vs 5 for N=10, non-monotone).~~ — fixed: L-BFGS now starts from the Poisson approximation's inverse Hessian and accepts steps on the approximate Wolfe conditions (`conditional_poisson/_fit.py`); N=10 takes 9 evaluations, and fits reach 1e-10 at N=1000.
 
 ### Benchmarks
