@@ -5,7 +5,7 @@ conditional_poisson — Conditional Poisson distribution over fixed-size subsets
 
 Four implementations with the same interface:
 
-  ConditionalPoissonNumPy          — O(N log² N) product tree (NumPy)
+  ConditionalPoissonNumPy          — O(N log² n) product tree (NumPy)
   ConditionalPoissonTorch          — O(N log² n) FFT product tree (PyTorch)
   ConditionalPoissonSequentialNumPy — O(Nn) sequential DP (NumPy)
   ConditionalPoissonSequentialTorch — O(Nn) sequential DP (PyTorch)

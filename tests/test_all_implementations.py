@@ -238,10 +238,32 @@ class TestStability:
         assert abs(cp.log_normalizer - log_Z) < 1e-9 * abs(log_Z)
         np.testing.assert_allclose(to_numpy(cp.incl_prob), n / N, atol=1e-10)
 
+    def test_many_ordinary_weights_exact(self, cls):
+        # Ordinary weights, but many of them: the largest coefficient of
+        # prod_i (1 + w_i z) is about 10^240 times the one at z^n, so an FFT
+        # without rescaling loses it.  Checked against exact rational arithmetic.
+        N, n = 1000, 10
+        w = np.random.default_rng(0).exponential(1.0, N)
+        W = [Fraction(float(wi)) for wi in w]
+        E = [Fraction(1)] + [Fraction(0)] * n
+        for wi in W:
+            for k in range(n, 0, -1):
+                E[k] += wi * E[k - 1]
+        # pi_i = w_i e_{n-1}(w without i) / e_n(w), where removing item i gives
+        # e_k(w without i) = e_k(w) - w_i e_{k-1}(w without i), e_0 = 1.
+        pi_exact = []
+        for wi in W:
+            e = Fraction(1)
+            for k in range(1, n):
+                e = E[k] - wi * e
+            pi_exact.append(float(wi * e / E[n]))
+        log_Z = math.log(E[n].numerator) - math.log(E[n].denominator)
+        cp = cls.from_weights(n, w)
+        assert abs(cp.log_normalizer - log_Z) < 1e-12 * abs(log_Z)
+        np.testing.assert_allclose(to_numpy(cp.incl_prob), pi_exact, rtol=1e-10, atol=1e-15)
+
     def test_extreme_weights_exact(self, cls):
         # Weights spanning e^{\pm 300}, checked against exact rational arithmetic.
-        if cls is ConditionalPoissonNumPy:
-            pytest.xfail("NumPy tree normalizes by the geometric mean only; underflows here")
         N, n = 200, 50
         w = np.exp(np.random.default_rng(7).uniform(-300, 300, N))
         E = [Fraction(1)] + [Fraction(0)] * n

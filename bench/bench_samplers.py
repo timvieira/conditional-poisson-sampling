@@ -2,7 +2,7 @@
 Benchmark: tree-based vs sequential CPS samplers.
 
 Sequential sampler uses ConditionalPoissonSequentialNumPy (O(Nn) DP).
-Tree-based sampler uses ConditionalPoissonNumPy (O(N log^2 N) product tree).
+Tree-based sampler uses ConditionalPoissonNumPy (O(N log^2 n) product tree).
 
 This script compares:
   1. Numerical accuracy of inclusion probabilities (tree vs sequential)

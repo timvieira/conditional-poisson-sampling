@@ -4,7 +4,7 @@ Sample random subsets of exactly $n$ items from a universe of $N$ items, where e
 
 This is the **conditional Poisson distribution** — the unique maximum-entropy distribution over fixed-size subsets with given inclusion probabilities. It arises by running independent Bernoulli trials and conditioning on exactly $n$ items being selected.
 
-All operations use a polynomial product tree running in $O(N \log^2 N)$ time.
+All operations use a polynomial product tree running in $\mathcal{O}(N \log^2 n)$ time.
 
 **[Read the blog post](https://timvieira.github.io/conditional-poisson-sampling/conditional-poisson-sampling/)**
 
@@ -62,9 +62,9 @@ print(np.max(np.abs(cp.incl_prob - pi_star)))  # should be < tol
 
 | Operation | Time |
 |---|---|
-| `incl_prob` / `log_normalizer` | $O(N \log^2 N)$ (cached) |
-| `sample(M)` | $O(N \log^2 N + M n \log N)$ |
-| `fit(pi_star)` | $O(N \log^2 N \cdot T_{\text{L-BFGS}})$ |
+| `incl_prob` / `log_normalizer` | $\mathcal{O}(N \log^2 n)$ (cached) |
+| `sample(M)` | $\mathcal{O}(N \log^2 n + M n \log N)$ |
+| `fit(pi_star)` | $\mathcal{O}(N \log^2 n \cdot T_{\text{L-BFGS}})$ |
 
 ## Tests
 

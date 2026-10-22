@@ -2633,7 +2633,7 @@ cp_fit = ConditionalPoissonNumPy.fit(pi_star, n=3, verbose=True)
   max|pi-pi*| = 1.498e-05
   max|pi-pi*| = 2.241e-07
   max|pi-pi*| = 2.082e-08
-  max|pi-pi*| = 9.085e-11</pre>
+  max|pi-pi*| = 9.084e-11</pre>
 
 **Comparison with R.**  The R `sampling` package solves the same problem with [`UPMEpiktildefrompik`](https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R).  It works with Poisson inclusion probabilities $\tilde{p}_i$ (weights $\w_i = \tilde{p}_i / (1 - \tilde{p}_i)$), starts from $\tilde{p}_i = \piptgt_i$, and iterates $\tilde{p}_i \leftarrow \tilde{p}_i + \piptgt_i - \pip_i$, where $\pip_i$ is the inclusion probability under the current weights.  Its [documentation](https://cran.r-project.org/web/packages/sampling/sampling.pdf) calls this Newton's method, but the update uses the identity matrix in place of the Jacobian, so it is a fixed-point iteration.  Each iteration recomputes $\bpip$ with an $\mathcal{O}(Nn)$ DP.
 
