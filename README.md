@@ -1,8 +1,8 @@
 # Conditional Poisson Sampling
 
-Sample random subsets of exactly $n$ items from a universe of $N$ items, where each item has a weight $w_i \ge 0$ (including $w_i = \infty$ for forced inclusion). The probability of drawing subset $S$ is proportional to $\prod_{i \in S} w_i$.
+Sample random subsets of exactly $n$ items from a universe of $N$ items, where each item has a positive, finite weight $w_i$. The probability of drawing subset $S$ is proportional to $\prod_{i \in S} w_i$. (To exclude an item, leave it out; to force one in, leave it out and draw $n - 1$ items from the rest.)
 
-This is the **conditional Poisson distribution** — the unique maximum-entropy distribution over fixed-size subsets with given inclusion probabilities. It arises by running independent Bernoulli trials and conditioning on exactly $n$ items being selected.
+This is the **conditional Poisson distribution**—the unique maximum-entropy distribution over fixed-size subsets with given inclusion probabilities. It arises by running independent Bernoulli trials and conditioning on exactly $n$ items being selected.
 
 All operations use a polynomial product tree running in $\mathcal{O}(N \log^2 n)$ time.
 
@@ -10,13 +10,14 @@ All operations use a polynomial product tree running in $\mathcal{O}(N \log^2 n)
 
 ## Installation
 
-Single-file library — copy `conditional_poisson_numpy.py` into your project, or install from a local clone:
+Install from a local clone:
 
 ```bash
-pip install .
+pip install .              # NumPy classes
+pip install '.[torch]'     # also ConditionalPoissonTorch and ConditionalPoissonSequentialTorch
 ```
 
-Requires Python 3.8+, NumPy, and SciPy.
+Requires Python 3.8+, NumPy, and SciPy; PyTorch is optional.
 
 ## Usage
 
@@ -63,14 +64,14 @@ print(np.max(np.abs(cp.incl_prob - pi_star)))  # should be < tol
 | Operation | Time |
 |---|---|
 | `incl_prob` / `log_normalizer` | $\mathcal{O}(N \log^2 n)$ (cached) |
-| `sample(M)` | $\mathcal{O}(N \log^2 n + M n \log N)$ |
+| `sample()`, $M$ times | $\mathcal{O}(N \log^2 n + M n \log N)$ |
 | `fit(pi_star)` | $\mathcal{O}(N \log^2 n \cdot T_{\text{L-BFGS}})$ |
 
 ## Tests
 
 ```bash
-pytest                              # with pytest
-python test_conditional_poisson_numpy.py  # standalone
+make test                          # all tests, with pytest
+python3 tests/test_identities.py   # the blog post's identities, standalone
 ```
 
 ## References
