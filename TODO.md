@@ -29,7 +29,6 @@
 ## Implementation
 
 ### Code cleanup
-- [ ] Add fixed-point iteration `fit` method (matching R's `UPMEpiktildefrompik`: `theta += pi_star - pi(theta)`) as an alternative to L-BFGS. Compare running time of L-BFGS vs fixed-point iteration. — comparison done (`bench/bench_fit.py`): the fixed-point iteration never needed fewer evaluations than L-BFGS on the typical targets, and needed more at the median for every weight spread tested, so an alternative method may not be worth adding.
 - [x] ~~L-BFGS fitting convergence is much slower than the old Newton-CG (24 iterations vs 5 for N=10, non-monotone).~~ — fixed: L-BFGS now starts from the Poisson approximation's inverse Hessian and accepts steps on the approximate Wolfe conditions (`conditional_poisson/_fit.py`); N=10 takes 9 evaluations, and fits reach 1e-10 at N=1000.
 
 ### Benchmarks
