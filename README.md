@@ -56,7 +56,7 @@ print(cp.log_prob([0, 3]))
 ```python
 pi_star = np.array([0.6, 0.4, 0.8, 0.3, 0.9])  # must sum to n
 cp = ConditionalPoissonNumPy.fit(pi_star, n=3, tol=1e-10, verbose=True)
-print(np.max(np.abs(cp.incl_prob - pi_star)))  # should be < tol
+print(np.max(np.abs(cp.incl_prob - pi_star)))  # 4.4e-13
 ```
 
 ### Complexity

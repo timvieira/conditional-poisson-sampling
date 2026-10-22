@@ -34,30 +34,41 @@ class ConditionalPoissonNumPyBase:
 
     @classmethod
     def fit(cls, target_incl, n, *, tol=1e-10, max_iter=200, verbose=False):
-        """Fit to target inclusion probabilities via L-BFGS."""
+        """Fit to target inclusion probabilities via L-BFGS.
+
+        Returns the evaluated point with the smallest max |pi - target_incl|,
+        which is not always the point where L-BFGS stops.  Near the optimum,
+        the decrease in the loss falls below its rounding error, so the line
+        search can reject a better point because of rounding alone.  The
+        gradient pi - target_incl stays accurate, so it decides.
+        """
         from scipy.optimize import minimize
         from scipy.special import logit
 
         target_incl = np.asarray(target_incl, float)
         cp = cls(n, logit(target_incl))
+        best_err, best_theta = np.inf, cp.theta
 
         def neg_ll_and_grad(theta):
+            nonlocal best_err, best_theta
             cp.theta = theta
             cp.clear()
             pi = cp.incl_prob
             loss = cp.log_normalizer - float(target_incl @ theta)
             grad = pi - target_incl
+            err = float(np.max(np.abs(grad)))
+            if err < best_err:
+                best_err, best_theta = err, theta.copy()
             if verbose:
-                print(f"  max|pi-pi*| = {np.max(np.abs(grad)):.3e}")
+                print(f"  max|pi-pi*| = {err:.3e}")
             return loss, grad
 
-        result = minimize(
+        minimize(
             neg_ll_and_grad, logit(target_incl),
             method='L-BFGS-B', jac=True,
             options={'maxiter': max_iter, 'gtol': tol, 'ftol': 0},
         )
-        theta = result.x
-        theta -= theta.mean()
+        theta = best_theta - best_theta.mean()
         return cls(n, theta)
 
     def clear(self):

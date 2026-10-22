@@ -204,6 +204,16 @@ class TestFit:
         pi_fit = to_numpy(cp_fit.incl_prob)
         assert np.max(np.abs(pi_fit - target)) < 1e-6
 
+    @pytest.mark.parametrize("np_cls", [ConditionalPoissonNumPy, ConditionalPoissonSequentialNumPy],
+                             ids=lambda c: c.__name__)
+    def test_fit_reaches_tol(self, np_cls):
+        # The README example.  L-BFGS stops at 2e-10 with the NumPy tree, because
+        # the line search rejects a better point on rounding error in the loss;
+        # fit must return the best point it evaluated.
+        pi_star = np.array([0.6, 0.4, 0.8, 0.3, 0.9])
+        cp = np_cls.fit(pi_star, n=3, tol=1e-10)
+        assert np.max(np.abs(cp.incl_prob - pi_star)) < 1e-10
+
     def test_fit_uniform(self, cls):
         N, n = 8, 3
         target = np.full(N, n / N)
