@@ -204,6 +204,16 @@ class TestFit:
         pi_fit = to_numpy(cp_fit.incl_prob)
         assert np.max(np.abs(pi_fit - target)) < 1e-6
 
+    def test_fit_result_is_consistent(self, cls):
+        # fit re-centers theta after optimizing, which moves the contour radius;
+        # the object it returns must not keep values computed before the shift.
+        # With a uniform target the starting point is already optimal, and the
+        # shift by logit(n/N) moves the radius far enough that a stale one
+        # ruins the product tree.
+        N, n = 400, 40
+        cp = cls.fit(np.full(N, n / N), n)
+        np.testing.assert_allclose(to_numpy(cp.incl_prob), n / N, atol=1e-10)
+
     @pytest.mark.parametrize("np_cls", [ConditionalPoissonNumPy, ConditionalPoissonSequentialNumPy],
                              ids=lambda c: c.__name__)
     def test_fit_reaches_tol(self, np_cls):

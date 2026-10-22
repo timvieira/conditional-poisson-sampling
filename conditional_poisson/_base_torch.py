@@ -59,10 +59,11 @@ class ConditionalPoissonTorchBase:
             return loss
 
         optimizer.step(closure)
-        with torch.no_grad():
-            cp.theta -= cp.theta.mean()
-        cp.theta = cp.theta.detach()
-        return cp
+        # Re-center theta (this does not change the distribution) and return a
+        # new object, so nothing computed for the old theta, such as the
+        # contour radius, carries over.
+        theta = cp.theta.detach()
+        return cls(n, theta - theta.mean(), dtype=dtype, device=device, **kw)
 
     def clear(self):
         """Flush all cached computations."""
