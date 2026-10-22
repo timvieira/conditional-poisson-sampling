@@ -632,6 +632,29 @@ def test_fitting_recovers_target():
         f"max err = {np.max(np.abs(cp.incl_prob - pi_star))}"
 
 
+def test_poisson_hessian_at_warm_start():
+    """With independent inclusion, log of the normalizer prod(1 + w_i) has
+    Hessian diag(pi* (1 - pi*)) at theta = logit(pi*)."""
+    N = 6
+    rng = np.random.default_rng(3)
+    pi_star = rng.uniform(0.1, 0.9, N)
+    theta0 = np.log(pi_star / (1 - pi_star))
+
+    def log_norm(theta):
+        # Sum over all subsets of every size, by brute force.
+        w = np.exp(theta)
+        return np.log(sum(Z_bf(w, k) for k in range(N + 1)))
+
+    eps = 1e-4
+    H = np.empty((N, N))
+    E = np.eye(N) * eps
+    for i in range(N):
+        for j in range(N):
+            H[i, j] = (log_norm(theta0 + E[i] + E[j]) - log_norm(theta0 + E[i] - E[j])
+                       - log_norm(theta0 - E[i] + E[j]) + log_norm(theta0 - E[i] - E[j])) / (4 * eps**2)
+    assert np.allclose(H, np.diag(pi_star * (1 - pi_star)), atol=1e-6)
+
+
 # ===========================================================================
 # 19. Contour scaling identity (Cell 26)
 # ===========================================================================

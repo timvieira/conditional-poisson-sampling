@@ -2307,7 +2307,7 @@ tensor([[1, 3, 5],
 >>> # Inverse problem: find weights from target inclusion probabilities
 >>> cp_fit = ConditionalPoissonTorch.fit(cp.incl_prob, n=3)
 >>> (cp_fit.incl_prob - cp.incl_prob).abs().max()
-tensor(6.5330e-08, dtype=torch.float64)
+tensor(8.3039e-11, dtype=torch.float64)
 ```
 
 ## The Poisson Approximation
@@ -2613,7 +2613,9 @@ $$
 
 **Gradient.**  $\nabla_{\btheta} \ell(\btheta) = \bpiptgt - \bpip(\btheta)$.<a href="tests/test_identities.py#test_fitting_gradient" title="test_fitting_gradient" class="verified" target="_blank">✓</a>  At the optimum, $\bpip(\btheta) = \bpiptgt$ exactly, so the gradient is zero.  Each evaluation of $\ell(\btheta)$ and $\nabla \ell(\btheta)$ costs $\mathcal{O}(N \log^2 n)$: one pass through the product tree + backpropagation.
 
-**Optimizer.**  L-BFGS uses only the gradient $\bpip(\btheta) - \bpiptgt$ (no second-order machinery needed).  The [Poisson approximation](#the-poisson-approximation) provides a warm start: $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.
+**Optimizer.**  We minimize $-\ell(\btheta)$ with L-BFGS, which needs only $\ell(\btheta)$ and its gradient—no Hessian.  The [Poisson approximation](#the-poisson-approximation) provides a warm start, $\theta_i^{(0)} = \text{logit}(\piptgt_i)$, which has initialization error $\mathcal{O}(1/N)$ per item.  It also provides the starting estimate of the curvature: if each item were included independently with probability $\piptgt_i$, the normalizer would be $\prod_{i=1}^{N} (1 + \w_i)$, and the Hessian of its log with respect to $\btheta$, at $\btheta^{(0)}$, would be the diagonal matrix with entries $\piptgt_i (1 - \piptgt_i)$.<a href="tests/test_identities.py#test_poisson_hessian_at_warm_start" title="test_poisson_hessian_at_warm_start" class="verified" target="_blank">✓</a>  L-BFGS starts from the inverse of this matrix instead of the identity.
+
+**Line search.**  Near the optimum, a step improves $\ell(\btheta)$ by roughly the square of the gradient, which soon falls below the rounding error in $\ell(\btheta)$ itself (and that error grows with $N$).  A line search that compares values of $\ell(\btheta)$ then rejects good steps and stalls with an error around $10^{-8}$.  The gradient stays accurate to nearly machine precision, so our line search also accepts a step that meets the *approximate Wolfe conditions* of [Hager & Zhang (2005)](https://doi.org/10.1137/030601880), which replace the comparison of values of $\ell(\btheta)$ with a test on the slope along the search direction.  With it, `fit` reaches its default tolerance, $\max_i |\pip_i - \piptgt_i| \le 10^{-10}$, even at $N = 1000$.<a href="tests/test_all_implementations.py#test_fit_reaches_tol" title="TestFit.test_fit_reaches_tol" class="verified" target="_blank">✓</a>
 
 ```python
 from conditional_poisson import ConditionalPoissonNumPy
@@ -2626,14 +2628,14 @@ cp_fit = ConditionalPoissonNumPy.fit(pi_star, n=3, verbose=True)
 ```
 
 <pre class="output">  max|pi-pi*| = 3.890e-02
-  max|pi-pi*| = 1.150e-01
-  max|pi-pi*| = 8.364e-03
-  max|pi-pi*| = 1.136e-03
-  max|pi-pi*| = 1.849e-04
-  max|pi-pi*| = 1.498e-05
-  max|pi-pi*| = 2.241e-07
-  max|pi-pi*| = 2.082e-08
-  max|pi-pi*| = 9.084e-11</pre>
+  max|pi-pi*| = 8.576e-03
+  max|pi-pi*| = 2.961e-04
+  max|pi-pi*| = 3.307e-05
+  max|pi-pi*| = 3.495e-06
+  max|pi-pi*| = 2.310e-07
+  max|pi-pi*| = 2.619e-08
+  max|pi-pi*| = 7.287e-10
+  max|pi-pi*| = 8.304e-11</pre>
 
 **Comparison with R.**  The R `sampling` package solves the same problem with [`UPMEpiktildefrompik`](https://github.com/cran/sampling/blob/master/R/UPMEpiktildefrompik.R).  It works with Poisson inclusion probabilities $\tilde{p}_i$ (weights $\w_i = \tilde{p}_i / (1 - \tilde{p}_i)$), starts from $\tilde{p}_i = \piptgt_i$, and iterates $\tilde{p}_i \leftarrow \tilde{p}_i + \piptgt_i - \pip_i$, where $\pip_i$ is the inclusion probability under the current weights.  Its [documentation](https://cran.r-project.org/web/packages/sampling/sampling.pdf) calls this Newton's method, but the update uses the identity matrix in place of the Jacobian, so it is a fixed-point iteration.  Each iteration recomputes $\bpip$ with an $\mathcal{O}(Nn)$ DP.
 
@@ -3256,6 +3258,8 @@ For non-diagonal $L$, the $k$-DPP introduces correlations between items (repulsi
 
 
 - [Griewank & Walther (2008)](https://doi.org/10.1137/1.9780898717761). *Evaluating Derivatives: Principles and Techniques of Algorithmic Differentiation*, 2nd edition. SIAM.
+
+- [Hager & Zhang (2005)](https://doi.org/10.1137/030601880). "A New Conjugate Gradient Method with Guaranteed Descent and an Efficient Line Search." *SIAM Journal on Optimization*, 16(1), 170–192.
 
 - [Stanley (1999)](https://doi.org/10.1017/CBO9780511609589). *Enumerative Combinatorics*, Volume 2. Cambridge University Press.
 

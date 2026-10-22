@@ -3,6 +3,7 @@
 from functools import cached_property
 import torch
 from conditional_poisson._contour import log_contour_radius
+from conditional_poisson._fit import fit_theta
 
 
 def _to_tensor(x, dtype=torch.float64):
@@ -36,34 +37,20 @@ class ConditionalPoissonTorchBase:
         return cls(n, torch.log(w), **kw)
 
     @classmethod
-    def fit(cls, target_incl, n: int, *, tol: float = 1e-7,
-            dtype=torch.float64, device=None, **kw):
-        """Fit to target inclusion probabilities via L-BFGS."""
-        target_incl = _to_tensor(target_incl, dtype).to(device=device)
-        cp = cls(n, torch.logit(target_incl).clone(), dtype=dtype, device=device, **kw)
-        cp.theta.requires_grad_(True)
+    def fit(cls, target_incl, n: int, *, tol: float = 1e-10, max_iter: int = 200,
+            verbose: bool = False, dtype=torch.float64, device=None, **kw):
+        """Fit theta so that every |pi_i - target_incl_i| <= tol.
 
-        optimizer = torch.optim.LBFGS(
-            [cp.theta],
-            max_iter=200, history_size=5,
-            line_search_fn='strong_wolfe',
-            tolerance_grad=tol, tolerance_change=0,
-        )
+        L-BFGS on the convex dual objective; see conditional_poisson._fit.  If
+        it stops before reaching tol, it warns and returns the best point found.
+        """
+        def evaluate(theta):
+            cp = cls(n, theta, dtype=dtype, device=device, **kw)
+            return cp.log_normalizer, cp.incl_prob.cpu().double().numpy()
 
-        def closure():
-            optimizer.zero_grad()
-            cp.clear()
-            log_Z, _ = cp._circuit(cp.theta)
-            loss = log_Z - target_incl @ cp.theta
-            loss.backward()
-            return loss
-
-        optimizer.step(closure)
-        # Re-center theta (this does not change the distribution) and return a
-        # new object, so nothing computed for the old theta, such as the
-        # contour radius, carries over.
-        theta = cp.theta.detach()
-        return cls(n, theta - theta.mean(), dtype=dtype, device=device, **kw)
+        target = _to_tensor(target_incl).detach().cpu().numpy()
+        theta = fit_theta(evaluate, target, n, tol=tol, max_iter=max_iter, verbose=verbose)
+        return cls(n, theta, dtype=dtype, device=device, **kw)
 
     def clear(self):
         """Flush all cached computations."""

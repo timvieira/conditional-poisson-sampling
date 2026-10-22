@@ -4,6 +4,7 @@ Every test runs on all four implementations. No class-specific test files.
 """
 
 import math
+import warnings
 from fractions import Fraction
 import numpy as np
 import pytest
@@ -202,27 +203,46 @@ class TestFit:
         target = to_numpy(cp_ref.incl_prob)
         cp_fit = cls.fit(target, n)
         pi_fit = to_numpy(cp_fit.incl_prob)
-        assert np.max(np.abs(pi_fit - target)) < 1e-6
+        assert np.max(np.abs(pi_fit - target)) <= 1e-10
 
     def test_fit_result_is_consistent(self, cls):
-        # fit re-centers theta after optimizing, which moves the contour radius;
-        # the object it returns must not keep values computed before the shift.
-        # With a uniform target the starting point is already optimal, and the
-        # shift by logit(n/N) moves the radius far enough that a stale one
-        # ruins the product tree.
+        # The object fit returns must not keep values computed for a different
+        # theta, such as the contour radius.  With a uniform target the
+        # starting point logit(n/N) is already optimal, and centering it moves
+        # the contour radius far enough that a stale one ruins the product tree.
         N, n = 400, 40
         cp = cls.fit(np.full(N, n / N), n)
         np.testing.assert_allclose(to_numpy(cp.incl_prob), n / N, atol=1e-10)
 
-    @pytest.mark.parametrize("np_cls", [ConditionalPoissonNumPy, ConditionalPoissonSequentialNumPy],
-                             ids=lambda c: c.__name__)
-    def test_fit_reaches_tol(self, np_cls):
-        # The README example.  L-BFGS stops at 2e-10 with the NumPy tree, because
-        # the line search rejects a better point on rounding error in the loss;
-        # fit must return the best point it evaluated.
-        pi_star = np.array([0.6, 0.4, 0.8, 0.3, 0.9])
-        cp = np_cls.fit(pi_star, n=3, tol=1e-10)
-        assert np.max(np.abs(cp.incl_prob - pi_star)) < 1e-10
+    @pytest.mark.parametrize("N, n", [(5, 3), (1000, 100)])
+    def test_fit_reaches_tol(self, cls, N, n):
+        # N = 5 is the README example.  At N = 1000 the change in the loss near
+        # the optimum is far below its rounding error, so a line search that
+        # compares loss values alone stalls with an error around 1e-8.
+        if N == 5:
+            pi_star = np.array([0.6, 0.4, 0.8, 0.3, 0.9])
+        else:
+            w = np.random.default_rng(0).exponential(1.0, N)
+            pi_star = ConditionalPoissonSequentialNumPy.from_weights(n, w).incl_prob
+        with warnings.catch_warnings():
+            warnings.simplefilter('error')
+            cp = cls.fit(pi_star, n, tol=1e-10)
+        assert np.max(np.abs(to_numpy(cp.incl_prob) - pi_star)) <= 1e-10
+
+    def test_fit_warns_when_stopped_early(self, cls):
+        w = np.random.default_rng(0).exponential(1.0, 10)
+        target = to_numpy(cls.from_weights(4, w).incl_prob)
+        with pytest.warns(RuntimeWarning, match="max_iter = 1 reached"):
+            cp = cls.fit(target, 4, max_iter=1)
+        assert np.max(np.abs(to_numpy(cp.incl_prob) - target)) > 1e-10
+
+    @pytest.mark.parametrize("target, match", [
+        ([0.5, 0.5, 0.0, 1.0], "strictly between 0 and 1"),
+        ([0.5, 0.5, 0.5, 0.6], "sum to 2.1, not n = 2"),
+    ])
+    def test_fit_rejects_invalid_target(self, cls, target, match):
+        with pytest.raises(ValueError, match=match):
+            cls.fit(np.array(target), 2)
 
     def test_fit_uniform(self, cls):
         N, n = 8, 3
