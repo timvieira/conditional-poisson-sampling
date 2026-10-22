@@ -11,7 +11,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import numpy as np
-from itertools import combinations
+from itertools import combinations, product
+from math import factorial
 from scipy.signal import convolve as poly_mul
 from conditional_poisson.tree_numpy import ConditionalPoissonNumPy
 
@@ -472,26 +473,20 @@ def test_bernoulli_acceptance_rate():
 
 
 def test_categorical_acceptance_rate():
-    """Categorical acceptance = n! * sum_{|S|=n} prod(p_i, i in S),
-    where p_i = w_i / sum(w).
+    """Categorical acceptance = n! * Z(w, n) / W^n, where W = sum(w).
+
+    The sampler draws n items i.i.d. with probabilities w / W and accepts if
+    they are distinct.  Sum the probability of every ordered sequence of n
+    draws whose items are distinct.
     """
     w, n = W_SMALL, N_SMALL
     N = len(w)
     p_cat = w / w.sum()
-    all_S = list(combinations(range(N), n))
-    from math import factorial
-    acc = factorial(n) * sum(np.prod(p_cat[list(s)]) for s in all_S)
-    # Verify by simulation
-    rng = np.random.default_rng(123)
-    trials = 200_000
-    accepted = 0
-    for _ in range(trials):
-        draws = rng.choice(N, size=n, replace=True, p=p_cat)
-        if len(set(draws)) == n:
-            accepted += 1
-    acc_sim = accepted / trials
-    assert abs(acc - acc_sim) < 0.01, \
-        f"formula={acc:.4f}, simulated={acc_sim:.4f}"
+    acc = sum(np.prod(p_cat[list(draws)])
+              for draws in product(range(N), repeat=n)
+              if len(set(draws)) == n)
+    acc_formula = factorial(n) * Z_bf(w, n) / w.sum() ** n
+    assert np.isclose(acc, acc_formula, rtol=1e-12)
 
 
 # ===========================================================================

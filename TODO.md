@@ -30,7 +30,7 @@
 
 ### Code cleanup
 - [ ] Add fixed-point iteration `fit` method (matching R's `UPMEpiktildefrompik`: `theta += pi_star - pi(theta)`) as an alternative to L-BFGS. Compare running time of L-BFGS vs fixed-point iteration.
-- [ ] L-BFGS fitting convergence is much slower than the old Newton-CG (24 iterations vs 5 for N=10, non-monotone). Consider restoring Newton-CG as the default optimizer (requires HVP internally, not as public API) or tuning L-BFGS parameters.
+- [x] ~~L-BFGS fitting convergence is much slower than the old Newton-CG (24 iterations vs 5 for N=10, non-monotone).~~ — fixed: L-BFGS now starts from the Poisson approximation's inverse Hessian and accepts steps on the approximate Wolfe conditions (`conditional_poisson/_fit.py`); N=10 takes 9 evaluations, and fits reach 1e-10 at N=1000.
 
 ### Benchmarks
 - [x] Rerun `bench_timing.py` and regenerate `timing_data.json` + SVG plots (sampling data is stale after sampler rewrite)
