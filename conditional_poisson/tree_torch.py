@@ -11,6 +11,7 @@ from functools import cached_property
 from itertools import accumulate
 import torch
 import torch.nn.functional as F
+from scipy.fft import next_fast_len
 from conditional_poisson._base_torch import ConditionalPoissonTorchBase
 
 
@@ -30,22 +31,32 @@ class ConditionalPoissonTorch(ConditionalPoissonTorchBase):
     def _circuit(self, theta):
         """Product tree with contour scaling.  Returns (log_Z, levels).
 
-        levels[d] is a (2^d, width) tensor holding the polynomials of the nodes
-        at depth d (root first), truncated to degree n and each divided by its
-        largest coefficient.  Every level is computed with one batched
-        multiplication; there is no per-node Python work.
+        levels[d] holds the polynomials of the nodes at depth d (root first),
+        one row per node, truncated to degree n and each divided by its largest
+        coefficient.  Each level multiplies adjacent pairs of nodes in the level
+        below; if that level has an odd number of nodes, its last node is
+        multiplied by the constant polynomial 1, which is not stored.  So the
+        children of node i at depth d are nodes 2i and 2i + 1 at depth d + 1
+        (the second may be missing), and with the leaves at depth D, node i
+        covers items i 2^(D-d), ..., (i + 1) 2^(D-d) - 1, up to item N - 1.
+        Every level is computed with one batched multiplication; there is no
+        per-node Python work.
         """
         n, N = self.n, self.N
         log_r = self._log_r
-        tree_n = 1 << max(1, (N - 1).bit_length())
 
-        # Leaves are (1 + w_i r z); padding leaves are the constant polynomial 1.
-        polys = torch.zeros(tree_n, 2, dtype=theta.dtype, device=theta.device)
+        # Leaves are (1 + w_i r z).  With N = 0 there is one leaf, the constant 1.
+        polys = torch.zeros(max(N, 1), 2, dtype=theta.dtype, device=theta.device)
         polys[:, 0] = 1.0
         polys[:N, 1] = torch.exp(theta + log_r)
-        log_scale = torch.zeros(tree_n, dtype=theta.dtype, device=theta.device)
+        log_scale = torch.zeros(len(polys), dtype=theta.dtype, device=theta.device)
         levels = [polys]
-        while polys.shape[0] > 1:
+        while len(polys) > 1:
+            if len(polys) % 2:                  # pair the last node with the constant 1
+                one = polys.new_zeros(1, polys.shape[1])
+                one[0, 0] = 1.0
+                polys = torch.cat([polys, one])
+                log_scale = torch.cat([log_scale, log_scale.new_zeros(1)])
             products = self._batch_poly_mul(polys[0::2, :n + 1], polys[1::2, :n + 1])
             products = products[:, :n + 1]
             # Divide each node by its largest coefficient so nothing overflows.
@@ -84,7 +95,8 @@ class ConditionalPoissonTorch(ConditionalPoissonTorchBase):
                 selected.append(i)
                 continue
             # Give j items to the left child and k - j to the right.  Each child
-            # can take at most its number of real (non-padding) leaves.
+            # can take at most its number of items (see _circuit).  A missing
+            # right child has none, so then j = k and Q[b] is never read.
             size = 1 << (D - d - 1)
             n_left = min(max(N - 2 * i * size, 0), size)
             n_right = min(max(N - (2 * i + 1) * size, 0), size)
@@ -108,12 +120,15 @@ class ConditionalPoissonTorch(ConditionalPoissonTorchBase):
 
     @staticmethod
     def _batch_poly_mul_fft(a_batch, b_batch):
-        La, Lb = a_batch.shape[1], b_batch.shape[1]
-        n_out = La + Lb - 1
+        n_out = a_batch.shape[1] + b_batch.shape[1] - 1
+        # Most products here have 2^k + 1 coefficients, and FFTs of lengths with
+        # large prime factors (8193 = 3 * 2731) are slow, so pad to a length
+        # with only small prime factors.
+        L = next_fast_len(n_out, real=True)
         return torch.fft.irfft(
-            torch.fft.rfft(a_batch, n=n_out) * torch.fft.rfft(b_batch, n=n_out),
-            n=n_out,
-        )
+            torch.fft.rfft(a_batch, n=L) * torch.fft.rfft(b_batch, n=L),
+            n=L,
+        )[:, :n_out]
 
     @staticmethod
     def _batch_poly_mul_direct(a_batch, b_batch):
