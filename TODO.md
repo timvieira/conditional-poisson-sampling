@@ -9,7 +9,6 @@
 - [ ] Do we like the linear-gradient background on the widgets?
 - [ ] Sampling animation widget: visual language is inconsistent with the product tree widget, and some of the pop-up histograms are confusing. Consider highlighting the current step in the pseudocode to anchor the viewer.
 - [x] Review the sampling pseudocode
-- [ ] Should we refer to polynomials more consistently as generating functions here?
 - [ ] Would evaluating/plotting the polynomial as a function of z tell us anything interesting?
 - [x] Add link to Wikipedia page on [elementary symmetric polynomials](https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial)
 
