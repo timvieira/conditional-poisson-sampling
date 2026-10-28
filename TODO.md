@@ -50,7 +50,6 @@
 - [ ] Tidy up the repo (clean up unused files, organize structure)
 - [ ] Fix `test_animation.mjs` — update paths, verify it runs, integrate into CI
 - [ ] Add mathematical correctness tests for JS widget algorithms (product tree, quota splitting, polynomial multiplication, CDF computation). Either extend `test_animation.mjs` to check computed values against known answers, or extract JS algorithms into testable modules and test with Node.js.
-- [ ] tests are too slow
 
 ### Packaging and Distribution
 
