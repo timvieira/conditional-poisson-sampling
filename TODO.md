@@ -5,7 +5,6 @@
 - [x] Add a disclaimer that this post was written with extensive help from Claude Code, especially in the interactive widgets, which would not have been possible without Claude Code.
 
 - [x] Widget contents spill out of containers on narrow screens (e.g., phone). Looks very bad.
-- [ ] Do we like the linear-gradient background on the widgets?
 - [ ] Sampling animation widget: visual language is inconsistent with the product tree widget, and some of the pop-up histograms are confusing. Consider highlighting the current step in the pseudocode to anchor the viewer.
 - [x] Review the sampling pseudocode
 - [ ] Would evaluating/plotting the polynomial as a function of z tell us anything interesting?
