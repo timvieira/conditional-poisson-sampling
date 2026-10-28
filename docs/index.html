@@ -2548,10 +2548,9 @@ $$</p>
 <p><b>The primal problem.</b> Find the distribution $\Ps$ over size-$n$ subsets that maximizes entropy subject to the inclusion-probability constraints:</p>
 </p>
 
-$$
+<p>$$
 \max_{\Ps \in \triangle^{\binom{\mathcal{S}}{n}}} H(\Ps) \quad \text{subject to} \quad \mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \piptgt_i \;\; \text{for } 1 \le i \le N
-$$
-
+$$</p>
 <p>
 <p>where $H(\Ps) \defeq -\sum_S \Ps(S) \log \Ps(S)$ is the Shannon entropy.  This is a convex optimization problem (maximizing a concave function over a convex set with linear constraints), so it has a unique solution.  However, the optimization variable $\Ps$ lives in a space with $\binom{N}{n}$ dimensions—one probability per subset—so we cannot solve it directly.</p>
 </p>
@@ -2560,10 +2559,9 @@ $$
 <p><b>The Lagrangian.</b> To handle the $N$ inclusion-probability constraints, introduce a multiplier $\theta_i$ for each one:</p>
 </p>
 
-$$
+<p>$$
 \mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_{i=1}^{N} \theta_i \big(\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] - \piptgt_i\big)
-$$
-
+$$</p>
 <p>
 <p>The key property: if $\Ps$ violates any constraint, the corresponding $\theta_i$ can be driven to $\pm\infty$ to make $\mathcal{L}(\Ps, \btheta) \to -\infty$.  So $\max_{\Ps} \min_{\btheta} \mathcal{L}(\Ps, \btheta)$ has the same solution as the constrained problem—the constraints are enforced by the multipliers rather than explicitly.</p>
 </p>
@@ -2572,18 +2570,16 @@ $$
 <p><b>Solving for $\Ps$ given $\btheta$.</b>  For fixed $\btheta$, we maximize $\mathcal{L}(\Ps, \btheta)$ over distributions $\Ps$.  Writing out the expectation as $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \sum_S \Ps(S)\, \mathbf{1}[i \in S]$ and taking the derivative with respect to each $\Ps(S)$:</p>
 </p>
 
-$$
+<p>$$
 \frac{\partial \mathcal{L}(\Ps, \btheta)}{\partial \Ps(S)} = -\log \Ps(S) - 1 + \sum_{i \in S} \theta_i
-$$
-
+$$</p>
 <p>
 <p>Setting this to zero gives $\Ps(S) \propto \exp\!\big(\sum_{i \in S} \theta_i\big)$.  (We don't need a separate multiplier for the normalization constraint $\sum_S \Ps(S) = 1$ because we can absorb it into the proportionality constant.)  After normalizing over size-$n$ subsets:</p>
 </p>
 
-$$
+<p>$$
 \Ps(S) = \exp\!\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big)
-$$
-
+$$</p>
 <p>
 <p>where $\w_i = \exp(\theta_i)$ and $\Zw{\bw}{n} = \sum_{|S|=n} \prod_{i \in S} \w_i$ is the normalizing constant.  This is exactly the conditional Poisson distribution!  So the max-entropy distribution with inclusion-probability constraints must be a conditional Poisson sampling (CPS) distribution—the only question is <em>which</em> weights.</p>
 </p>
@@ -2592,34 +2588,31 @@ $$
 <p><b>Eliminating $\Ps$.</b>  Now substitute this optimal $\Ps$ back into $\mathcal{L}(\Ps, \btheta)$ to get a function of $\btheta$ alone.  The inclusion probabilities under $\Ps$ are $\mathbb{E}_{\Ps}[\mathbf{1}[i \in S]] = \pip_i(\btheta)$, so:</p>
 </p>
 
-$$
+<p>$$
 \mathcal{L}(\Ps, \btheta) = H(\Ps) + \sum_{i=1}^{N} \theta_i \big(\pip_i(\btheta) - \piptgt_i\big)
-$$
-
+$$</p>
 <p>
 <p>We need $H(\Ps)$.  Since $\log \Ps(S) = \sum_{i \in S} \theta_i - \log \Zw{\bw}{n}$:</p>
 </p>
 
-$$
+<p>$$
 \begin{align}
 H(\Ps) &= -\sum_S \Ps(S) \log \Ps(S) \\
       &= -\sum_S \Ps(S)\Big(\sum_{i \in S} \theta_i - \log \Zw{\bw}{n}\Big) \\
       &= \log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta
 \end{align}
-$$
-
+$$</p>
 <p>
 <p>where the last step uses $\sum_S \Ps(S) \sum_{i \in S} \theta_i = \sum_{i=1}^{N} \theta_i \pip_i(\btheta) = \bpip(\btheta)^\top \btheta$.  Substituting $H(\Ps)$ into $\mathcal{L}(\Ps, \btheta)$:</p>
 </p>
 
-$$
+<p>$$
 \begin{align}
 \mathcal{L}(\Ps, \btheta)
 &= \big(\log \Zw{\bw}{n} - \bpip(\btheta)^\top \btheta\big) + \bpip(\btheta)^\top \btheta - \bpiptgt^{\top} \btheta \\
 &= \log \Zw{\bw}{n} - \bpiptgt^{\top} \btheta
 \end{align}
-$$
-
+$$</p>
 <p>
 <p>The $\bpip(\btheta)$ terms cancel, leaving a clean function of $\btheta$ alone.</p>
 </p>
@@ -3212,11 +3205,9 @@ $$
 <summary>Proof
 </summary>
 
-Factor the generating function over $A \cup B$:
-
-$$\prod_{i \in A \cup B}(1 + \w_i \z) = \prod_{i \in A}(1 + \w_i \z) \;\cdot\; \prod_{i \in B}(1 + \w_i \z)$$
-
-The left side is $\sum_k \Zw{(\ba;\,\bb)}{k}\, \z^k$.  The right side is a product of two polynomials, so its $k$<sup>th</sup> coefficient is the convolution $\sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$.  Equating coefficients of $\z^k$ gives the result. <span style="float:right">$\blacksquare$</span>
+<p>Factor the generating function over $A \cup B$:</p>
+<p>$$\prod_{i \in A \cup B}(1 + \w_i \z) = \prod_{i \in A}(1 + \w_i \z) \;\cdot\; \prod_{i \in B}(1 + \w_i \z)$$</p>
+<p>The left side is $\sum_k \Zw{(\ba;\,\bb)}{k}\, \z^k$.  The right side is a product of two polynomials, so its $k$<sup>th</sup> coefficient is the convolution $\sum_{j=0}^{k} \Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$.  Equating coefficients of $\z^k$ gives the result. <span style="float:right">$\blacksquare$</span></p>
 
 </details>
 
@@ -3229,13 +3220,10 @@ The left side is $\sum_k \Zw{(\ba;\,\bb)}{k}\, \z^k$.  The right side is a produ
 <summary>A diagonal $k$-DPP is exactly a conditional Poisson distribution
 </summary>
 
-A $k$-DPP (a determinantal point process restricted to subsets of size $k$; here $k = n$) on $\{1, \ldots, N\}$ with a **diagonal** kernel matrix $L = \text{diag}(\w_1, \ldots, \w_N)$ is exactly the conditional Poisson distribution:
-
-$$\mathcal{P}_L^n(S) = \frac{\det(L_S)}{\sum_{|S'|=n} \det(L_{S'})} = \frac{\prod_{i \in S} \w_i}{\Zw{\bw}{n}}$$
-
-since the determinant of a diagonal submatrix is the product of its diagonal entries.<a href="tests/test_identities.py#test_kdpp_diagonal" title="test_kdpp_diagonal" class="verified" target="_blank">✓</a>  The normalizer $\sum_{|S|=n} \det(L_S) = e_n(\lambda_1, \ldots, \lambda_N)$ is an elementary symmetric polynomial of the eigenvalues—which for a diagonal matrix are just the weights.  Newton's identities connect the two: compute $e_n$ from the power sums $g_k = \text{tr}(L^k)$.
-
-For non-diagonal $L$, the $k$-DPP introduces correlations between items (repulsion), while the conditional Poisson distribution has only the size constraint.  See [Kulesza & Taskar (2012)](https://arxiv.org/abs/1207.6083) for details.
+<p>A $k$-DPP (a determinantal point process restricted to subsets of size $k$; here $k = n$) on $\{1, \ldots, N\}$ with a <strong>diagonal</strong> kernel matrix $L = \text{diag}(\w_1, \ldots, \w_N)$ is exactly the conditional Poisson distribution:</p>
+<p>$$\mathcal{P}_L^n(S) = \frac{\det(L_S)}{\sum_{|S'|=n} \det(L_{S'})} = \frac{\prod_{i \in S} \w_i}{\Zw{\bw}{n}}$$</p>
+<p>since the determinant of a diagonal submatrix is the product of its diagonal entries.<a href="tests/test_identities.py#test_kdpp_diagonal" title="test_kdpp_diagonal" class="verified" target="_blank">✓</a>  The normalizer $\sum_{|S|=n} \det(L_S) = e_n(\lambda_1, \ldots, \lambda_N)$ is an elementary symmetric polynomial of the eigenvalues—which for a diagonal matrix are just the weights.  Newton's identities connect the two: compute $e_n$ from the power sums $g_k = \text{tr}(L^k)$.</p>
+<p>For non-diagonal $L$, the $k$-DPP introduces correlations between items (repulsion), while the conditional Poisson distribution has only the size constraint.  See <a href="https://arxiv.org/abs/1207.6083">Kulesza &amp; Taskar (2012)</a> for details.</p>
 
 </details>
 

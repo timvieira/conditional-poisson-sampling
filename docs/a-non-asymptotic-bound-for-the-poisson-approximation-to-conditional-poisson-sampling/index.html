@@ -108,43 +108,25 @@
 <summary><b>Derivation sketch</b> (Boistard, Lopuhaä & Ruiz-Gazen, 2012)
 </summary>
 
-**Step 1: Bayes reduction.**  Let $I_1, \ldots, I_N$ be independent Bernoulli variables with $P(I_i = 1) = p_i$, and let $K \defeq \sum_i I_i$ be the (random) Poisson sample size.  The conditional inclusion probability is
-
-$$\pip_i = P(I_i = 1 \mid K = n) = p_i \cdot \frac{P(K = n \mid I_i = 1)}{P(K = n)}.$$
-
-So the entire problem reduces to computing a ratio of Poisson-binomial probabilities.
-
-**Step 2: Edgeworth expansion.**  Since $K$ is a sum of $N$ independent (but non-identical) Bernoullis with variance $d = \sum_i p_i(1-p_i)$, the local probability $P(K = n)$ has an Edgeworth expansion around the Gaussian approximation.  Writing $x = (K - n)/\sqrt{d}$, the expansion is
-
-$$P(K = n) = \frac{1}{\sqrt{2\pi d}}\Big(1 + \sum_{j=1}^{s} P_j(0)\, d^{-j/2} + \mathcal{O}(d^{-(s+1)/2})\Big)$$
-
-where the $P_j$ are polynomials in Hermite polynomials and normalized cumulants $S_m \defeq \kappa_m / d^{m-1}$.  Crucially, $S_m = \mathcal{O}(1)$ (since each cumulant $\kappa_m$ of a sum of Bernoullis satisfies $\kappa_m = \mathcal{O}(d)$).  Odd-order Hermite polynomials vanish at $x = 0$ (we are evaluating at the mean), so only even powers of $d^{-1/2}$ survive:
-
-$$P(K = n) = \frac{1}{\sqrt{2\pi d}}\Big(1 + c_1\, d^{-1} + \mathcal{O}(d^{-2})\Big)$$
-
-where $c_1$ is an explicit constant depending on $\kappa_3$ and $\kappa_4$.
-
-**Step 3: Conditional expansion.**  Conditioning on $I_i = 1$ removes item $i$ from the sum.  Define $\tilde{K} = K - I_i$, so $\tilde{K} = n - 1$ given $K = n$ and $I_i = 1$.  The conditional sum $\tilde{K}$ has mean $n - p_i$, variance $d - p_i(1-p_i)$, and its expansion is centered at $\tilde{x} = (p_i - 1)/\sqrt{d - p_i(1-p_i)}$, which is $\mathcal{O}(d^{-1/2})$.
-
-Expanding around $\tilde{x} = 0$ introduces additional $d^{-1/2}$ corrections from the Gaussian density $\phi(\tilde{x}) = \phi(0)(1 - \tilde{x}^2/2 + \cdots)$ and from the shifted Edgeworth polynomials $P_j(\tilde{x})$.  The result is
-
-$$P(K = n \mid I_i = 1) = \frac{1}{\sqrt{2\pi d}}\Big(1 + c_2\, d^{-1} + \mathcal{O}(d^{-2})\Big)$$
-
-where $c_2$ depends on $i$ through $p_i$.
-
-**Step 4: Ratio.**  Taking the ratio:
-
-$$\frac{P(K = n \mid I_i = 1)}{P(K = n)} = \frac{1 + c_2\, d^{-1} + \mathcal{O}(d^{-2})}{1 + c_1\, d^{-1} + \mathcal{O}(d^{-2})} = 1 + (c_2 - c_1)\, d^{-1} + \mathcal{O}(d^{-2}).$$
-
-The explicit computation of $c_2 - c_1$ (carried out in detail in Boistard et al., Section 4) yields $c_2 - c_1 = -(p_i - \bar{p})(1 - p_i)$.
-
-**Regularity condition.**  The expansion requires $d \to \infty$, which holds under $\limsup N/d < \infty$—equivalently, the $p_i$ don't all concentrate near 0 or 1.
-
-**Higher-order inclusion probabilities.**  The same technique extends to joint inclusion probabilities $\pip_{i_1, \ldots, i_k} = P(I_{i_1} = \cdots = I_{i_k} = 1 \mid K = n)$.  The result (Theorem 1 in Boistard et al.) is
-
-$$\pip_{i_1, \ldots, i_k} = \prod_{j=1}^{k} p_{i_j} \cdot \Big(1 + a\, d^{-1} + \mathcal{O}(d^{-2})\Big)$$
-
-where $a$ is an explicit polynomial in the $p_{i_j}$ and the population summaries $\bar{p}$, $d$.
+<p><strong>Step 1: Bayes reduction.</strong>  Let $I_1, \ldots, I_N$ be independent Bernoulli variables with $P(I_i = 1) = p_i$, and let $K \defeq \sum_i I_i$ be the (random) Poisson sample size.  The conditional inclusion probability is</p>
+<p>$$\pip_i = P(I_i = 1 \mid K = n) = p_i \cdot \frac{P(K = n \mid I_i = 1)}{P(K = n)}.$$</p>
+<p>So the entire problem reduces to computing a ratio of Poisson-binomial probabilities.</p>
+<p><strong>Step 2: Edgeworth expansion.</strong>  Since $K$ is a sum of $N$ independent (but non-identical) Bernoullis with variance $d = \sum_i p_i(1-p_i)$, the local probability $P(K = n)$ has an Edgeworth expansion around the Gaussian approximation.  Writing $x = (K - n)/\sqrt{d}$, the expansion is</p>
+<p>$$P(K = n) = \frac{1}{\sqrt{2\pi d}}\Big(1 + \sum_{j=1}^{s} P_j(0)\, d^{-j/2} + \mathcal{O}(d^{-(s+1)/2})\Big)$$</p>
+<p>where the $P_j$ are polynomials in Hermite polynomials and normalized cumulants $S_m \defeq \kappa_m / d^{m-1}$.  Crucially, $S_m = \mathcal{O}(1)$ (since each cumulant $\kappa_m$ of a sum of Bernoullis satisfies $\kappa_m = \mathcal{O}(d)$).  Odd-order Hermite polynomials vanish at $x = 0$ (we are evaluating at the mean), so only even powers of $d^{-1/2}$ survive:</p>
+<p>$$P(K = n) = \frac{1}{\sqrt{2\pi d}}\Big(1 + c_1\, d^{-1} + \mathcal{O}(d^{-2})\Big)$$</p>
+<p>where $c_1$ is an explicit constant depending on $\kappa_3$ and $\kappa_4$.</p>
+<p><strong>Step 3: Conditional expansion.</strong>  Conditioning on $I_i = 1$ removes item $i$ from the sum.  Define $\tilde{K} = K - I_i$, so $\tilde{K} = n - 1$ given $K = n$ and $I_i = 1$.  The conditional sum $\tilde{K}$ has mean $n - p_i$, variance $d - p_i(1-p_i)$, and its expansion is centered at $\tilde{x} = (p_i - 1)/\sqrt{d - p_i(1-p_i)}$, which is $\mathcal{O}(d^{-1/2})$.</p>
+<p>Expanding around $\tilde{x} = 0$ introduces additional $d^{-1/2}$ corrections from the Gaussian density $\phi(\tilde{x}) = \phi(0)(1 - \tilde{x}^2/2 + \cdots)$ and from the shifted Edgeworth polynomials $P_j(\tilde{x})$.  The result is</p>
+<p>$$P(K = n \mid I_i = 1) = \frac{1}{\sqrt{2\pi d}}\Big(1 + c_2\, d^{-1} + \mathcal{O}(d^{-2})\Big)$$</p>
+<p>where $c_2$ depends on $i$ through $p_i$.</p>
+<p><strong>Step 4: Ratio.</strong>  Taking the ratio:</p>
+<p>$$\frac{P(K = n \mid I_i = 1)}{P(K = n)} = \frac{1 + c_2\, d^{-1} + \mathcal{O}(d^{-2})}{1 + c_1\, d^{-1} + \mathcal{O}(d^{-2})} = 1 + (c_2 - c_1)\, d^{-1} + \mathcal{O}(d^{-2}).$$</p>
+<p>The explicit computation of $c_2 - c_1$ (carried out in detail in Boistard et al., Section 4) yields $c_2 - c_1 = -(p_i - \bar{p})(1 - p_i)$.</p>
+<p><strong>Regularity condition.</strong>  The expansion requires $d \to \infty$, which holds under $\limsup N/d < \infty$—equivalently, the $p_i$ don't all concentrate near 0 or 1.</p>
+<p><strong>Higher-order inclusion probabilities.</strong>  The same technique extends to joint inclusion probabilities $\pip_{i_1, \ldots, i_k} = P(I_{i_1} = \cdots = I_{i_k} = 1 \mid K = n)$.  The result (Theorem 1 in Boistard et al.) is</p>
+<p>$$\pip_{i_1, \ldots, i_k} = \prod_{j=1}^{k} p_{i_j} \cdot \Big(1 + a\, d^{-1} + \mathcal{O}(d^{-2})\Big)$$</p>
+<p>where $a$ is an explicit polynomial in the $p_{i_j}$ and the population summaries $\bar{p}$, $d$.</p>
 
 </details>
 
