@@ -19,11 +19,20 @@ if (length(args) != 3) {
 w <- scan(args[1], quiet = TRUE)
 n <- as.integer(args[2])
 
-now <- function() proc.time()[["elapsed"]]
+now <- function() proc.time()[["elapsed"]]       # counts whole milliseconds
 
 time_it <- function(fn) {
-    t0 <- now(); fn(); first <- now() - t0
-    loops <- max(1, ceiling(0.2 / max(first, 1e-6)))
+    # The first call is the warm-up, and its time sizes the repeats.  A call
+    # can be shorter than the clock's 1 ms resolution and read as 0 s, so
+    # double the number of calls timed together until they last at least 10 ms.
+    calls <- 1
+    repeat {
+        t0 <- now(); for (i in seq_len(calls)) fn(); elapsed <- now() - t0
+        if (elapsed >= 0.01) break
+        calls <- 2 * calls
+    }
+    first <- elapsed / calls
+    loops <- max(1, ceiling(0.2 / first))
     repeats <- if (first < 1) 5 else if (first < 10) 3 else 1
     best <- Inf
     for (r in seq_len(repeats)) {
