@@ -54,9 +54,3 @@
 ### Packaging and Distribution
 
 - [ ] Publish to PyPI
-
-### Dev Quality
-
-- [ ] Add linting config (ruff/flake8/mypy)
-- [ ] Lint checkers
-- [ ] Coverage

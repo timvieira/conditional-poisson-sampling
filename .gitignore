@@ -12,3 +12,5 @@ docs/css
 memory/
 timing_data.json
 timing_grid.json
+.coverage
+coverage-report/

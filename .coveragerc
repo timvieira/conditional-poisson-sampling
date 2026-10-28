@@ -1,0 +1,19 @@
+[run]
+branch = True
+source = conditional_poisson
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    assert False,.*
+    assert 0,.*
+    if 0:
+    if (self\.)?DEBUG.*
+    if (self\.)?debug.*
+    if (self\.)?verbos(e|ity).*
+    if __name__ == .__main__.:
+    def todo_.*
+ignore_errors = True

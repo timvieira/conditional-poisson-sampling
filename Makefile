@@ -1,8 +1,10 @@
-.PHONY: help test bench figures data snippets deploy dev clean install install-r
+.PHONY: help test lint coverage bench figures data snippets deploy dev clean install install-r
 
 help:
 	@echo "Usage: make <target>"
 	@echo "  test          Run all tests"
+	@echo "  lint          Check the code with ruff"
+	@echo "  coverage      Run the tests with coverage and open the HTML report"
 	@echo "  bench         Run timing benchmarks (serial; ~30 min)"
 	@echo "  figures       Regenerate SVG plots from timing data"
 	@echo "  data          bench + figures"
@@ -11,6 +13,13 @@ help:
 
 test:
 	python -m pytest tests/ -v
+
+lint:
+	ruff check .
+
+coverage:
+	python -m pytest tests/ --cov=conditional_poisson --cov-report=term --cov-report=html:coverage-report
+	xdg-open coverage-report/index.html
 
 # Timing benchmarks: serial and single-threaded, so runs do not compete for CPU.
 # Writes content/figures/timing.json, the data behind every timing figure.
@@ -40,4 +49,4 @@ install-r:
 
 clean:
 	rm -rf __pycache__ conditional_poisson/__pycache__ tests/__pycache__ bench/__pycache__
-	rm -rf *.egg-info build dist .pytest_cache
+	rm -rf *.egg-info build dist .pytest_cache coverage-report .coverage

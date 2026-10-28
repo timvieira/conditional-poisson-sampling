@@ -12,7 +12,7 @@ dependencies = ["numpy", "scipy"]
 
 [project.optional-dependencies]
 torch = ["torch"]
-dev = ["pytest", "scipy", "torch", "plotly", "cvxpy"]
+dev = ["pytest", "pytest-cov", "pytest-timeout", "coverage", "ruff", "scipy", "torch", "plotly", "cvxpy"]
 
 [tool.setuptools.packages.find]
 include = ["conditional_poisson*"]
@@ -23,3 +23,6 @@ timeout = 20
 [tool.blog]
 static = ["figures"]
 preprocess = ["python extract_snippets.py"]
+
+[tool.ruff.lint]
+ignore = ["E741", "E402", "E701", "E702", "E731"]
