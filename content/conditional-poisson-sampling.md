@@ -1,5 +1,5 @@
 title: Conditional Poisson Sampling
-date: 2026-03-25
+date: 2026-10-28
 comments: true
 tags: notebook, sampling, algorithms, sampling-without-replacement
 
@@ -43,7 +43,7 @@ The normalizing constant $\Zw{\bw}{n} \defeq \sum_{|S|=n} \prod_{i \in S} \w_i$ 
 
 **Inclusion probabilities.** The inclusion probability $\pip_i \defeq \sum_{S} \Ps(S)\, \mathbf{1}[i \in S]$.  Higher weight means higher inclusion probability, but the relationship is nonlinear because the other weights also matter—doubling $\w_i$ does not double $\pip_i$, as the other items push back through the size constraint $|S| = n$. Later in this article, we provide an interactive widget for exploring the nonlinear relationship between $\bw$ and $\bpip$.
 
-**Why is this distribution special?** The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, it is the unique *maximum-entropy* one<a href="tests/test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>—making the fewest assumptions beyond the marginals ([Jaynes, 1957](https://doi.org/10.1103/PhysRev.106.620); [Chen, Dempster & Liu, 1994](https://academic.oup.com/biomet/article-abstract/81/3/457/256956)), in the same sense that the Gaussian is max-entropy for given mean and variance.  The log-normalizer $\log \Zw{\bw}{n}$ is convex in $\btheta$, so many properties follow mechanically: inclusion probabilities are the gradient ($\pip_i = \partial \log \Z / \partial \theta_i$) and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the *exponential fixed-size design* for this reason.
+**Why is this distribution special?** The conditional Poisson distribution is an exponential family with natural parameters $\theta_i \defeq \log \w_i$ and sufficient statistics $\mathbf{1}[i \in S]$.  Among all distributions over size-$n$ subsets with prescribed inclusion probabilities $\pip_i = P(i \in S)$, it is the unique *maximum-entropy* one<a href="tests/test_identities.py#test_max_entropy" title="test_max_entropy" class="verified" target="_blank">✓</a>—making the fewest assumptions beyond the marginals ([Jaynes, 1957](https://doi.org/10.1103/PhysRev.106.620); [Chen, Dempster & Liu, 1994](https://doi.org/10.1093/biomet/81.3.457)), in the same sense that the Gaussian is max-entropy for given mean and variance.  The log-normalizer $\log \Zw{\bw}{n}$ is convex in $\btheta$, so many properties follow mechanically: inclusion probabilities are the gradient ($\pip_i = \partial \log \Z / \partial \theta_i$) and fitting $\btheta$ to target inclusion probabilities is a convex optimization problem.  The distribution is also called the *exponential fixed-size design* for this reason ([Tillé, 2006](https://doi.org/10.1007/0-387-34240-0)).
 
 **Relationship to Poisson sampling.** In Poisson sampling,<footnote>Named after mathematician [Siméon Denis Poisson](https://en.wikipedia.org/wiki/Sim%C3%A9on_Denis_Poisson).  Although poisson is the French word for fish, no fishing metaphor is intended.</footnote> each item $i$ is included independently with probability $p_i$, so the sample size $|S| = \sum_{i=1}^{N} \mathbf{1}[i \in S]$ is random.  The *conditional* Poisson distribution conditions on $|S| = n$ exactly—fixing the sample size while preserving the relative inclusion odds.  Under Poisson sampling, each item's inclusion probability is simply $\pip_i = p_i$; conditioning on $|S| = n$ makes $\pip_i$ depend on all the other weights too, which is what makes computing $\bpip$ nontrivial.  The weight $\w_i$ is the *odds* of the $i$<sup>th</sup> coin: $\w_i = p_i / (1 - p_i)$, equivalently $p_i = \w_i/(1+\w_i)$.<a href="tests/test_identities.py#test_weight_is_odds" title="test_weight_is_odds, test_conditional_poisson_from_bernoulli" class="verified" target="_blank">✓</a>
 
@@ -63,12 +63,12 @@ $\quad$ $S \leftarrow \{s_1, \ldots, s_n\}$<br>
 
 The resulting distribution over size-$n$ subsets is exactly $\Ps(S)$.<a href="tests/test_identities.py#test_rejection_bernoulli_produces_cps" title="test_rejection_bernoulli_produces_cps" class="verified" target="_blank">✓</a>
 This rejection sampler is not a practical sampling algorithm;<footnote>The acceptance probability of this construction is $n! \cdot \Zw{\bw}{n} / \W^n$.<a href="tests/test_identities.py#test_categorical_acceptance_rate" title="test_categorical_acceptance_rate" class="verified" target="_blank">✓</a></footnote>
-it simply establishes what the distribution *is*.  We will derive sampling algorithms that sample from $\Ps(S)$ efficiently.
+it simply establishes what the distribution *is*.  We will derive sampling algorithms that sample from $\Ps(S)$ efficiently.  In machine learning, [Meister, Amini, Vieira & Cotterell (2021)](https://aclanthology.org/2021.emnlp-main.52/) use it to make beam search stochastic: at each step, the beam is a conditional Poisson sample of the candidates, drawn without replacement, instead of the highest-scoring ones.
 
 
 **What this post covers.** The computational challenges are: computing $\Zw{\bw}{n}$ and $\Ps(S)$, computing $\bpip$ from $\bw$, drawing exact samples $S \sim \Ps$, and the inverse problem of finding $\bw$ from target $\bpip$.  This post gives efficient algorithms for all four—in $\mathcal{O}(N \log^2 n)$ time using a polynomial product tree—and times them against the $\mathcal{O}(Nn)$ dynamic program used by existing software.  The appendices cover numerical stability, timings over a wider range of sizes, and further identities.
 
-**Software.** The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).  As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python (or any language outside of R's survey-sampling packages).  The existing R implementation—`UPmaxentropy` in the [sampling](https://cran.r-project.org/web/packages/sampling/) package—uses $\mathcal{O}(Nn)$ dynamic programming.  The product-tree algorithm used here does not appear in any prior software that I could find.
+**Software.** The code is available as a [Python library](https://github.com/timvieira/conditional-poisson-sampling).  As far as I can tell, this is the only publicly available library for conditional Poisson sampling in Python (or any language outside of R's survey-sampling packages).  The existing R implementation—`UPmaxentropy` in the [sampling](https://cran.r-project.org/web/packages/sampling/) package—uses $\mathcal{O}(Nn)$ dynamic programming, and its documentation cites [Chen & Liu (1997)](https://www3.stat.sinica.edu.tw/statistica/j7n4/j7n44/j7n44.htm).  The product-tree algorithm used here does not appear in any prior software that I could find.
 
 
 <style>
@@ -348,7 +348,7 @@ $$
 
 **Why does this work?** When you expand the product, each factor $(1 + \w_i \z)$ contributes either $1$ (item $i$ excluded) or $\w_i \z$ (item $i$ included).  A single term in the expansion picks one choice per factor, giving $\prod_{i \in S} \w_i \cdot \z^{|S|}$ for some subset $S$.  The exponent of $\z$ counts how many items were included.  Summing over all $2^N$ terms and collecting by powers of $\z$, the coefficient of $\z^k$ is exactly $\sum_{|S|=k} \prod_{i \in S} \w_i = \Zw{\bw}{k}$.
 
-So the $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="tests/test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  Below, we compute it in two ways: by multiplying in the factors one at a time, in $\mathcal{O}(Nn)$ time, and by multiplying them in a balanced binary tree, in $\mathcal{O}(N \log^2 n)$ time.  The second is a standard technique from computer algebra known as the *subproduct tree* (see [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065), Chapter 10).
+So the $n$<sup>th</sup> coefficient is exactly $\Zw{\bw}{n}$, the normalizing constant.<a href="tests/test_identities.py#test_product_polynomial_coefficients" title="test_product_polynomial_coefficients" class="verified" target="_blank">✓</a>  Below, we compute it in two ways: by multiplying in the factors one at a time, in $\mathcal{O}(Nn)$ time, and by multiplying them in a balanced binary tree, in $\mathcal{O}(N \log^2 n)$ time.  The second is a standard technique from computer algebra known as the *subproduct tree* (see [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065)).
 
 **Polynomials as arrays.** In code, a polynomial like $1 + 3\z + 2\z^2$ is just the array `[1, 3, 2]`.  The $\z$ is a *formal* variable—we never substitute a number into it; it just tracks which coefficient is which.  Multiplying two polynomials corresponds to *convolving* their coefficient arrays—for example, $(1 + 2\z)(1 + 3\z)$ convolves `[1, 2]` with `[1, 3]` to get `[1, 5, 6]`.  It turns out that convolution can be done efficiently using the [fast Fourier transform](https://en.wikipedia.org/wiki/Fast_Fourier_transform) (FFT), costing $\mathcal{O}(d \log d)$ where $d$ is the degree, rather than $\mathcal{O}(d^2)$ for the schoolbook method.  This is the key fact that makes the product tree $\mathcal{O}(N \log^2 n)$ instead of $\mathcal{O}(Nn)$.
 
@@ -3223,7 +3223,7 @@ The left side is $\sum_k \Zw{(\ba;\,\bb)}{k}\, \z^k$.  The right side is a produ
 With $B$ a single item, the sum has only two nonzero terms, and the identity reduces to the [weighted Pascal recurrence](#pascal-dp).<a href="tests/test_identities.py#test_pascal_is_vandermonde_with_one_leaf" title="test_pascal_is_vandermonde_with_one_leaf" class="verified" target="_blank">✓</a>  This is why polynomial multiplication computes $\Z$: the product tree exploits this identity at every node.  It is also what makes the sampling algorithm correct—splitting a quota of $k$ items between two subtrees according to $\Zw{\ba}{j} \cdot \Zw{\bb}{k-j}$ produces the exact conditional distribution.
 
 
-**Newton's identities.** The elementary symmetric polynomials can be computed from **power sums** $g_k \defeq \sum_{i=1}^{N} \w_i^k$ (see [Stanley (1999)](https://doi.org/10.1017/CBO9780511609589), Chapter 7):
+**Newton's identities.** The elementary symmetric polynomials can be computed from **power sums** $g_k \defeq \sum_{i=1}^{N} \w_i^k$ (see [Stanley (1999)](https://doi.org/10.1017/CBO9780511609589)):
 
 $$\Zw{\bw}{k} = \sum_{i=1}^{k} \frac{(-1)^{i-1}}{k}\, \Zw{\bw}{k-i} \cdot g_i$$
 
@@ -3246,30 +3246,33 @@ For non-diagonal $L$, the $k$-DPP introduces correlations between items (repulsi
 
 ## References
 
-- [Hájek (1964)](https://doi.org/10.1214/aoms/1177700375). "Asymptotic Theory of Rejective Sampling with Varying Probabilities from a Finite Population." *The Annals of Mathematical Statistics*, 35(4), 1491–1523.
+- [Baur & Strassen (1983)](https://doi.org/10.1016/0304-3975(83)90110-X). "The Complexity of Partial Derivatives." *Theoretical Computer Science*, 22(3).
 
-- [Jaynes (1957)](https://doi.org/10.1103/PhysRev.106.620). "Information Theory and Statistical Mechanics." *Physical Review*, 106(4), 620–630.
+- [Chen, Dempster & Liu (1994)](https://doi.org/10.1093/biomet/81.3.457). "Weighted Finite Population Sampling to Maximize Entropy." *Biometrika*, 81(3).
 
-- [Chen, Dempster & Liu (1994)](https://academic.oup.com/biomet/article-abstract/81/3/457/256956). "Weighted Finite Population Sampling to Maximize Entropy." *Biometrika*, 81(3), 457–469.
+- [Chen & Liu (1997)](https://www3.stat.sinica.edu.tw/statistica/j7n4/j7n44/j7n44.htm). "Statistical Applications of the Poisson-Binomial and Conditional Bernoulli Distributions." *Statistica Sinica*, 7(4).
 
-- [Darroch (1964)](https://doi.org/10.1214/aoms/1177703287). "On the Distribution of the Number of Successes in Independent Trials." *The Annals of Mathematical Statistics*, 35(3), 1317–1321.
-
-- [Rabiner (1989)](https://doi.org/10.1109/5.18626). "A Tutorial on Hidden Markov Models and Selected Applications in Speech Recognition." *Proceedings of the IEEE*, 77(2), 257–286.
-
-- [Baur & Strassen (1983)](https://doi.org/10.1016/0304-3975(83)90110-X). "The Complexity of Partial Derivatives." *Theoretical Computer Science*, 22(3), 317–330.
-
+- [Darroch (1964)](https://doi.org/10.1214/aoms/1177703287). "On the Distribution of the Number of Successes in Independent Trials." *The Annals of Mathematical Statistics*, 35(3).
 
 - [Griewank & Walther (2008)](https://doi.org/10.1137/1.9780898717761). *Evaluating Derivatives: Principles and Techniques of Algorithmic Differentiation*, 2nd edition. SIAM.
 
-- [Hager & Zhang (2005)](https://doi.org/10.1137/030601880). "A New Conjugate Gradient Method with Guaranteed Descent and an Efficient Line Search." *SIAM Journal on Optimization*, 16(1), 170–192.
+- [Hager & Zhang (2005)](https://doi.org/10.1137/030601880). "A New Conjugate Gradient Method with Guaranteed Descent and an Efficient Line Search." *SIAM Journal on Optimization*, 16(1).
+
+- [Hájek (1964)](https://doi.org/10.1214/aoms/1177700375). "Asymptotic Theory of Rejective Sampling with Varying Probabilities from a Finite Population." *The Annals of Mathematical Statistics*, 35(4).
+
+- [Jaynes (1957)](https://doi.org/10.1103/PhysRev.106.620). "Information Theory and Statistical Mechanics." *Physical Review*, 106(4).
+
+- [Kulesza & Taskar (2012)](https://doi.org/10.1561/2200000044). "Determinantal Point Processes for Machine Learning." *Foundations and Trends in Machine Learning*, 5(2–3).
+
+- [Meister, Amini, Vieira & Cotterell (2021)](https://aclanthology.org/2021.emnlp-main.52/). "Conditional Poisson Stochastic Beams." *Proceedings of EMNLP 2021*.
+
+- [Rabiner (1989)](https://doi.org/10.1109/5.18626). "A Tutorial on Hidden Markov Models and Selected Applications in Speech Recognition." *Proceedings of the IEEE*, 77(2).
 
 - [Stanley (1999)](https://doi.org/10.1017/CBO9780511609589). *Enumerative Combinatorics*, Volume 2. Cambridge University Press.
 
+- [Tillé (2006)](https://doi.org/10.1007/0-387-34240-0). *Sampling Algorithms*. Springer.
+
 - [von zur Gathen & Gerhard (2013)](https://doi.org/10.1017/CBO9781139856065). *Modern Computer Algebra*, 3rd edition. Cambridge University Press.
-
-- [Tillé (2006)](https://link.springer.com/book/10.1007/978-0-387-34240-0). *Sampling Algorithms*. Springer.
-
-- [Meister, Amini, Vieira & Cotterell (2021)](https://aclanthology.org/2021.emnlp-main.52/). "Conditional Poisson Stochastic Beams." *Proceedings of EMNLP 2021*.
 
 **Citing this post:**
 
