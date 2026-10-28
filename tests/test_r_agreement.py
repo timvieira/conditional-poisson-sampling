@@ -132,9 +132,9 @@ class TestRPiAgreement(unittest.TestCase):
         cp = ConditionalPoissonNumPy.from_weights(n, w)
         pi_tree = cp.incl_prob
         self.assertAlmostEqual(pi_r.sum(), n, places=8,
-                               msg=f"R pi doesn't sum to n")
+                               msg="R pi doesn't sum to n")
         self.assertAlmostEqual(pi_tree.sum(), n, places=8,
-                               msg=f"Tree pi doesn't sum to n")
+                               msg="Tree pi doesn't sum to n")
         max_diff = np.max(np.abs(pi_r - pi_tree))
         self.assertLess(max_diff, tol,
                         msg=f"N={len(w)}, n={n}: max|pi_R - pi_tree| = {max_diff:.2e}")
@@ -179,7 +179,6 @@ class TestRFittingAgreement(unittest.TestCase):
 
     def _check_roundtrip(self, pi_target, n, tol=1e-5):
         """Both R and our fitter should recover the target π."""
-        N = len(pi_target)
 
         # R fitting
         w_r, ptilde_r, pi_r_roundtrip = r_fit(pi_target, n)
@@ -278,7 +277,6 @@ class TestRSamplingDistribution(unittest.TestCase):
         n_samples = 20000
 
         # True distribution
-        cp = ConditionalPoissonNumPy.from_weights(n, w)
         from itertools import combinations
         all_S = list(combinations(range(len(w)), n))
         log_w = np.log(w)
@@ -297,8 +295,6 @@ class TestRSamplingDistribution(unittest.TestCase):
                 if frozenset(s) == subset:
                     counts[k] += 1
                     break
-
-        empirical_probs = counts / n_samples
 
         # Chi-squared test
         expected = true_probs * n_samples

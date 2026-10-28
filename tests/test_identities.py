@@ -91,7 +91,6 @@ N_MED = 5
 def test_distribution_definition():
     """P(S) = prod(w_i, i in S) / Z(w,n) for all size-n subsets."""
     w, n = W_SMALL, N_SMALL
-    cp = ConditionalPoissonNumPy.from_weights(n, w)
     probs, _ = all_probs_bf(w, n)
     Z = Z_bf(w, n)
     for S, p_bf in probs.items():
@@ -235,10 +234,8 @@ def test_pi_leave_one_out():
 def test_higher_order_inclusion():
     """pi(X) = P(X ⊆ S) = prod(w_i, i in X) * Z(w^{-X}, n-|X|) / Z(w, n)."""
     w, n = W_SMALL, N_SMALL
-    N = len(w)
     probs, _ = all_probs_bf(w, n)
     Z_full = Z_bf(w, n)
-    all_S = list(probs.keys())
     for X in [(0,), (1,), (0, 2), (3, 5), (0, 1, 2)]:
         X = list(X)
         if len(X) > n:
@@ -271,7 +268,6 @@ def test_covariance_is_hessian():
     theta = np.log(w)
     eps = 1e-5
     hessian = np.zeros((N, N))
-    log_Z_0 = np.log(Z_bf(w, n))
     for i in range(N):
         for j in range(i, N):
             t_pp = theta.copy(); t_pp[i] += eps; t_pp[j] += eps
@@ -656,7 +652,6 @@ def test_contour_scaling():
 def test_contour_r_solves_expected_size():
     """The optimal r satisfies sum(w_i r / (1 + w_i r)) = n."""
     w, n = W_MED, N_MED
-    cp = ConditionalPoissonNumPy.from_weights(n, w)
     # The internal scaling factor: when we set p_i = w_i r / (1 + w_i r),
     # the expected number of heads is n.
     # We can recover r from pi: pi_i = w_i * Z(w^{-i}, n-1) / Z(w, n)
@@ -916,7 +911,6 @@ def test_dtree_product_rule():
 def test_sampling_distribution():
     """Sampling produces the correct distribution (chi-squared test)."""
     w, n = W_SMALL[:6], 2  # small enough for brute force
-    N = len(w)
     cp = ConditionalPoissonNumPy.from_weights(n, w)
     probs_exact, _ = all_probs_bf(w, n)
     all_S = sorted(probs_exact.keys(), key=lambda s: tuple(sorted(s)))

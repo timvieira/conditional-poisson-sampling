@@ -29,13 +29,13 @@ __all__ = [
 
 # PyTorch implementations are optional (torch may not be installed)
 try:
-    from conditional_poisson.tree_torch import ConditionalPoissonTorch
+    from conditional_poisson.tree_torch import ConditionalPoissonTorch as ConditionalPoissonTorch  # re-export
     __all__.append("ConditionalPoissonTorch")
 except ImportError:
     pass
 
 try:
-    from conditional_poisson.sequential_torch import ConditionalPoissonSequentialTorch
+    from conditional_poisson.sequential_torch import ConditionalPoissonSequentialTorch as ConditionalPoissonSequentialTorch  # re-export
     __all__.append("ConditionalPoissonSequentialTorch")
 except ImportError:
     pass

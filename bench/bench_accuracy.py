@@ -106,7 +106,9 @@ def r_accuracy():
 
     Requires: R with the 'sampling' package installed.
     """
-    import subprocess, json, shutil
+    import subprocess
+    import json
+    import shutil
 
     # Check if R is available
     rscript = shutil.which("Rscript")

@@ -1,6 +1,5 @@
 """Shared base class for NumPy conditional Poisson implementations."""
 
-from functools import cached_property
 import numpy as np
 from conditional_poisson._fit import fit_theta
 

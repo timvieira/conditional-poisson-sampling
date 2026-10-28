@@ -12,7 +12,7 @@
 import numpy as np
 
 class ConditionalPoissonSampling:
-    """Conditional Poisson Sampling (aka k-Bernoulli Point Process)
+    r"""Conditional Poisson Sampling (aka k-Bernoulli Point Process)
 
     This class implements efficient algorithms for sampling, normalization, and
     marginalization based on the elementary symmetric polynomials.
