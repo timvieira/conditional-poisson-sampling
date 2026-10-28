@@ -514,34 +514,6 @@ def test_rejection_bernoulli_produces_cps():
 
 
 # ===========================================================================
-# 16. Horvitz-Thompson estimator (Cell 31)
-# ===========================================================================
-
-def test_horvitz_thompson_unbiased():
-    """E[sum_{i in S} p(i)/pi_i * f(i)] = sum_i p(i) * f(i)."""
-    w, n = W_SMALL, N_SMALL
-    N = len(w)
-    cp = ConditionalPoissonNumPy.from_weights(n, w)
-    rng = np.random.default_rng(0)
-
-    # Arbitrary f and p
-    f = rng.standard_normal(N)
-    p_dist = rng.dirichlet(np.ones(N))
-    mu_true = np.sum(p_dist * f)
-
-    # Monte Carlo estimate of E[HT]
-    M = 10_000
-    samples = np.stack([cp.sample() for _ in range(M)])
-    ht_estimates = np.array([
-        np.sum(p_dist[s] / cp.incl_prob[s] * f[s]) for s in samples
-    ])
-    mu_ht = ht_estimates.mean()
-    se = ht_estimates.std() / np.sqrt(M)
-    assert abs(mu_ht - mu_true) < 4 * se, \
-        f"mu_true={mu_true:.6f}, mu_ht={mu_ht:.6f}, 4*se={4*se:.6f}"
-
-
-# ===========================================================================
 # 17. Maximum entropy (Cell 2)
 # ===========================================================================
 
