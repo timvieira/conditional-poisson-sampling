@@ -2,7 +2,6 @@
 
 ## Content
 
-- [ ] $P(i \in S)$ is unclear notation
 - [x] Add a disclaimer that this post was written with extensive help from Claude Code, especially in the interactive widgets, which would not have been possible without Claude Code.
 
 - [x] Widget contents spill out of containers on narrow screens (e.g., phone). Looks very bad.
@@ -44,7 +43,6 @@
 ## Blog Polish
 - [x] ~~Add a note encouraging readers to report issues on the [GitHub issue tracker](https://github.com/timvieira/conditional-poisson-sampling/issues)~~ — done
 - [x] ~~Add a citation section at the end of the post (e.g., BibTeX snippet, suggested citation format)~~ — done
-- [ ] Why are there still references to the NumPy implementation in the article? The timing section legitimately benchmarks the NumPy tree, but it should be framed as the reference/pedagogical implementation, not the recommended one.
 - [ ] Consistently color code math symbols and widgets — use the same colors for $P(S)$, $\pi$, and $w$ in both LaTeX and D3 widgets. Previously removed all color coding; bring it back in a principled way with a shared palette.
 
 ## Widget UX
@@ -92,7 +90,6 @@
 - [x] ~~Decide: remove `bench_scaling.py`?~~ — removed (redundant with `bench_timing.py`)
 - [x] ~~Delete stale branches~~ — done
 - [ ] tests are too slow
-- [ ] remove all the useless ascii art: # ── Fitting ─────────────────
 
 
 ### Packaging and Distribution
