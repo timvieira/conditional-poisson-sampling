@@ -2753,7 +2753,7 @@ $$</p>
 <p><strong>Choosing $r$.</strong>  The contour radius sets the mean of $K$ to $n$:</p>
 <p>$$\mathbb{E}[K] = \sum_{i=1}^{N} \frac{\w_i r}{1 + \w_i r} = \sum_{i=1}^{N} p_i(r) = n$$</p>
 <p>For a sum of independent Bernoullis, the mode is within 1 of the mean, and when the mean is an integer, the mode equals it (<a href="https://doi.org/10.1214/aoms/1177703287">Darroch, 1964</a>, Theorem 4).  So $\Pr[K = n]$ is the largest of the $N + 1$ probabilities $\Pr[K = 0], \ldots, \Pr[K = N]$, and in particular $\Pr[K = n] \ge 1/(N+1)$.<a href="tests/test_identities.py#test_contour_radius_puts_mode_at_n" title="test_contour_radius_puts_mode_at_n, test_contour_r_solves_expected_size" class="verified" target="_blank">✓</a>  The coefficient we need is never small next to the others, and both algorithms below rely on this.  It is also why the contour radius is the $r$ of the <a href="#the-poisson-approximation">Poisson approximation</a>: both ask for the rescaling that centers the distribution of $K$ at $n$.</p>
-<p>The left side increases with $r$, from 0 to $N$, so Newton's method in $\log r$, safeguarded by bisection, finds the root in a few iterations.  A simpler heuristic, $r = n / \W$ (where $\W \defeq \sum_{i=1}^{N} \w_i$), linearizes $\w_i r / (1 + \w_i r) \approx \w_i r$; it works for mild weights but loses accuracy with heavy tails.</p>
+<p>The left side increases with $r$, from 0 to $N$, so Newton's method in $\log r$, safeguarded by bisection, finds the root in a few iterations.  A simpler heuristic, $r = n / \W$ (where $\W \defeq \sum_{i=1}^{N} \w_i$), linearizes $\w_i r / (1 + \w_i r) \approx \w_i r$.</p>
 <h3 id="the-product-tree">The Product Tree</h3>
 <p>An FFT rounds every coefficient of a product to within about $\varepsilon \cdot \max_k|c_k|$, where $c_k$ denotes the $k$<sup>th</sup> coefficient of the product and $\varepsilon \approx 10^{-16}$ is machine epsilon.  For $\prod_{i=1}^{N}(1 + \w_i \z) = \sum_{k=0}^{N} c_k \z^k$ without rescaling, the largest coefficient can be $\approx 10^{300}$ times larger than $c_n$, the coefficient we need—so FFT noise drowns the signal.</p>
 <p>After rescaling by $r$, the $k$<sup>th</sup> coefficient becomes $c_k(r) = \Zw{\bw}{k} \cdot r^k$, which is proportional to $\Pr[K = k]$.  With the contour radius, the mode of $K$ is $n$, so among the coefficients the tree keeps (degrees up to $n$), $c_n(r)$ is the largest: the dynamic range $\max_{k \le n} c_k(r) / c_n(r)$ is exactly 1,<a href="tests/test_identities.py#test_rescaling_dynamic_range" title="test_rescaling_dynamic_range" class="verified" target="_blank">✓</a> and the rounding error of the FFT at the root is relative to $c_n(r)$ itself.</p>
@@ -2992,103 +2992,6 @@ $$</p>
 </div>
 
 <p><strong>Autograd compatibility.</strong> The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).  The per-node divisors are treated the same way.  <a href="https://doi.org/10.1137/1.9780898717761">Griewank &amp; Walther (2008)</a> take "what's good for function values is good for their derivatives" as a working hypothesis (Rule 2) and back it with a backward error analysis (Rule 3, Section 3.4): if nothing overflows or underflows, reverse mode returns the exact gradient of the same computation with each elementary operation perturbed at the level of machine precision.  So a stable forward pass does most of the work.</p>
-<div class="widget" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
-<p><strong>Numerical validation.</strong> The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$), writing $r^\star$ for the contour radius.  With $r=1$ the dynamic range is $\approx 10^{16}$, destroying all precision.  The contour radius brings it to 1.<a href="tests/test_identities.py#test_rescaling_dynamic_range" title="test_rescaling_dynamic_range" class="verified" target="_blank">✓</a></p>
-<div id="r-comparison">
-</div>
-<script>
-(function() {
-  var data = [
-    {label:'$r = 1$',        dr:1e16, err:8e+01},
-    {label:'$r = n/\\W$',    dr:1e0,  err:7e-15},
-    {label:'$r = r^\\star$', dr:1e0,  err:1e-14},
-    {label:'$r = 1$',        dr:1e16, err:2e+02},
-    {label:'$r = n/\\W$',    dr:8e1,  err:2e-13},
-    {label:'$r = r^\\star$', dr:1e0,  err:4e-14},
-  ];
-
-  var groups = [
-    {title: 'mild weights', rows: data.slice(0,3)},
-    {title: 'heavy tails',  rows: data.slice(3,6)},
-  ];
-
-  var container = d3.select('#r-comparison');
-  var margin = {top: 4, right: 160, bottom: 40, left: 80};
-  var W = 560, rowH = 28, groupGap = 18, groupLabelH = 22;
-  var totalH = groups.length * (3 * rowH + groupLabelH + groupGap) - groupGap;
-  var H = margin.top + margin.bottom + totalH;
-  var width = W - margin.left - margin.right;
-
-  var svg = container.append('svg').attr('width', W).attr('height', H)
-    .style('user-select','none').style('-webkit-user-select','none').style('overflow','visible');
-  var g = svg.append('g').attr('transform','translate('+margin.left+','+margin.top+')');
-
-  var x = d3.scaleLog().domain([1, 1e17]).range([0, width]).clamp(true);
-
-  // x-axis at bottom
-  g.append('g').attr('transform','translate(0,'+totalH+')')
-    .call(d3.axisBottom(x).ticks(6, '.0e').tickSize(3))
-    .selectAll('text').style('font-size','10px');
-  g.append('foreignObject').attr('x', width/2 - 80).attr('y', totalH + 18).attr('width', 160).attr('height', 24)
-    .append('xhtml:div').style('text-align','center').style('font-size','12px').style('color','#666')
-    .html('dynamic range (log scale)');
-
-  var colors = {'$r = 1$':'#c0504d', '$r = n/\\W$':'#999', '$r = r^\\star$':'#5b9bd5'};
-  var yPos = 0;
-
-  function drTeX(dr) {
-    if (dr >= 1e3) return '10^{' + Math.round(Math.log10(dr)) + '}';
-    return dr.toFixed(0);
-  }
-  function errTeX(err) {
-    var exp = Math.floor(Math.log10(Math.abs(err)));
-    var coef = err / Math.pow(10, exp);
-    var coefStr = Math.round(coef);
-    if (exp === 0) return coefStr;
-    return coefStr + '\\!\\times\\! 10^{' + exp + '}';
-  }
-
-  groups.forEach(function(grp, gi) {
-    // Group title
-    g.append('foreignObject').attr('x', -margin.left).attr('y', yPos - 2).attr('width', margin.left - 6).attr('height', 24)
-      .append('xhtml:div').style('text-align','right').style('font-size','11px')
-      .style('color','#888').style('font-style','italic').style('line-height','22px')
-      .html(grp.title);
-    yPos += groupLabelH;
-
-    grp.rows.forEach(function(d) {
-      var barW = Math.max(2, x(Math.max(1.01, d.dr)));
-      // Bar
-      g.append('rect').attr('x', 0).attr('y', yPos + 4)
-        .attr('width', barW).attr('height', rowH - 8)
-        .attr('fill', colors[d.label]).attr('opacity', 0.8).attr('rx', 2);
-      // Row label (MathJax via foreignObject)
-      g.append('foreignObject').attr('x', -margin.left).attr('y', yPos).attr('width', margin.left - 6).attr('height', rowH)
-        .append('xhtml:div').style('text-align','right').style('font-size','13px')
-        .style('color','#333').style('line-height', rowH + 'px')
-        .html(d.label);
-      // Annotation (MathJax via foreignObject)
-      var annotHtml = '$\\text{DR}{=}' + drTeX(d.dr) + ',\\;|\\text{err}|{=}' + errTeX(d.err) + '$';
-      g.append('foreignObject').attr('x', barW + 5).attr('y', yPos).attr('width', 200).attr('height', rowH)
-        .append('xhtml:div').style('font-size','12px').style('color','#666')
-        .style('line-height', rowH + 'px').style('white-space','nowrap')
-        .html(annotHtml);
-      yPos += rowH;
-    });
-    yPos += groupGap;
-  });
-
-  // Typeset MathJax
-  var el = container.node();
-  if (window.MathJax && MathJax.typesetPromise) {
-    MathJax.typesetClear([el]);
-    MathJax.typesetPromise([el]);
-  }
-})();
-</script>
-
-</div>
-
 <p>With the contour radius, the tree matches exact rational arithmetic for weights spanning $e^{\pm 300}$.<a href="tests/test_all_implementations.py#test_extreme_weights_exact" title="TestStability.test_extreme_weights_exact" class="verified" target="_blank">✓</a>  Code: <a href="https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson/tree_torch.py"><code>conditional_poisson/tree_torch.py</code></a></p>
 <h3 id="the-dynamic-program">The Dynamic Program</h3>
 <p>The DP needs no FFT, but its table holds $\Zw{\w_1, \ldots, \w_m}{k}$, which can be too large or too small for floating-point numbers: R's sampling package runs an unscaled $\mathcal{O}(Nn)$ recurrence and returns NaN at $N = 2000$, $n = 800$ in the <a href="#timing">Timing</a> section.  Our DP rescales the weights by the contour radius and divides row $m$ by $\prod_{i=1}^{m}(1 + \w_i r)$.  Row $m$ then holds the distribution of $K_m$, the number of heads among the first $m$ coins, for $k \le n$:</p>
@@ -3107,7 +3010,7 @@ $$</p>
 <p>With weights spanning $e^{\pm 300}$, the unscaled recurrence overflows, while the scaled DP agrees with 50-digit arithmetic on $\log \Z$ and $\bpip$ to within $10^{-13}$, even though more than a quarter of its table underflows to zero.<a href="tests/test_identities.py#test_scaled_dp_extreme_weights" title="test_scaled_dp_extreme_weights" class="verified" target="_blank">✓</a></p>
 <p>The same trick—dividing each step of a recurrence by a scale factor and adding up the logs—keeps the forward algorithm for hidden Markov models from underflowing (<a href="https://doi.org/10.1109/5.18626">Rabiner, 1989</a>, Section V.A).  There, each row is divided by its sum, which must be computed along the way; here, the divisors $1 + \w_m r$ are known in advance, and the contour radius guarantees that the entry we need is the largest in the last row.</p>
 <p><a id="appendix-b"></a></p>
-<h2 id="appendix-b-timing-in-math564-and-math565">Appendix B: Timing in $N$ and $n$</h2>
+<h2 id="appendix-b-timing-in-math546-and-math547">Appendix B: Timing in $N$ and $n$</h2>
 <p>The <a href="#timing">Timing</a> section fixes $n = 0.4N$.  The 3D plots below vary $N$ from 100 to 20,000 and $n$ from 5 to $N/2$, with the same setup.  Drag to rotate, scroll to zoom, and hover for values.  For $\Z$ and $\bpip$, the DP is faster at every $n$ when $N \le 200$, and the tree is faster at every $n$ when $N \ge 1000$.  The crossover depends on $N$ more than on $n$ because of constant factors: the DP pays a few microseconds of NumPy overhead per item, and the tree pays about 1.3 ms per call.  For sampling, the tree's sampler is faster only when $n$ is at most about 2% of $N$.</p>
 <div class="widget timing-card">
 <div class="timing-legend"><span style="color:#c0504d">&#9632;</span> product tree &nbsp;&nbsp; <span style="color:#5b9bd5">&#9632;</span> DP
@@ -3190,7 +3093,7 @@ $$</p>
 </script>
 
 <p><a id="appendix-c"></a></p>
-<h2 id="appendix-c-identities-for-math612-and-its-relatives">Appendix C: Identities for $\Z$ and Its Relatives</h2>
+<h2 id="appendix-c-identities-for-math594-and-its-relatives">Appendix C: Identities for $\Z$ and Its Relatives</h2>
 <p>The normalizing constant $\Zw{\bw}{n}$ is the $n$<sup>th</sup> <a href="https://en.wikipedia.org/wiki/Elementary_symmetric_polynomial">elementary symmetric polynomial</a> $e_n(\bw)$.  Here are some useful identities.</p>
 <h3 id="differential-identities">Differential Identities</h3>
 <p>The exponential family structure gives the inclusion probability as the gradient of the log-normalizer:</p>
@@ -3215,7 +3118,7 @@ $$</p>
 <p><strong>Newton's identities.</strong> The elementary symmetric polynomials can be computed from <strong>power sums</strong> $g_k \defeq \sum_{i=1}^{N} \w_i^k$ (see <a href="https://doi.org/10.1017/CBO9780511609589">Stanley (1999)</a>):</p>
 <p>$$\Zw{\bw}{k} = \sum_{i=1}^{k} \frac{(-1)^{i-1}}{k}\, \Zw{\bw}{k-i} \cdot g_i$$</p>
 <p><a href="tests/test_identities.py#test_newtons_identities" title="test_newtons_identities" class="verified" target="_blank">✓</a> This is an $\mathcal{O}(Nn)$ algorithm that only needs the power sums, not the individual weights—useful when the universe is implicitly defined (e.g., paths in a weighted finite-state automaton, where $g_k$ can be computed via matrix methods).</p>
-<h3 id="connection-to-math638-dpps">Connection to $k$-DPPs</h3>
+<h3 id="connection-to-math620-dpps">Connection to $k$-DPPs</h3>
 <details class="derivation">
 <summary>A diagonal $k$-DPP is exactly a conditional Poisson distribution
 </summary>
