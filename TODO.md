@@ -7,7 +7,6 @@
 ## Timing Section
 
 - [ ] Contour diagram needs work.
-- [ ] "Numerical validation" section — not sure this is the best way to present this information.
 
 ## Implementation
 

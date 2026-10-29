@@ -2733,7 +2733,7 @@ $$\mathbb{E}[K] = \sum_{i=1}^{N} \frac{\w_i r}{1 + \w_i r} = \sum_{i=1}^{N} p_i(
 
 For a sum of independent Bernoullis, the mode is within 1 of the mean, and when the mean is an integer, the mode equals it ([Darroch, 1964](https://doi.org/10.1214/aoms/1177703287), Theorem 4).  So $\Pr[K = n]$ is the largest of the $N + 1$ probabilities $\Pr[K = 0], \ldots, \Pr[K = N]$, and in particular $\Pr[K = n] \ge 1/(N+1)$.<a href="tests/test_identities.py#test_contour_radius_puts_mode_at_n" title="test_contour_radius_puts_mode_at_n, test_contour_r_solves_expected_size" class="verified" target="_blank">✓</a>  The coefficient we need is never small next to the others, and both algorithms below rely on this.  It is also why the contour radius is the $r$ of the [Poisson approximation](#the-poisson-approximation): both ask for the rescaling that centers the distribution of $K$ at $n$.
 
-The left side increases with $r$, from 0 to $N$, so Newton's method in $\log r$, safeguarded by bisection, finds the root in a few iterations.  A simpler heuristic, $r = n / \W$ (where $\W \defeq \sum_{i=1}^{N} \w_i$), linearizes $\w_i r / (1 + \w_i r) \approx \w_i r$; it works for mild weights but loses accuracy with heavy tails.
+The left side increases with $r$, from 0 to $N$, so Newton's method in $\log r$, safeguarded by bisection, finds the root in a few iterations.  A simpler heuristic, $r = n / \W$ (where $\W \defeq \sum_{i=1}^{N} \w_i$), linearizes $\w_i r / (1 + \w_i r) \approx \w_i r$.
 
 ### The Product Tree
 
@@ -2979,104 +2979,6 @@ Rescaling does not prevent overflow: $\prod_{i=1}^{N}(1 + \w_i r)$ can still exc
 </div>
 
 **Autograd compatibility.** The rescaling $\w_i \mapsto \w_i \cdot r$ is on the autograd graph (it's just a scalar multiply); the root-finding for $r$ is not (it's a numerical conditioning choice, not part of the mathematical function).  Gradients flow through $\w_i \cdot r$ as if $r$ were a constant—which is correct, since $\log \Z$ does not depend on $r$ (every $r$ gives the same answer in exact arithmetic).  The per-node divisors are treated the same way.  [Griewank & Walther (2008)](https://doi.org/10.1137/1.9780898717761) take "what's good for function values is good for their derivatives" as a working hypothesis (Rule 2) and back it with a backward error analysis (Rule 3, Section 3.4): if nothing overflows or underflows, reverse mode returns the exact gradient of the same computation with each elementary operation perturbed at the level of machine precision.  So a stable forward pass does most of the work.
-
-<div class="widget" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
-
-**Numerical validation.** The table below shows the dynamic range ($\max_k |c_k| / |c_n|$) and $\log \Z$ error for three choices of $r$ on two weight regimes ($N=200$, $n=10$), writing $r^\star$ for the contour radius.  With $r=1$ the dynamic range is $\approx 10^{16}$, destroying all precision.  The contour radius brings it to 1.<a href="tests/test_identities.py#test_rescaling_dynamic_range" title="test_rescaling_dynamic_range" class="verified" target="_blank">✓</a>
-
-<div id="r-comparison"></div>
-<script>
-(function() {
-  var data = [
-    {label:'$r = 1$',        dr:1e16, err:8e+01},
-    {label:'$r = n/\\W$',    dr:1e0,  err:7e-15},
-    {label:'$r = r^\\star$', dr:1e0,  err:1e-14},
-    {label:'$r = 1$',        dr:1e16, err:2e+02},
-    {label:'$r = n/\\W$',    dr:8e1,  err:2e-13},
-    {label:'$r = r^\\star$', dr:1e0,  err:4e-14},
-  ];
-
-  var groups = [
-    {title: 'mild weights', rows: data.slice(0,3)},
-    {title: 'heavy tails',  rows: data.slice(3,6)},
-  ];
-
-  var container = d3.select('#r-comparison');
-  var margin = {top: 4, right: 160, bottom: 40, left: 80};
-  var W = 560, rowH = 28, groupGap = 18, groupLabelH = 22;
-  var totalH = groups.length * (3 * rowH + groupLabelH + groupGap) - groupGap;
-  var H = margin.top + margin.bottom + totalH;
-  var width = W - margin.left - margin.right;
-
-  var svg = container.append('svg').attr('width', W).attr('height', H)
-    .style('user-select','none').style('-webkit-user-select','none').style('overflow','visible');
-  var g = svg.append('g').attr('transform','translate('+margin.left+','+margin.top+')');
-
-  var x = d3.scaleLog().domain([1, 1e17]).range([0, width]).clamp(true);
-
-  // x-axis at bottom
-  g.append('g').attr('transform','translate(0,'+totalH+')')
-    .call(d3.axisBottom(x).ticks(6, '.0e').tickSize(3))
-    .selectAll('text').style('font-size','10px');
-  g.append('foreignObject').attr('x', width/2 - 80).attr('y', totalH + 18).attr('width', 160).attr('height', 24)
-    .append('xhtml:div').style('text-align','center').style('font-size','12px').style('color','#666')
-    .html('dynamic range (log scale)');
-
-  var colors = {'$r = 1$':'#c0504d', '$r = n/\\W$':'#999', '$r = r^\\star$':'#5b9bd5'};
-  var yPos = 0;
-
-  function drTeX(dr) {
-    if (dr >= 1e3) return '10^{' + Math.round(Math.log10(dr)) + '}';
-    return dr.toFixed(0);
-  }
-  function errTeX(err) {
-    var exp = Math.floor(Math.log10(Math.abs(err)));
-    var coef = err / Math.pow(10, exp);
-    var coefStr = Math.round(coef);
-    if (exp === 0) return coefStr;
-    return coefStr + '\\!\\times\\! 10^{' + exp + '}';
-  }
-
-  groups.forEach(function(grp, gi) {
-    // Group title
-    g.append('foreignObject').attr('x', -margin.left).attr('y', yPos - 2).attr('width', margin.left - 6).attr('height', 24)
-      .append('xhtml:div').style('text-align','right').style('font-size','11px')
-      .style('color','#888').style('font-style','italic').style('line-height','22px')
-      .html(grp.title);
-    yPos += groupLabelH;
-
-    grp.rows.forEach(function(d) {
-      var barW = Math.max(2, x(Math.max(1.01, d.dr)));
-      // Bar
-      g.append('rect').attr('x', 0).attr('y', yPos + 4)
-        .attr('width', barW).attr('height', rowH - 8)
-        .attr('fill', colors[d.label]).attr('opacity', 0.8).attr('rx', 2);
-      // Row label (MathJax via foreignObject)
-      g.append('foreignObject').attr('x', -margin.left).attr('y', yPos).attr('width', margin.left - 6).attr('height', rowH)
-        .append('xhtml:div').style('text-align','right').style('font-size','13px')
-        .style('color','#333').style('line-height', rowH + 'px')
-        .html(d.label);
-      // Annotation (MathJax via foreignObject)
-      var annotHtml = '$\\text{DR}{=}' + drTeX(d.dr) + ',\\;|\\text{err}|{=}' + errTeX(d.err) + '$';
-      g.append('foreignObject').attr('x', barW + 5).attr('y', yPos).attr('width', 200).attr('height', rowH)
-        .append('xhtml:div').style('font-size','12px').style('color','#666')
-        .style('line-height', rowH + 'px').style('white-space','nowrap')
-        .html(annotHtml);
-      yPos += rowH;
-    });
-    yPos += groupGap;
-  });
-
-  // Typeset MathJax
-  var el = container.node();
-  if (window.MathJax && MathJax.typesetPromise) {
-    MathJax.typesetClear([el]);
-    MathJax.typesetPromise([el]);
-  }
-})();
-</script>
-
-</div>
 
 With the contour radius, the tree matches exact rational arithmetic for weights spanning $e^{\pm 300}$.<a href="tests/test_all_implementations.py#test_extreme_weights_exact" title="TestStability.test_extreme_weights_exact" class="verified" target="_blank">✓</a>  Code: [`conditional_poisson/tree_torch.py`](https://github.com/timvieira/conditional-poisson-sampling/blob/main/conditional_poisson/tree_torch.py)
 

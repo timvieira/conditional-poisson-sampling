@@ -25,4 +25,5 @@ static = ["figures"]
 preprocess = ["python extract_snippets.py"]
 
 [tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
 ignore = ["E741", "E402", "E701", "E702", "E731"]

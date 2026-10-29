@@ -668,7 +668,9 @@ def test_contour_r_solves_expected_size():
 
 
 def test_rescaling_dynamic_range():
-    """Numerical validation table: r=1 has DR~10^16, r=r* has DR~1."""
+    """At the contour radius r*, c_n is the largest of the coefficients up to
+    degree n, so the dynamic range max_{k<=n} c_k / c_n is 1.  The heuristic
+    r = n/W also recovers log Z to within 1e-6 on these weights."""
     N, n = 200, 10
     rng = np.random.default_rng(123)
 
